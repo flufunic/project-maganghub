@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PreventifMesinController;
+use App\Http\Controllers\CheckSheetController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -26,9 +27,50 @@ Route::middleware('auth')->group(function () {
     ])->name('preventif-mesin.export');
 
     Route::resource('/preventif-mesin', PreventifMesinController::class);
+    Route::resource('/check-sheets', CheckSheetController::class);
+
+    Route::post('/check-sheets/{checkSheet}/items', [
+        CheckSheetController::class,
+        'storeItem'
+    ])->name('check-sheets.items.store');
+
+    Route::put('/check-sheets/{checkSheet}/items/{item}', [
+        CheckSheetController::class,
+        'updateItem'
+    ])->name('check-sheets.items.update');
+
+    Route::delete('/check-sheets/{checkSheet}/items/{item}', [
+        CheckSheetController::class,
+        'destroyItem'
+    ])->name('check-sheets.items.destroy');
 
     Route::post('/preventif-mesin/{preventifMesin}/checklist', [
         PreventifMesinController::class,
         'storeChecklist'
     ])->name('preventif-mesin.checklist.store');
+
+    Route::post('/check-sheets/{checkSheet}/checklist', [
+        CheckSheetController::class,
+        'storeChecklist'
+    ])->name('check-sheets.checklist.store');
+
+    Route::post('/check-sheets/{checkSheet}/abnormalities', [
+        CheckSheetController::class,
+        'storeAbnormality'
+    ])->name('check-sheets.abnormalities.store');
+
+    Route::put('/check-sheets/{checkSheet}/abnormalities/{abnormality}', [
+        CheckSheetController::class,
+        'updateAbnormality'
+    ])->name('check-sheets.abnormalities.update');
+
+    Route::delete('/check-sheets/{checkSheet}/abnormalities/{abnormality}', [
+        CheckSheetController::class,
+        'destroyAbnormality'
+    ])->name('check-sheets.abnormalities.destroy');
+
+    Route::get('/check-sheets/{checkSheet}/export-excel', [
+        CheckSheetController::class,
+        'exportExcel'
+    ])->name('check-sheets.export-excel');
 });

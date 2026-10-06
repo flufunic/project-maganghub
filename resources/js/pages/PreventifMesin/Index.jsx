@@ -1,3 +1,4 @@
+import Sidebar from '@/Components/Sidebar';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -92,6 +93,7 @@ export default function Index({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selectedPreventif, setSelectedPreventif] = useState(null);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(false);
     const [showCatatan, setShowCatatan] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
     const [catatan, setCatatan] = useState('');
@@ -455,6 +457,11 @@ export default function Index({
 
     return (
         <>
+
+            <Sidebar
+                open={showSidebar}
+                onClose={() => setShowSidebar(false)}
+            />
             <Head title="Data Preventif Mesin" />
 
             <div className="min-h-screen bg-slate-50">
@@ -463,7 +470,30 @@ export default function Index({
                 <header className="border-b border-slate-200 bg-white">
                     <div className="mx-auto w-full max-w-[1800px] px-4 py-4 sm:px-6 sm:py-5">
                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
+                            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                            {/* HAMBURGER */}
+                            <button
+                                type="button"
+                                onClick={() => setShowSidebar(true)}
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-white hover:text-blue-600"
+                                title="Menu"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    className="h-6 w-6"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M4 6h16M4 12h16M4 18h16"
+                                    />
+                                </svg>
+                            </button>
 
+                            {/* ICON + JUDUL */}
                             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-200 sm:h-12 sm:w-12 sm:rounded-2xl">
                                     <Icon
@@ -482,7 +512,7 @@ export default function Index({
                                     </p>
                                 </div>
                             </div>
-
+                        </div>
                             <div className="flex w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5 sm:gap-2 md:w-auto">
 
                                 {/* NOTIFIKASI */}
@@ -628,20 +658,6 @@ export default function Index({
                                         </div>
                                     )}
                                 </div>
-
-                                <div className="h-6 w-px shrink-0 bg-slate-200" />
-
-                                <button
-                                    type="button"
-                                    onClick={() => router.post('/logout')}
-                                    className="group inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 sm:px-4 md:flex-none"
-                                >
-                                    <Icon
-                                        type="logout"
-                                        className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
-                                    />
-                                    <span>Logout</span>
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -818,9 +834,9 @@ export default function Index({
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
                         <div className="overflow-x-auto">
-                            <table className="border-collapse text-sm">
+                            <table className="w-full border-separate border-spacing-0 text-sm">
 
-                                <thead className="bg-slate-50 text-slate-700">
+                                <thead className="bg-slate-100/80 text-slate-700">
 
                                     <tr>
                                         {[
@@ -836,7 +852,7 @@ export default function Index({
                                             <th
                                                 key={header}
                                                 rowSpan="2"
-                                                className={`border border-slate-200 px-4 py-3.5 font-semibold whitespace-nowrap ${
+                                                className={`border-b border-r border-slate-200 px-4 py-3.5 font-semibold whitespace-nowrap first:border-l ${
                                                     header === 'Item Preventif'
                                                         ? 'min-w-[300px] text-left'
                                                         : 'text-center'
@@ -855,7 +871,7 @@ export default function Index({
 
                                         <th
                                             colSpan={jumlahHari}
-                                            className="border border-slate-200 bg-blue-50 px-4 py-3.5 text-center font-bold tracking-wide text-blue-700"
+                                            className="border-b border-r border-blue-100 bg-blue-50/80 px-4 py-3.5 text-center font-bold tracking-wide text-blue-700"
                                         >
                                             {months[selectedMonth].toUpperCase()} {selectedYear}
                                         </th>
@@ -872,7 +888,7 @@ export default function Index({
                                         {tanggal.map((day) => (
                                             <th
                                                 key={day}
-                                                className="min-w-[50px] border border-slate-200 px-2 py-3 text-center text-xs font-semibold text-slate-500"
+                                                className="min-w-[50px] border-b border-r border-slate-200 px-2 py-3 text-center text-xs font-semibold text-slate-500"
                                             >
                                                 {day}
                                             </th>
@@ -896,7 +912,7 @@ export default function Index({
                                                     return (
                                                         <tr
                                                             key={preventif.no}
-                                                            className="group transition hover:bg-slate-50"
+                                                            className="group transition-colors hover:bg-blue-50/30"
                                                         >
                                                             {/* DIVISI */}
                                                             {rowSpan > 0 && (
@@ -916,7 +932,9 @@ export default function Index({
                                                             {/* ITEM */}
                                                             <td className="border border-slate-200 px-4 py-3 text-slate-700">
                                                                 <div className="max-w-[360px] whitespace-normal leading-relaxed">
-                                                                    {preventif.item_preventif}
+                                                                    <span className="font-medium text-slate-700">
+                                                                        {preventif.item_preventif}
+                                                                    </span>
                                                                 </div>
                                                             </td>
 
@@ -960,12 +978,12 @@ export default function Index({
                                                             {/* STATUS */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap">
                                                                 {status === 'ACT' ? (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
                                                                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                                                         ACT
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 shadow-sm">
                                                                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                                                         Plan
                                                                     </span>
@@ -995,10 +1013,12 @@ export default function Index({
                                                                 return (
                                                                     <td
                                                                         key={day}
-                                                                        className={`border border-slate-200 px-2 py-2 text-center ${
+                                                                        className={`border border-slate-200 px-1.5 py-2 text-center transition-colors ${
                                                                             checked
-                                                                                ? 'bg-emerald-50/60'
-                                                                                : ''
+                                                                                ? 'bg-emerald-50'
+                                                                                : plan
+                                                                                ? 'bg-blue-50/30'
+                                                                                : 'bg-white'
                                                                         }`}
                                                                     >
                                                                         <div className="flex flex-col items-center gap-1">
@@ -1016,12 +1036,12 @@ export default function Index({
                                                                                             );
                                                                                         }
                                                                                     }}
-                                                                                    className={`flex h-6 w-6 items-center justify-center rounded border-2 ${
+                                                                                    className={`flex h-7 w-7 items-center justify-center rounded-lg border-2 shadow-sm transition-all ${
                                                                                         !canChecklist
                                                                                             ? 'cursor-default border-slate-300 bg-white'
                                                                                             : checked
-                                                                                            ? 'cursor-pointer border-green-600 bg-green-600 text-white hover:bg-green-700'
-                                                                                            : 'cursor-pointer border-blue-600 bg-white hover:bg-blue-50'
+                                                                                            ? 'cursor-pointer border-emerald-500 bg-emerald-500 text-white shadow-emerald-200 hover:bg-emerald-600 hover:shadow-md'
+                                                                                            : 'cursor-pointer border-blue-300 bg-white text-blue-500 hover:border-blue-500 hover:bg-blue-50 hover:shadow-sm'
                                                                                     }`}
                                                                                     title={
                                                                                         !canChecklist
@@ -1115,11 +1135,11 @@ export default function Index({
                                             )}
 
                                             {/* TOTAL */}
-                                            <tr className="bg-slate-50">
+                                           <tr className="bg-slate-100/80">
 
                                                 <td
                                                     colSpan={6}
-                                                    className="border border-slate-200 px-4 py-3 text-center font-bold text-slate-700"
+                                                    className="border border-slate-200 px-4 py-3.5 text-center font-bold text-slate-700"
                                                 >
                                                     Total Preventif Mesin
                                                 </td>

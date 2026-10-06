@@ -664,7 +664,7 @@ class PreventifMesinController extends Controller
 
     private function tambahPeriode(
         Carbon $tanggal,
-        $nilai,
+        int $nilai,
         ?string $satuan
     ): Carbon {
 
