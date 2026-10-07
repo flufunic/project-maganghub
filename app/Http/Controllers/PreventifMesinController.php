@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PreventifMesin;
+use App\Models\PreventifPengiriman;
 use Inertia\Inertia;
 use Inertia\Response;
 use Carbon\Carbon;
@@ -240,6 +241,32 @@ class PreventifMesinController extends Controller
         }
 
         // =========================
+        // STATUS PENGIRIMAN PER TANGGAL
+        // =========================
+        $notifikasiPengiriman = PreventifPengiriman::query()
+            ->whereIn('status', [
+                'menunggu',
+                'diperiksa',
+                'ditolak',
+            ])
+            ->get()
+            ->map(function ($pengiriman) {
+                return [
+                    'id' => $pengiriman->id,
+
+                    'tanggal' => Carbon::parse($pengiriman->tanggal)
+                        ->format('Y-m-d'),
+
+                    'tanggal_format' => Carbon::parse($pengiriman->tanggal)
+                        ->translatedFormat('d F Y'),
+
+                    'status' => $pengiriman->status,
+
+                    'alasan_penolakan' => $pengiriman->alasan_penolakan,
+                ];
+            })
+            ->values();
+        // =========================
         // KIRIM KE INERTIA
         // =========================
         return Inertia::render('PreventifMesin/Index', [
@@ -256,6 +283,8 @@ class PreventifMesinController extends Controller
         'totalHotAll' => $totalHotAll,
 
         'notifikasi' => $notifikasi,
+
+        'notifikasiPengiriman' => $notifikasiPengiriman,
 
         'flash' => [
             'success' => session('success'),

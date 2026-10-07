@@ -2,7 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PreventifMesinController;
+use App\Http\Controllers\PreventifPengirimanController;
+use App\Http\Controllers\PimpinanController;
 use App\Http\Controllers\CheckSheetController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -10,6 +13,16 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/login', [
+    AuthController::class,
+    'showLogin'
+])->name('login');
+
+Route::post('/login', [
+    AuthController::class,
+    'login'
+])->name('login.store');
 
 Route::post('/logout', function (Request $request) {
     Auth::logout();
@@ -73,4 +86,31 @@ Route::middleware('auth')->group(function () {
         CheckSheetController::class,
         'exportExcel'
     ])->name('check-sheets.export-excel');
+
+    Route::post('/preventif-pengiriman', [
+        PreventifPengirimanController::class,
+        'store'
+    ])
+        ->middleware('role:admin')
+        ->name('preventif-pengiriman.store');
+});
+
+Route::middleware(['auth', 'role:pimpinan'])->group(function () {
+    Route::get('/pimpinan', [
+        PimpinanController::class,
+        'index'
+    ])->name('pimpinan.index');
+
+    Route::get('/pimpinan/pengiriman/{pengiriman}', [
+        PimpinanController::class,
+        'show'
+    ])->name('pimpinan.pengiriman.show');
+
+    Route::post('/pimpinan/pengiriman/{pengiriman}/periksa', [
+        PimpinanController::class,
+        'periksa'
+    ])->name('pimpinan.pengiriman.periksa');
+
+    Route::post('/pimpinan/pengiriman/{pengiriman}/tolak', [PimpinanController::class, 'tolak'])
+        ->name('pimpinan.pengiriman.tolak');
 });

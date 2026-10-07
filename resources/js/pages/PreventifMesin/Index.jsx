@@ -11,6 +11,7 @@ export default function Index({
     totalDotAll = 0,
     totalHotAll = 0,
     notifikasi = [],
+    notifikasiPengiriman = [],
 }) {
     // =========================
     // BULAN CHECKLIST
@@ -97,6 +98,19 @@ export default function Index({
     const [showCatatan, setShowCatatan] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
     const [catatan, setCatatan] = useState('');
+
+    // =========================
+    // NOTIFIKASI PENGIRIMAN
+    // =========================
+    const getNotifikasiPengiriman = (tanggal) => {
+        return notifikasiPengiriman.find(
+            (item) => item.tanggal === tanggal
+        );
+    };
+
+    const jumlahPengirimanDitolak = notifikasiPengiriman.filter(
+        (item) => item.status === 'ditolak'
+    ).length;
 
     // =========================
     // SUCCESS TOAST
@@ -532,7 +546,7 @@ export default function Index({
                                             stroke="currentColor"
                                             strokeWidth="1.8"
                                             className={`h-5 w-5 ${
-                                                notifikasi.length > 0
+                                                notifikasi.length + jumlahPengirimanDitolak > 0
                                                     ? 'animate-wiggle text-blue-600 drop-shadow-[0_0_6px_rgba(59,130,246,0.8)]'
                                                     : ''
                                             }`}
@@ -550,11 +564,11 @@ export default function Index({
                                         </svg>
 
                                         {/* JUMLAH NOTIF */}
-                                        {notifikasi.length > 0 && (
+                                        {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
                                             <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                                                {notifikasi.length > 99
+                                                {(notifikasi.length + jumlahPengirimanDitolak) > 99
                                                     ? '99+'
-                                                    : notifikasi.length}
+                                                    : notifikasi.length + jumlahPengirimanDitolak}
                                             </span>
                                         )}
                                     </button>
@@ -576,13 +590,62 @@ export default function Index({
                                                 </div>
 
                                                 <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
-                                                    {notifikasi.length} Notif
+                                                    {notifikasi.length + jumlahPengirimanDitolak} Notif
                                                 </span>
                                             </div>
 
                                             {/* ISI */}
                                             <div className="max-h-[400px] overflow-y-auto">
+                                                {/* NOTIFIKASI PENGIRIMAN DITOLAK */}
+                                                {notifikasiPengiriman
+                                                    .filter((item) => item.status === 'ditolak')
+                                                    .map((notif, index) => (
+                                                        <div
+                                                            key={`ditolak-${notif.tanggal}-${index}`}
+                                                            className="border-b border-red-100 bg-red-50/50 px-4 py-3"
+                                                        >
+                                                            <div className="flex items-start gap-3">
 
+                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                                                                    <span className="text-base">
+                                                                        ✕
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="min-w-0 flex-1">
+
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <p className="text-xs font-bold text-red-700">
+                                                                            Pengiriman Ditolak
+                                                                        </p>
+
+                                                                        <span className="shrink-0 text-[10px] font-medium text-red-400">
+                                                                            {notif.tanggal_format}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                        Data preventif tanggal{' '}
+                                                                        <span className="font-semibold">
+                                                                            {notif.tanggal_format}
+                                                                        </span>{' '}
+                                                                        ditolak oleh pimpinan.
+                                                                    </p>
+
+                                                                    <div className="mt-2 rounded-lg border border-red-100 bg-white px-3 py-2">
+                                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-red-500">
+                                                                            Alasan Penolakan
+                                                                        </p>
+
+                                                                        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                            {notif.alasan_penolakan || '-'}
+                                                                        </p>
+                                                                    </div>
+
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 {notifikasi.length > 0 ? (
                                                     notifikasi.map((notif, index) => (
                                                         <div
@@ -632,11 +695,12 @@ export default function Index({
                                                                     <p className="mt-1 text-[10px] font-medium text-slate-400">
                                                                         No. {notif.no_item}
                                                                     </p>
+
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     ))
-                                                ) : (
+                                                ) : jumlahPengirimanDitolak === 0 ? (
                                                     <div className="flex flex-col items-center px-6 py-10 text-center">
 
                                                         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
@@ -652,8 +716,9 @@ export default function Index({
                                                         <p className="mt-1 text-xs text-slate-400">
                                                             Belum ada jadwal atau pengecekan yang perlu diperhatikan.
                                                         </p>
+
                                                     </div>
-                                                )}
+                                                ) : null}
                                             </div>
                                         </div>
                                     )}
@@ -1135,7 +1200,7 @@ export default function Index({
                                             )}
 
                                             {/* TOTAL */}
-                                           <tr className="bg-slate-100/80">
+                                            <tr className="bg-slate-100/80">
 
                                                 <td
                                                     colSpan={6}
@@ -1152,16 +1217,116 @@ export default function Index({
                                                     {formatJam(totalHotAll)}
                                                 </td>
 
+                                                {/* STATUS */}
                                                 <td className="border border-slate-200 px-4 py-3"></td>
 
-                                                {tanggal.map((day) => (
-                                                    <td
-                                                        key={day}
-                                                        className="border border-slate-200 px-2 py-3"
-                                                    />
-                                                ))}
+                                                {/* TOMBOL KIRIM PER TANGGAL */}
+                                                {tanggal.map((day) => {
+                                                    const tanggalKirim = getTanggalChecklist(day);
 
-                                                <td className="border border-slate-200 px-3 py-3"></td>
+                                                    const notifPengiriman =
+                                                        getNotifikasiPengiriman(tanggalKirim);
+
+                                                    const ditolak =
+                                                        notifPengiriman?.status === 'ditolak';
+
+                                                    const diperiksa =
+                                                        notifPengiriman?.status === 'diperiksa';
+
+                                                    return (
+                                                        <td
+                                                            key={day}
+                                                            className="border border-slate-200 px-1 py-2 text-center"
+                                                        >
+                                                            <div className="relative inline-flex">
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        router.post(
+                                                                            '/preventif-pengiriman',
+                                                                            {
+                                                                                tanggal: tanggalKirim,
+                                                                            },
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                    title={
+                                                                        ditolak
+                                                                            ? `Ditolak: ${notifPengiriman.alasan_penolakan || 'Tidak ada alasan'}`
+                                                                            : diperiksa
+                                                                            ? `Sudah diperiksa ${tanggalKirim}`
+                                                                            : `Kirim data ${tanggalKirim}`
+                                                                    }
+                                                                    className={`
+                                                                        group inline-flex h-8 w-8
+                                                                        items-center justify-center
+                                                                        rounded-lg
+                                                                        text-white
+                                                                        shadow-sm
+                                                                        transition-all duration-200
+                                                                        hover:-translate-y-0.5
+                                                                        active:translate-y-0
+                                                                        ${
+                                                                            ditolak
+                                                                                ? 'bg-red-600 shadow-red-200 hover:bg-red-700'
+                                                                                : diperiksa
+                                                                                ? 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700'
+                                                                                : 'bg-blue-600 shadow-blue-200 hover:bg-blue-700'
+                                                                        }
+                                                                    `}
+                                                                >
+                                                                    <svg
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="2"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        className="
+                                                                            h-4 w-4
+                                                                            transition-transform duration-200
+                                                                            group-hover:translate-x-0.5
+                                                                            group-hover:-translate-y-0.5
+                                                                        "
+                                                                    >
+                                                                        <path d="M22 2 11 13" />
+                                                                        <path d="m22 2-7 20-4-9-9-4Z" />
+                                                                    </svg>
+                                                                </button>
+
+                                                                {/* BADGE DITOLAK */}
+                                                                {ditolak && (
+                                                                    <span
+                                                                        className="
+                                                                            absolute -right-1.5 -top-1.5
+                                                                            flex h-4 min-w-4
+                                                                            items-center justify-center
+                                                                            rounded-full
+                                                                            border-2 border-white
+                                                                            bg-red-500
+                                                                            px-1
+                                                                            text-[8px]
+                                                                            font-bold
+                                                                            text-white
+                                                                            shadow-sm
+                                                                        "
+                                                                    >
+                                                                        !
+                                                                    </span>
+                                                                )}
+
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+
+
+                                                {/* Kolom aksi */}
+                                                <td className="border border-slate-200"></td>
                                             </tr>
                                         </>
                                     ) : (
