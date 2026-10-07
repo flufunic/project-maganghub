@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 
 // =========================================================
-// KOMPONEN KECIL
+// ICONS
 // =========================================================
 
 const IconButton = ({
@@ -12,9 +12,9 @@ const IconButton = ({
     children,
 }) => {
     const variants = {
-        blue: 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white',
-        red: 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white',
-        slate: 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
+        blue: 'border-blue-100 bg-blue-50 text-blue-600 hover:border-blue-200 hover:bg-blue-600 hover:text-white',
+        red: 'border-red-100 bg-red-50 text-red-600 hover:border-red-200 hover:bg-red-600 hover:text-white',
+        slate: 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
     };
 
     return (
@@ -22,7 +22,7 @@ const IconButton = ({
             type="button"
             title={title}
             onClick={onClick}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 ${variants[variant]}`}
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${variants[variant]}`}
         >
             {children}
         </button>
@@ -31,65 +31,62 @@ const IconButton = ({
 
 const EditIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        fill="none"
         stroke="currentColor"
+        strokeWidth="1.8"
         className="h-4 w-4"
     >
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-3.33.999.999-3.33a4.5 4.5 0 011.13-1.897L16.862 4.487z"
+            d="M12 20h9"
         />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M19.5 7.125L16.875 4.5"
+            d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
         />
     </svg>
 );
 
 const DeleteIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        fill="none"
         stroke="currentColor"
+        strokeWidth="1.8"
         className="h-4 w-4"
     >
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M6 7.5h12"
+            d="M3 6h18"
         />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M9.75 7.5V5.25A1.25 1.25 0 0111 4h2a1.25 1.25 0 011.25 1.25V7.5"
+            d="M8 6V4h8v2"
         />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M8.25 7.5v11.25A1.25 1.25 0 009.5 20h5a1.25 1.25 0 001.25-1.25V7.5"
+            d="M19 6l-1 14H6L5 6"
         />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M10.5 11v5.25M13.5 11v5.25"
+            d="M10 11v5M14 11v5"
         />
     </svg>
 );
 
 const PlusIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={2}
+        fill="none"
         stroke="currentColor"
+        strokeWidth="2"
         className="h-4 w-4"
     >
         <path
@@ -102,75 +99,147 @@ const PlusIcon = () => (
 
 const ArrowLeftIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        fill="none"
         stroke="currentColor"
-        className="h-5 w-5"
+        strokeWidth="1.8"
+        className="h-4 w-4"
     >
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+            d="M19 12H5"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 19l-7-7 7-7"
         />
     </svg>
 );
 
 const ClipboardIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        fill="none"
         stroke="currentColor"
-        className="h-5 w-5"
+        strokeWidth="1.8"
+        className="h-7 w-7"
     >
+        <rect
+            x="5"
+            y="4"
+            width="14"
+            height="17"
+            rx="2"
+        />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M9 5.25h6M9.75 3.75h4.5A1.5 1.5 0 0115.75 5.25v.75h.75A2.25 2.25 0 0118.75 8.25v11.25A2.25 2.25 0 0116.5 21.75h-9A2.25 2.25 0 015.25 19.5V8.25A2.25 2.25 0 017.5 6h.75v-.75a1.5 1.5 0 011.5-1.5z"
+            d="M9 4.5V3h6v1.5"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 9h6M9 13h6M9 17h4"
         />
     </svg>
 );
 
 const AlertIcon = () => (
     <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        fill="none"
         stroke="currentColor"
-        className="h-5 w-5"
+        strokeWidth="1.8"
+        className="h-6 w-6"
     >
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M12 9v3.75m0 3h.007v.008H12V15.75z"
+            d="M10.3 3.6L2.7 17a2 2 0 001.7 3h15.2a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"
         />
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M10.29 3.86L2.82 17.25a1.875 1.875 0 001.64 2.812h15.08a1.875 1.875 0 001.64-2.812L13.71 3.86a1.875 1.875 0 00-3.42 0z"
+            d="M12 9v4"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 17h.01"
         />
     </svg>
 );
 
-const ModalIcon = ({ type }) => {
-    if (type === 'alert') {
-        return (
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-                <AlertIcon />
-            </div>
-        );
-    }
+const ExcelIcon = () => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="h-4 w-4"
+    >
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M14 2v6h6"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 13l2 2-2 2M12 13l2 2-2 2"
+        />
+    </svg>
+);
 
-    return (
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-            <ClipboardIcon />
-        </div>
-    );
-};
+const CheckIcon = () => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        className="h-4 w-4"
+    >
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 12l4 4L19 6"
+        />
+    </svg>
+);
+
+const CalendarIcon = () => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="h-5 w-5"
+    >
+        <rect
+            x="3"
+            y="4"
+            width="18"
+            height="17"
+            rx="2"
+        />
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M16 2v4M8 2v4M3 10h18"
+        />
+    </svg>
+);
+
+// =========================================================
+// FORM FIELD
+// =========================================================
 
 const Field = ({
     label,
@@ -180,7 +249,7 @@ const Field = ({
     className = '',
 }) => (
     <div className={className}>
-        <label className="mb-2 block text-sm font-semibold text-slate-700">
+        <label className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
             {label}
             {required && (
                 <span className="ml-1 text-red-500">*</span>
@@ -202,48 +271,70 @@ const inputClass =
 
 const selectClass = inputClass;
 
+// =========================================================
+// MODAL
+// =========================================================
+
 const Modal = ({
     title,
     description,
     icon = 'default',
     onClose,
     children,
-}) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-        <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
-                <div className="flex items-center gap-3">
-                    <ModalIcon type={icon} />
+}) => {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm">
+            <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
+                <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-900">
-                            {title}
-                        </h2>
+                <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-5 sm:px-7">
+                    <div className="flex items-start gap-4">
+                        <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                                icon === 'alert'
+                                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-200'
+                                    : 'bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200'
+                            }`}
+                        >
+                            {icon === 'alert' ? (
+                                <AlertIcon />
+                            ) : (
+                                <ClipboardIcon />
+                            )}
+                        </div>
 
-                        <p className="mt-0.5 text-sm text-slate-500">
-                            {description}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-lg font-extrabold text-slate-900">
+                                {title}
+                            </h3>
+
+                            {description && (
+                                <p className="mt-1 text-sm leading-6 text-slate-500">
+                                    {description}
+                                </p>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl leading-none text-slate-400 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                            ×
+                        </button>
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                >
-                    ×
-                </button>
-            </div>
-
-            <div className="overflow-y-auto">
-                {children}
+                <div className="max-h-[75vh] overflow-y-auto p-6 sm:p-7">
+                    {children}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 // =========================================================
-// MAIN COMPONENT
+// MAIN
 // =========================================================
 
 export default function Show({
@@ -252,6 +343,10 @@ export default function Show({
     tahun,
     tanggal,
 }) {
+    // =====================================================
+    // STATE
+    // =====================================================
+
     const [editingItem, setEditingItem] = useState(null);
     const [editingAbnormality, setEditingAbnormality] =
         useState(null);
@@ -259,14 +354,16 @@ export default function Show({
     const [showAddItemModal, setShowAddItemModal] =
         useState(false);
 
-    const [showAddAbnormalityModal, setShowAddAbnormalityModal] =
-        useState(false);
+    const [
+        showAddAbnormalityModal,
+        setShowAddAbnormalityModal,
+    ] = useState(false);
 
     const [shiftFilter, setShiftFilter] = useState('all');
 
-    // =========================================================
-    // FORM TAMBAH ITEM
-    // =========================================================
+    // =====================================================
+    // FORM - ADD ITEM
+    // =====================================================
 
     const {
         data,
@@ -283,9 +380,9 @@ export default function Show({
         shift: '',
     });
 
-    // =========================================================
-    // FORM EDIT ITEM
-    // =========================================================
+    // =====================================================
+    // FORM - EDIT ITEM
+    // =====================================================
 
     const {
         data: editData,
@@ -302,9 +399,9 @@ export default function Show({
         shift: '',
     });
 
-    // =========================================================
-    // FORM TAMBAH ABNORMALITY
-    // =========================================================
+    // =====================================================
+    // FORM - ADD ABNORMALITY
+    // =====================================================
 
     const {
         data: abnormalityData,
@@ -321,9 +418,9 @@ export default function Show({
         pic: '',
     });
 
-    // =========================================================
-    // FORM EDIT ABNORMALITY
-    // =========================================================
+    // =====================================================
+    // FORM - EDIT ABNORMALITY
+    // =====================================================
 
     const {
         data: editAbnormalityData,
@@ -340,9 +437,9 @@ export default function Show({
         pic: '',
     });
 
-    // =========================================================
-    // DATA BULAN
-    // =========================================================
+    // =====================================================
+    // MONTH
+    // =====================================================
 
     const namaBulan = [
         'Januari',
@@ -359,9 +456,9 @@ export default function Show({
         'Desember',
     ];
 
-    // =========================================================
-    // FILTER PERIODE
-    // =========================================================
+    // =====================================================
+    // PERIOD
+    // =====================================================
 
     const ubahPeriode = (bulanBaru, tahunBaru) => {
         router.get(
@@ -377,9 +474,9 @@ export default function Show({
         );
     };
 
-    // =========================================================
+    // =====================================================
     // CHECKLIST
-    // =========================================================
+    // =====================================================
 
     const toggleChecklist = (item, tanggalLengkap) => {
         const checklist = item.checklists?.find(
@@ -404,9 +501,9 @@ export default function Show({
         );
     };
 
-    // =========================================================
-    // TAMBAH ITEM
-    // =========================================================
+    // =====================================================
+    // ADD ITEM
+    // =====================================================
 
     const submit = (e) => {
         e.preventDefault();
@@ -419,9 +516,9 @@ export default function Show({
         });
     };
 
-    // =========================================================
+    // =====================================================
     // EDIT ITEM
-    // =========================================================
+    // =====================================================
 
     const submitEdit = (e) => {
         e.preventDefault();
@@ -437,9 +534,9 @@ export default function Show({
         );
     };
 
-    // =========================================================
-    // TAMBAH ABNORMALITY
-    // =========================================================
+    // =====================================================
+    // ADD ABNORMALITY
+    // =====================================================
 
     const submitAbnormality = (e) => {
         e.preventDefault();
@@ -455,9 +552,9 @@ export default function Show({
         );
     };
 
-    // =========================================================
+    // =====================================================
     // EDIT ABNORMALITY
-    // =========================================================
+    // =====================================================
 
     const submitEditAbnormality = (e) => {
         e.preventDefault();
@@ -473,21 +570,19 @@ export default function Show({
         );
     };
 
-    // =========================================================
-    // FILTER ITEM SHIFT
-    // =========================================================
+    // =====================================================
+    // FILTER
+    // =====================================================
 
     const filteredItems = checkSheet.items.filter((item) => {
-        if (shiftFilter === 'all') {
-            return true;
-        }
+        if (shiftFilter === 'all') return true;
 
         return item.shift === shiftFilter;
     });
 
-    // =========================================================
-    // OPEN EDIT ITEM
-    // =========================================================
+    // =====================================================
+    // EDIT ITEM
+    // =====================================================
 
     const bukaEditItem = (item) => {
         setEditingItem(item);
@@ -501,9 +596,9 @@ export default function Show({
         });
     };
 
-    // =========================================================
-    // OPEN EDIT ABNORMALITY
-    // =========================================================
+    // =====================================================
+    // EDIT ABNORMALITY
+    // =====================================================
 
     const bukaEditAbnormality = (abnormality) => {
         setEditingAbnormality(abnormality);
@@ -511,15 +606,16 @@ export default function Show({
         setEditAbnormalityData({
             tanggal: abnormality.tanggal,
             abnormality: abnormality.abnormality,
-            countermeasure: abnormality.countermeasure ?? '',
+            countermeasure:
+                abnormality.countermeasure ?? '',
             status: abnormality.status,
             pic: abnormality.pic ?? '',
         });
     };
 
-    // =========================================================
-    // HAPUS ITEM
-    // =========================================================
+    // =====================================================
+    // DELETE ITEM
+    // =====================================================
 
     const hapusItem = (item) => {
         if (
@@ -536,9 +632,9 @@ export default function Show({
         }
     };
 
-    // =========================================================
-    // HAPUS ABNORMALITY
-    // =========================================================
+    // =====================================================
+    // DELETE ABNORMALITY
+    // =====================================================
 
     const hapusAbnormality = (abnormality) => {
         if (
@@ -555,123 +651,227 @@ export default function Show({
         }
     };
 
+    // =====================================================
+    // HELPERS
+    // =====================================================
+
+    const formatTanggal = (value) => {
+        if (!value) return '-';
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return date.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const getStatusClass = (status) => {
+        if (status === 'Closed') {
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        }
+
+        if (status === 'Progress') {
+            return 'border-amber-200 bg-amber-50 text-amber-700';
+        }
+
+        return 'border-red-200 bg-red-50 text-red-700';
+    };
+
+    const getStatusDot = (status) => {
+        if (status === 'Closed') {
+            return 'bg-emerald-500';
+        }
+
+        if (status === 'Progress') {
+            return 'bg-amber-500';
+        }
+
+        return 'bg-red-500';
+    };
+
+    const getTanggalValue = (itemTanggal) => {
+        if (itemTanggal && typeof itemTanggal === 'object') {
+            return itemTanggal.tanggal;
+        }
+
+        return itemTanggal;
+    };
+
+    const getTanggalLengkap = (itemTanggal, bulan, tahun) => {
+        if (itemTanggal && typeof itemTanggal === 'object') {
+            return itemTanggal.tanggal_lengkap;
+        }
+
+        return `${tahun}-${String(bulan).padStart(2, '0')}-${String(
+            itemTanggal
+        ).padStart(2, '0')}`;
+    };
+
+    const getChecklist = (item, tanggalLengkap) => {
+        return item.checklists?.find((checklist) => {
+            const tanggalChecklist = String(checklist.tanggal).substring(
+                0,
+                10
+            );
+
+            return tanggalChecklist === tanggalLengkap;
+        });
+    };
+
     return (
         <>
-            <Head title={checkSheet.nama_checksheet} />
+            <Head
+                title={`${checkSheet.nama_checksheet} - Check Sheet`}
+            />
 
-            <div className="min-h-screen bg-[#f6f8fb] text-slate-800">
-
-                {/* =====================================================
+            <div className="min-h-screen bg-slate-50 text-slate-800">
+                {/* =================================================
                     HEADER
-                ====================================================== */}
+                ================================================== */}
 
-                <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur">
-                    <div className="mx-auto max-w-[1500px] px-5 py-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between gap-4">
+                <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900">
+                    <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" />
+                    <div className="pointer-events-none absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-indigo-400/15 blur-3xl" />
+                    <div className="pointer-events-none absolute right-1/3 top-10 h-40 w-40 rounded-full bg-violet-400/10 blur-3xl" />
 
-                            <div className="flex min-w-0 items-center gap-3">
-                                <Link
-                                    href="/check-sheets"
-                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-                                    title="Kembali"
-                                >
-                                    <ArrowLeftIcon />
-                                </Link>
+                    <div className="relative mx-auto max-w-[1500px] px-5 py-6 sm:px-6 lg:px-8">
+                        {/* Breadcrumb */}
+                        <div className="mb-5 flex items-center gap-2 text-xs font-medium text-blue-200">
+                            <Link
+                                href="/check-sheets"
+                                className="transition hover:text-white"
+                            >
+                                Check Sheet Prediktif
+                            </Link>
+
+                            <span className="text-blue-400">
+                                /
+                            </span>
+
+                            <span className="max-w-[280px] truncate text-white/90">
+                                {checkSheet.nama_checksheet}
+                            </span>
+                        </div>
+
+                        {/* Title */}
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                            <div className="flex min-w-0 items-start gap-4">
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-400 via-indigo-500 to-violet-500 text-white shadow-xl shadow-blue-950/30">
+                                    <ClipboardIcon />
+                                </div>
 
                                 <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
                                             {checkSheet.nama_checksheet}
                                         </h1>
 
-                                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                                        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-100 backdrop-blur-sm">
                                             Check Sheet
                                         </span>
                                     </div>
 
-                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 sm:text-sm">
-                                        <span>
-                                            {checkSheet.divisi?.nama_divisi ?? '-'}
+                                    <p className="max-w-3xl text-sm leading-6 text-blue-100/80">
+                                        Kelola inspection point,
+                                        checklist harian, dan
+                                        abnormality dalam satu
+                                        halaman.
+                                    </p>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <span className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                                            {checkSheet.divisi?.nama_divisi ??
+                                                '-'}
                                         </span>
 
-                                        <span className="text-slate-300">
+                                        <span className="text-blue-300">
                                             •
                                         </span>
 
-                                        <span>
-                                            {checkSheet.nomor_dokumen}
+                                        <span className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                                            {checkSheet.nomor_dokumen ??
+                                                '-'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="hidden items-center gap-2 sm:flex">
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                        Periode
-                                    </p>
-
-                                    <p className="text-sm font-bold text-slate-700">
-                                        {namaBulan[bulan - 1]} {tahun}
-                                    </p>
-                                </div>
-                            </div>
+                            <Link
+                                href="/check-sheets"
+                                className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/15"
+                            >
+                                <ArrowLeftIcon />
+                                Kembali
+                            </Link>
                         </div>
                     </div>
+
+                    <div className="h-1 bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400" />
                 </header>
 
-                <main className="mx-auto max-w-[1500px] px-5 py-6 sm:px-6 lg:px-8">
+                {/* =================================================
+                    MAIN
+                ================================================== */}
 
+                <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 lg:px-8 lg:py-10">
                     {/* =================================================
-                        INFORMASI CHECK SHEET
+                        INFO CARD
                     ================================================== */}
 
-                    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+                    <section className="mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
+                        <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-5 sm:px-7">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-200">
                                     <ClipboardIcon />
                                 </div>
 
                                 <div>
-                                    <h2 className="text-sm font-bold text-slate-900">
+                                    <h2 className="text-base font-extrabold text-slate-900">
                                         Informasi Check Sheet
                                     </h2>
 
-                                    <p className="text-xs text-slate-500">
-                                        Informasi dasar dokumen pemeriksaan
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Detail dokumen yang sedang
+                                        dikelola.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid divide-y divide-slate-100 md:grid-cols-3 md:divide-x md:divide-y-0">
-                            <div className="px-5 py-4 sm:px-6">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        <div className="grid gap-4 p-6 sm:grid-cols-3 sm:p-7">
+                            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-500">
                                     Divisi
                                 </p>
 
-                                <p className="mt-1.5 text-sm font-semibold text-slate-800">
-                                    {checkSheet.divisi?.nama_divisi ?? '-'}
+                                <p className="mt-2 text-base font-extrabold text-slate-900">
+                                    {checkSheet.divisi?.nama_divisi ??
+                                        '-'}
                                 </p>
                             </div>
 
-                            <div className="px-5 py-4 sm:px-6">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-500">
                                     Nama Check Sheet
                                 </p>
 
-                                <p className="mt-1.5 text-sm font-semibold text-slate-800">
+                                <p className="mt-2 text-base font-extrabold text-slate-900">
                                     {checkSheet.nama_checksheet}
                                 </p>
                             </div>
 
-                            <div className="px-5 py-4 sm:px-6">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-white p-5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-500">
                                     Nomor Dokumen
                                 </p>
 
-                                <p className="mt-1.5 text-sm font-semibold text-slate-800">
+                                <p className="mt-2 text-base font-extrabold text-slate-900">
                                     {checkSheet.nomor_dokumen}
                                 </p>
                             </div>
@@ -679,33 +879,36 @@ export default function Show({
                     </section>
 
                     {/* =================================================
-                        TOOLBAR PERIODE
+                        PERIOD TOOLBAR
                     ================================================== */}
 
-                    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <section className="relative mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-blue-50/50 shadow-xl shadow-slate-200/40">
+                        <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-                            {/* JUDUL */}
+                        <div className="flex flex-col gap-5 p-6 sm:p-7 xl:flex-row xl:items-end xl:justify-between">
                             <div>
-                                <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                <div className="mb-1 flex items-center gap-2">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-200">
+                                        <CalendarIcon />
+                                    </div>
 
-                                    <h2 className="text-sm font-bold text-slate-900">
-                                        Periode Checklist
-                                    </h2>
+                                    <div>
+                                        <h2 className="text-base font-extrabold text-slate-900">
+                                            Periode Checklist
+                                        </h2>
+
+                                        <p className="text-xs text-slate-500">
+                                            Pilih periode dan shift
+                                            yang ingin ditampilkan.
+                                        </p>
+                                    </div>
                                 </div>
-
-                                <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">
-                                    Atur periode dan shift untuk melihat checklist harian.
-                                </p>
                             </div>
 
-                            {/* FILTER + EXCEL */}
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-
+                            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                 {/* BULAN */}
-                                <div className="w-full sm:w-40">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <div className="min-w-[170px]">
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                                         Bulan
                                     </label>
 
@@ -713,26 +916,28 @@ export default function Show({
                                         value={bulan}
                                         onChange={(e) =>
                                             ubahPeriode(
-                                                Number(e.target.value),
+                                                e.target.value,
                                                 tahun
                                             )
                                         }
                                         className={selectClass}
                                     >
-                                        {namaBulan.map((nama, index) => (
-                                            <option
-                                                key={index}
-                                                value={index + 1}
-                                            >
-                                                {nama}
-                                            </option>
-                                        ))}
+                                        {namaBulan.map(
+                                            (nama, index) => (
+                                                <option
+                                                    key={nama}
+                                                    value={index + 1}
+                                                >
+                                                    {nama}
+                                                </option>
+                                            )
+                                        )}
                                     </select>
                                 </div>
 
                                 {/* TAHUN */}
-                                <div className="w-full sm:w-28">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <div className="min-w-[120px]">
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                                         Tahun
                                     </label>
 
@@ -741,335 +946,299 @@ export default function Show({
                                         onChange={(e) =>
                                             ubahPeriode(
                                                 bulan,
-                                                Number(e.target.value)
+                                                e.target.value
                                             )
                                         }
                                         className={selectClass}
                                     >
-                                        {[2025, 2026, 2027].map(
-                                            (tahunOption) => (
-                                                <option
-                                                    key={tahunOption}
-                                                    value={tahunOption}
-                                                >
-                                                    {tahunOption}
-                                                </option>
-                                            )
-                                        )}
+                                        {Array.from(
+                                            {
+                                                length: 7,
+                                            },
+                                            (_, index) =>
+                                                new Date().getFullYear() -
+                                                3 +
+                                                index
+                                        ).map((year) => (
+                                            <option
+                                                key={year}
+                                                value={year}
+                                            >
+                                                {year}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
 
                                 {/* SHIFT */}
-                                <div className="w-full sm:w-40">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <div className="min-w-[150px]">
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                                         Shift
                                     </label>
 
                                     <select
                                         value={shiftFilter}
                                         onChange={(e) =>
-                                            setShiftFilter(e.target.value)
+                                            setShiftFilter(
+                                                e.target.value
+                                            )
                                         }
                                         className={selectClass}
                                     >
                                         <option value="all">
                                             Semua Shift
                                         </option>
-
                                         <option value="A">
                                             Shift A
                                         </option>
-
                                         <option value="B">
                                             Shift B
                                         </option>
                                     </select>
                                 </div>
 
-                                {/* EXCEL */}
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        window.location.href = `/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}`
-                                    }
-                                    title="Download Excel"
-                                    className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-700"
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth={1.8}
-                                        stroke="currentColor"
-                                        className="h-5 w-5"
+                                {/* EXPORT */}
+                                <div className="flex items-end">
+                                    <a
+                                        href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}`}
+                                        className="inline-flex h-[43px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-700 hover:shadow-xl"
                                     >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M12 3.75v11.25m0 0l-4.5-4.5m4.5 4.5l4.5-4.5"
-                                        />
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M5.25 19.5h13.5"
-                                        />
-                                    </svg>
-                                </button>
-
+                                        <ExcelIcon />
+                                        Export Excel
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </section>
 
                     {/* =================================================
-                        ITEM PEMERIKSAAN
+                        INSPECTION POINT
                     ================================================== */}
 
-                    <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-                        {/* HEADER */}
-
-                        <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
+                    <section className="mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
+                        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 via-blue-50/50 to-indigo-50/50 px-6 py-5 sm:px-7">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200">
                                         <ClipboardIcon />
                                     </div>
 
                                     <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="text-base font-bold text-slate-900">
-                                                Item Pemeriksaan
-                                            </h2>
+                                        <h2 className="text-base font-extrabold text-slate-900">
+                                            Inspection Point
+                                        </h2>
 
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                                                {filteredItems.length} item
-                                            </span>
-                                        </div>
-
-                                        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-                                            Daftar inspection point dan checklist harian.
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Kelola titik pemeriksaan dan
+                                            checklist harian.
                                         </p>
                                     </div>
+
+                                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[10px] font-bold text-blue-600">
+                                        {filteredItems.length}{' '}
+                                        Item
+                                    </span>
                                 </div>
 
-                                <div className="flex">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            reset();
-                                            setShowAddItemModal(true);
-                                        }}
-                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.98] sm:w-auto"
-                                    >
-                                        <PlusIcon />
-                                        Tambah Inspection Point
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setShowAddItemModal(true)
+                                    }
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700 hover:shadow-xl"
+                                >
+                                    <PlusIcon />
+                                    Tambah Inspection Point
+                                </button>
                             </div>
                         </div>
 
-                        {/* TABLE */}
-
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-max text-sm">
-
+                            <table className="min-w-[1200px] w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-900 text-white">
-                                        <th className="sticky left-0 z-20 w-16 border-r border-slate-700 bg-slate-900 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                                    <tr className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 text-white">
+                                        <th className="sticky left-0 z-20 w-16 border-r border-white/10 px-3 py-4 text-center text-[10px] font-bold uppercase tracking-wider">
                                             No
                                         </th>
 
-                                        <th className="min-w-[250px] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide">
+                                        <th className="sticky left-16 z-20 min-w-[230px] border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Inspection Point
                                         </th>
 
-                                        <th className="min-w-[190px] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide">
+                                        <th className="min-w-[170px] border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Condition
                                         </th>
 
-                                        <th className="min-w-[130px] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide">
+                                        <th className="min-w-[180px] border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Method
                                         </th>
 
-                                        <th className="min-w-[85px] px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                                        <th className="w-28 border-r border-white/10 px-4 py-4 text-center text-[10px] font-bold uppercase tracking-wider">
                                             Shift
                                         </th>
 
-                                        <th className="min-w-[110px] border-r border-slate-700 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                                        <th className="w-24 border-r border-white/10 px-3 py-4 text-center text-[10px] font-bold uppercase tracking-wider">
                                             Aksi
                                         </th>
 
-                                        {tanggal.map((hari) => (
-                                            <th
-                                                key={hari.tanggal_lengkap}
-                                                className="min-w-11 border-l border-slate-700 bg-slate-800 px-1 py-2.5 text-center"
-                                            >
-                                                <span className="block text-[10px] font-medium text-slate-400">
-                                                    TGL
-                                                </span>
+                                        {tanggal.map((itemTanggal, index) => {
+                                            const tanggalValue = getTanggalValue(itemTanggal);
+                                            const tanggalLengkap = getTanggalLengkap(
+                                                itemTanggal,
+                                                bulan,
+                                                tahun
+                                            );
 
-                                                <span className="mt-0.5 block text-xs font-bold text-white">
-                                                    {hari.tanggal}
-                                                </span>
-                                            </th>
-                                        ))}
+                                            return (
+                                                <th
+                                                    key={tanggalLengkap || index}
+                                                    className="w-12 min-w-12 border-r border-white/10 px-1 py-4 text-center text-[10px] font-bold"
+                                                >
+                                                    {tanggalValue}
+                                                </th>
+                                            );
+                                        })}
                                     </tr>
                                 </thead>
 
-                                <tbody className="divide-y divide-slate-100">
-
-                                    {filteredItems.length > 0 ? (
-                                        filteredItems.map((item) => (
-                                            <tr
-                                                key={item.id}
-                                                className="group transition hover:bg-blue-50/30"
-                                            >
-
-                                                {/* NO */}
-
-                                                <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-3 py-3 text-center font-bold text-slate-600 group-hover:bg-blue-50/30">
-                                                    {item.no}
-                                                </td>
-
-                                                {/* INSPECTION POINT */}
-
-                                                <td className="max-w-[300px] px-4 py-3">
-                                                    <p className="font-semibold leading-5 text-slate-800">
-                                                        {item.inspection_point}
-                                                    </p>
-                                                </td>
-
-                                                {/* CONDITION */}
-
-                                                <td className="max-w-[230px] px-4 py-3">
-                                                    <p className="leading-5 text-slate-600">
-                                                        {item.condition ?? '-'}
-                                                    </p>
-                                                </td>
-
-                                                {/* METHOD */}
-
-                                                <td className="px-4 py-3">
-                                                    <span className="text-slate-600">
-                                                        {item.method ?? '-'}
-                                                    </span>
-                                                </td>
-
-                                                {/* SHIFT */}
-
-                                                <td className="px-4 py-3 text-center">
-                                                    <span
-                                                        className={`inline-flex min-w-9 items-center justify-center rounded-lg px-2 py-1 text-[11px] font-bold ${
-                                                            item.shift === 'A'
-                                                                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100'
-                                                                : 'bg-orange-50 text-orange-700 ring-1 ring-orange-100'
-                                                        }`}
-                                                    >
-                                                        {item.shift}
-                                                    </span>
-                                                </td>
-
-                                                {/* AKSI */}
-
-                                                <td className="border-r border-slate-100 px-3 py-3">
-                                                    <div className="flex justify-center gap-1.5">
-                                                        <IconButton
-                                                            title="Edit"
-                                                            onClick={() =>
-                                                                bukaEditItem(
-                                                                    item
-                                                                )
-                                                            }
-                                                            variant="blue"
-                                                        >
-                                                            <EditIcon />
-                                                        </IconButton>
-
-                                                        <IconButton
-                                                            title="Hapus"
-                                                            onClick={() =>
-                                                                hapusItem(
-                                                                    item
-                                                                )
-                                                            }
-                                                            variant="red"
-                                                        >
-                                                            <DeleteIcon />
-                                                        </IconButton>
-                                                    </div>
-                                                </td>
-
-                                                {/* CHECKLIST HARIAN */}
-
-                                                {tanggal.map((hari) => {
-                                                    const checklist =
-                                                        item.checklists?.find(
-                                                            (checklist) =>
-                                                                checklist.tanggal ===
-                                                                hari.tanggal_lengkap
-                                                        );
-
-                                                    const sudahChecklist =
-                                                        checklist?.status ===
-                                                        true;
-
-                                                    return (
-                                                        <td
-                                                            key={
-                                                                hari.tanggal_lengkap
-                                                            }
-                                                            className="border-l border-slate-100 px-1.5 py-2 text-center"
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    toggleChecklist(
-                                                                        item,
-                                                                        hari.tanggal_lengkap
-                                                                    )
-                                                                }
-                                                                title={
-                                                                    sudahChecklist
-                                                                        ? 'Checklist selesai'
-                                                                        : 'Tandai selesai'
-                                                                }
-                                                                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-150 ${
-                                                                    sudahChecklist
-                                                                        ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
-                                                                        : 'border-slate-200 bg-white text-transparent hover:border-blue-400 hover:bg-blue-50'
-                                                                }`}
-                                                            >
-                                                                ✓
-                                                            </button>
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))
-                                    ) : (
+                                <tbody>
+                                    {filteredItems.length === 0 ? (
                                         <tr>
                                             <td
                                                 colSpan={
-                                                    6 + tanggal.length
+                                                    6 +
+                                                    tanggal.length
                                                 }
-                                                className="px-6 py-16 text-center"
+                                                className="px-6 py-14 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                                                         <ClipboardIcon />
                                                     </div>
 
-                                                    <p className="mt-3 text-sm font-semibold text-slate-700">
-                                                        Belum ada item pemeriksaan
+                                                    <p className="font-bold text-slate-700">
+                                                        Belum ada
+                                                        Inspection
+                                                        Point
                                                     </p>
 
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Tambahkan inspection point untuk mulai membuat checklist.
+                                                    <p className="mt-1 text-sm text-slate-400">
+                                                        Tambahkan
+                                                        inspection point
+                                                        untuk mulai
+                                                        menggunakan
+                                                        checklist.
                                                     </p>
                                                 </div>
                                             </td>
                                         </tr>
+                                    ) : (
+                                        filteredItems.map(
+                                            (item, index) => (
+                                                <tr
+                                                    key={item.id}
+                                                    className="group border-b border-slate-100 last:border-b-0 hover:bg-blue-50/40"
+                                                >
+                                                    <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-3 py-3 text-center text-sm font-bold text-slate-500 group-hover:bg-blue-50/40">
+                                                        {item.no ??
+                                                            index +
+                                                                1}
+                                                    </td>
+
+                                                    <td className="sticky left-16 z-10 border-r border-slate-100 bg-white px-4 py-3 group-hover:bg-blue-50/40">
+                                                        <div className="font-semibold text-slate-800">
+                                                            {
+                                                                item.inspection_point
+                                                            }
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                        {item.condition ||
+                                                            '-'}
+                                                    </td>
+
+                                                    <td className="border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                        {item.method ||
+                                                            '-'}
+                                                    </td>
+
+                                                    <td className="border-r border-slate-100 px-4 py-3 text-center">
+                                                        <span className="inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600">
+                                                            {item.shift ||
+                                                                '-'}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="border-r border-slate-100 px-2 py-3">
+                                                        <div className="flex justify-center gap-1.5">
+                                                            <IconButton
+                                                                title="Edit"
+                                                                onClick={() =>
+                                                                    bukaEditItem(
+                                                                        item
+                                                                    )
+                                                                }
+                                                                variant="blue"
+                                                            >
+                                                                <EditIcon />
+                                                            </IconButton>
+
+                                                            <IconButton
+                                                                title="Hapus"
+                                                                onClick={() =>
+                                                                    hapusItem(
+                                                                        item
+                                                                    )
+                                                                }
+                                                                variant="red"
+                                                            >
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </div>
+                                                    </td>
+
+                                                    {tanggal.map((itemTanggal, index) => {
+                                                        const tanggalLengkap = getTanggalLengkap(
+                                                            itemTanggal,
+                                                            bulan,
+                                                            tahun
+                                                        );
+
+                                                        const checklist = getChecklist(
+                                                            item,
+                                                            tanggalLengkap
+                                                        );
+
+                                                        const checked = Boolean(checklist?.status);
+
+                                                        return (
+                                                            <td
+                                                                key={tanggalLengkap || index}
+                                                                className="border-r border-slate-100 px-1 py-2 text-center"
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        toggleChecklist(
+                                                                            item,
+                                                                            tanggalLengkap
+                                                                        )
+                                                                    }
+                                                                    className={`mx-auto flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-200 ${
+                                                                        checked
+                                                                            ? 'border-emerald-200 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-emerald-100 hover:from-emerald-500 hover:to-teal-600'
+                                                                            : 'border-slate-200 bg-slate-50 text-transparent hover:border-blue-300 hover:bg-blue-50'
+                                                                    }`}
+                                                                >
+                                                                    {checked && <CheckIcon />}
+                                                                </button>
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            )
+                                        )
                                     )}
                                 </tbody>
                             </table>
@@ -1080,42 +1249,44 @@ export default function Show({
                         ABNORMALITY
                     ================================================== */}
 
-                    <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-                        {/* HEADER */}
-
-                        <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
+                    <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
+                        <div className="border-b border-slate-100 bg-gradient-to-r from-white via-amber-50/40 to-orange-50/40 px-6 py-5 sm:px-7">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-200">
                                         <AlertIcon />
                                     </div>
 
                                     <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="text-base font-bold text-slate-900">
-                                                Abnormality
-                                            </h2>
+                                        <h2 className="text-base font-extrabold text-slate-900">
+                                            Abnormality
+                                        </h2>
 
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                                                {checkSheet.abnormalities?.length ?? 0} laporan
-                                            </span>
-                                        </div>
-
-                                        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-                                            Catatan kondisi abnormal yang ditemukan saat pemeriksaan.
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Catat abnormality,
+                                            countermeasure, status,
+                                            dan PIC.
                                         </p>
                                     </div>
+
+                                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-600">
+                                        {
+                                            checkSheet
+                                                .abnormalities
+                                                ?.length
+                                        }{' '}
+                                        Data
+                                    </span>
                                 </div>
 
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        resetAbnormality();
-                                        setShowAddAbnormalityModal(true);
-                                    }}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.98] sm:w-auto"
+                                    onClick={() =>
+                                        setShowAddAbnormalityModal(
+                                            true
+                                        )
+                                    }
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:-translate-y-0.5 hover:from-amber-600 hover:to-orange-600 hover:shadow-xl"
                                 >
                                     <PlusIcon />
                                     Tambah Abnormality
@@ -1123,83 +1294,113 @@ export default function Show({
                             </div>
                         </div>
 
-                        {/* TABLE */}
-
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[900px] text-sm">
+                            <table className="min-w-[900px] w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50">
-                                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                    <tr className="bg-gradient-to-r from-slate-800 via-indigo-800 to-violet-800 text-white">
+                                        <th className="w-36 border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Tanggal
                                         </th>
 
-                                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        <th className="min-w-[230px] border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Abnormality
                                         </th>
 
-                                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        <th className="min-w-[260px] border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             Countermeasure
                                         </th>
 
-                                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        <th className="w-32 border-r border-white/10 px-4 py-4 text-center text-[10px] font-bold uppercase tracking-wider">
                                             Status
                                         </th>
 
-                                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        <th className="w-40 border-r border-white/10 px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider">
                                             PIC
                                         </th>
 
-                                        <th className="border-b border-slate-200 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                        <th className="w-24 px-3 py-4 text-center text-[10px] font-bold uppercase tracking-wider">
                                             Aksi
                                         </th>
                                     </tr>
                                 </thead>
 
-                                <tbody className="divide-y divide-slate-100">
-                                    {checkSheet.abnormalities?.length > 0 ? (
+                                <tbody>
+                                    {!checkSheet.abnormalities ||
+                                    checkSheet.abnormalities
+                                        .length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan="6"
+                                                className="px-6 py-14 text-center"
+                                            >
+                                                <div className="mx-auto flex max-w-sm flex-col items-center">
+                                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+                                                        <AlertIcon />
+                                                    </div>
+
+                                                    <p className="font-bold text-slate-700">
+                                                        Belum ada
+                                                        abnormality
+                                                    </p>
+
+                                                    <p className="mt-1 text-sm text-slate-400">
+                                                        Tambahkan data
+                                                        abnormality jika
+                                                        ditemukan kondisi
+                                                        tidak normal.
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
                                         checkSheet.abnormalities.map(
                                             (abnormality) => (
                                                 <tr
-                                                    key={abnormality.id}
-                                                    className="transition hover:bg-slate-50"
+                                                    key={
+                                                        abnormality.id
+                                                    }
+                                                    className="group border-b border-slate-100 last:border-b-0 hover:bg-amber-50/30"
                                                 >
-                                                    <td className="whitespace-nowrap px-4 py-4 font-medium text-slate-700">
-                                                        {abnormality.tanggal}
+                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-700">
+                                                        {formatTanggal(
+                                                            abnormality.tanggal
+                                                        )}
                                                     </td>
 
-                                                    <td className="max-w-[300px] px-4 py-4">
-                                                        <p className="font-semibold leading-5 text-slate-800">
-                                                            {abnormality.abnormality}
-                                                        </p>
-                                                    </td>
-
-                                                    <td className="max-w-[300px] px-4 py-4 text-slate-600">
-                                                        {abnormality.countermeasure ??
+                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-800">
+                                                        {abnormality.abnormality ||
                                                             '-'}
                                                     </td>
 
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-4 py-4 text-sm leading-6 text-slate-600">
+                                                        {abnormality.countermeasure ||
+                                                            '-'}
+                                                    </td>
+
+                                                    <td className="px-4 py-4 text-center">
                                                         <span
-                                                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                                                                abnormality.status ===
-                                                                'Open'
-                                                                    ? 'bg-red-50 text-red-700 ring-1 ring-red-100'
-                                                                    : abnormality.status ===
-                                                                      'Progress'
-                                                                    ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-100'
-                                                                    : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
-                                                            }`}
+                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold ${getStatusClass(
+                                                                abnormality.status
+                                                            )}`}
                                                         >
-                                                            {abnormality.status}
+                                                            <span
+                                                                className={`h-1.5 w-1.5 rounded-full ${getStatusDot(
+                                                                    abnormality.status
+                                                                )}`}
+                                                            />
+
+                                                            {
+                                                                abnormality.status
+                                                            }
                                                         </span>
                                                     </td>
 
-                                                    <td className="px-4 py-4 text-slate-600">
-                                                        {abnormality.pic ??
+                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-600">
+                                                        {abnormality.pic ||
                                                             '-'}
                                                     </td>
 
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-3 py-4">
                                                         <div className="flex justify-center gap-1.5">
                                                             <IconButton
                                                                 title="Edit"
@@ -1229,51 +1430,53 @@ export default function Show({
                                                 </tr>
                                             )
                                         )
-                                    ) : (
-                                        <tr>
-                                            <td
-                                                colSpan="6"
-                                                className="px-6 py-16 text-center"
-                                            >
-                                                <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                                                        <AlertIcon />
-                                                    </div>
-
-                                                    <p className="mt-3 text-sm font-semibold text-slate-700">
-                                                        Belum ada abnormality
-                                                    </p>
-
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Catatan kondisi abnormal akan muncul di sini.
-                                                    </p>
-                                                </div>
-                                            </td>
-                                        </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
                     </section>
                 </main>
+
+                {/* =================================================
+                    FOOTER
+                ================================================== */}
+
+                <footer className="border-t border-slate-200 bg-white">
+                    <div className="mx-auto flex max-w-[1500px] items-center justify-center px-5 py-5 sm:px-6 lg:px-8">
+                        <p className="text-xs text-slate-400">
+                            © {new Date().getFullYear()} Emma Sarkilla
+                        </p>
+                    </div>
+                </footer>
             </div>
 
-            {/* =========================================================
-                MODAL TAMBAH ITEM
-            ========================================================== */}
+            {/* =====================================================
+                MODAL - ADD ITEM
+            ====================================================== */}
 
             {showAddItemModal && (
                 <Modal
                     title="Tambah Inspection Point"
-                    description="Tambahkan item pemeriksaan baru."
-                    onClose={() => {
-                        reset();
-                        setShowAddItemModal(false);
-                    }}
+                    description="Tambahkan titik pemeriksaan baru ke dalam check sheet."
+                    onClose={() =>
+                        setShowAddItemModal(false)
+                    }
                 >
-                    <form onSubmit={submit} className="p-6">
-                        <div className="grid gap-5 md:grid-cols-2">
+                    <form
+                        onSubmit={submit}
+                        className="space-y-6"
+                    >
+                        <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-5">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
 
+                                <h4 className="text-sm font-extrabold text-slate-800">
+                                    Identitas Inspection Point
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="No"
                                 required
@@ -1281,7 +1484,6 @@ export default function Show({
                             >
                                 <input
                                     type="number"
-                                    min="1"
                                     value={data.no}
                                     onChange={(e) =>
                                         setData(
@@ -1289,8 +1491,8 @@ export default function Show({
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Contoh: 1"
                                     className={inputClass}
+                                    placeholder="Contoh: 1"
                                 />
                             </Field>
 
@@ -1312,37 +1514,36 @@ export default function Show({
                                     <option value="">
                                         Pilih Shift
                                     </option>
-
                                     <option value="A">
                                         Shift A
                                     </option>
-
                                     <option value="B">
                                         Shift B
                                     </option>
                                 </select>
                             </Field>
+                        </div>
 
-                            <Field
-                                label="Inspection Point"
-                                required
-                                error={errors.inspection_point}
-                                className="md:col-span-2"
-                            >
-                                <textarea
-                                    value={data.inspection_point}
-                                    onChange={(e) =>
-                                        setData(
-                                            'inspection_point',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    placeholder="Contoh: Periksa kondisi oli mesin"
-                                    className={inputClass}
-                                />
-                            </Field>
+                        <Field
+                            label="Inspection Point"
+                            required
+                            error={errors.inspection_point}
+                        >
+                            <input
+                                type="text"
+                                value={data.inspection_point}
+                                onChange={(e) =>
+                                    setData(
+                                        'inspection_point',
+                                        e.target.value
+                                    )
+                                }
+                                className={inputClass}
+                                placeholder="Masukkan titik pemeriksaan"
+                            />
+                        </Field>
 
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="Condition"
                                 error={errors.condition}
@@ -1355,9 +1556,9 @@ export default function Show({
                                             e.target.value
                                         )
                                     }
-                                    rows={3}
-                                    placeholder="Contoh: Tidak bocor"
+                                    rows="4"
                                     className={inputClass}
+                                    placeholder="Kondisi normal yang diharapkan"
                                 />
                             </Field>
 
@@ -1365,8 +1566,7 @@ export default function Show({
                                 label="Method"
                                 error={errors.method}
                             >
-                                <input
-                                    type="text"
+                                <textarea
                                     value={data.method}
                                     onChange={(e) =>
                                         setData(
@@ -1374,20 +1574,20 @@ export default function Show({
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Contoh: Visual"
+                                    rows="4"
                                     className={inputClass}
+                                    placeholder="Metode pemeriksaan"
                                 />
                             </Field>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    reset();
-                                    setShowAddItemModal(false);
-                                }}
-                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                onClick={() =>
+                                    setShowAddItemModal(false)
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Batal
                             </button>
@@ -1395,33 +1595,45 @@ export default function Show({
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl bg-gradient-to-r from-blue-500 via-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processing
                                     ? 'Menyimpan...'
-                                    : 'Simpan'}
+                                    : 'Simpan Data'}
                             </button>
                         </div>
                     </form>
                 </Modal>
             )}
 
-            {/* =========================================================
-                MODAL EDIT ITEM
-            ========================================================== */}
+            {/* =====================================================
+                MODAL - EDIT ITEM
+            ====================================================== */}
 
             {editingItem && (
                 <Modal
                     title="Edit Inspection Point"
-                    description="Perbarui data item pemeriksaan."
+                    description="Perbarui informasi inspection point yang sudah tersimpan."
                     onClose={() => {
                         setEditingItem(null);
                         resetEdit();
                     }}
                 >
-                    <form onSubmit={submitEdit} className="p-6">
-                        <div className="grid gap-5 md:grid-cols-2">
+                    <form
+                        onSubmit={submitEdit}
+                        className="space-y-6"
+                    >
+                        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 to-violet-50/50 p-5">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
 
+                                <h4 className="text-sm font-extrabold text-slate-800">
+                                    Perbarui Data
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="No"
                                 required
@@ -1429,7 +1641,6 @@ export default function Show({
                             >
                                 <input
                                     type="number"
-                                    min="1"
                                     value={editData.no}
                                     onChange={(e) =>
                                         setEditData(
@@ -1459,38 +1670,37 @@ export default function Show({
                                     <option value="">
                                         Pilih Shift
                                     </option>
-
                                     <option value="A">
-                                        Shift A
+                                        Shift <A:link></A:link>
                                     </option>
-
                                     <option value="B">
                                         Shift B
                                     </option>
                                 </select>
                             </Field>
+                        </div>
 
-                            <Field
-                                label="Inspection Point"
-                                required
-                                error={editErrors.inspection_point}
-                                className="md:col-span-2"
-                            >
-                                <textarea
-                                    value={
-                                        editData.inspection_point
-                                    }
-                                    onChange={(e) =>
-                                        setEditData(
-                                            'inspection_point',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    className={inputClass}
-                                />
-                            </Field>
+                        <Field
+                            label="Inspection Point"
+                            required
+                            error={editErrors.inspection_point}
+                        >
+                            <input
+                                type="text"
+                                value={
+                                    editData.inspection_point
+                                }
+                                onChange={(e) =>
+                                    setEditData(
+                                        'inspection_point',
+                                        e.target.value
+                                    )
+                                }
+                                className={inputClass}
+                            />
+                        </Field>
 
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="Condition"
                                 error={editErrors.condition}
@@ -1503,7 +1713,7 @@ export default function Show({
                                             e.target.value
                                         )
                                     }
-                                    rows={3}
+                                    rows="4"
                                     className={inputClass}
                                 />
                             </Field>
@@ -1512,8 +1722,7 @@ export default function Show({
                                 label="Method"
                                 error={editErrors.method}
                             >
-                                <input
-                                    type="text"
+                                <textarea
                                     value={editData.method}
                                     onChange={(e) =>
                                         setEditData(
@@ -1521,19 +1730,20 @@ export default function Show({
                                             e.target.value
                                         )
                                     }
+                                    rows="4"
                                     className={inputClass}
                                 />
                             </Field>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setEditingItem(null);
                                     resetEdit();
                                 }}
-                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Batal
                             </button>
@@ -1541,7 +1751,7 @@ export default function Show({
                             <button
                                 type="submit"
                                 disabled={processingEdit}
-                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl bg-gradient-to-r from-blue-500 via-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processingEdit
                                     ? 'Menyimpan...'
@@ -1552,26 +1762,34 @@ export default function Show({
                 </Modal>
             )}
 
-            {/* =========================================================
-                MODAL TAMBAH ABNORMALITY
-            ========================================================== */}
+            {/* =====================================================
+                MODAL - ADD ABNORMALITY
+            ====================================================== */}
 
             {showAddAbnormalityModal && (
                 <Modal
                     title="Tambah Abnormality"
-                    description="Catat kondisi abnormal yang ditemukan."
+                    description="Catat kondisi abnormal yang ditemukan selama pemeriksaan."
                     icon="alert"
-                    onClose={() => {
-                        resetAbnormality();
-                        setShowAddAbnormalityModal(false);
-                    }}
+                    onClose={() =>
+                        setShowAddAbnormalityModal(false)
+                    }
                 >
                     <form
                         onSubmit={submitAbnormality}
-                        className="p-6"
+                        className="space-y-6"
                     >
-                        <div className="grid gap-5 md:grid-cols-2">
+                        <div className="rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50/80 to-orange-50/50 p-5">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
 
+                                <h4 className="text-sm font-extrabold text-slate-800">
+                                    Detail Abnormality
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="Tanggal"
                                 required
@@ -1612,116 +1830,116 @@ export default function Show({
                                     <option value="Open">
                                         Open
                                     </option>
-
                                     <option value="Progress">
                                         Progress
                                     </option>
-
                                     <option value="Closed">
                                         Closed
                                     </option>
                                 </select>
                             </Field>
-
-                            <Field
-                                label="Abnormality"
-                                required
-                                error={abnormalityErrors.abnormality}
-                            >
-                                <textarea
-                                    value={
-                                        abnormalityData.abnormality
-                                    }
-                                    onChange={(e) =>
-                                        setAbnormalityData(
-                                            'abnormality',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    placeholder="Contoh: Terdapat kebocoran oli"
-                                    className={inputClass}
-                                />
-                            </Field>
-
-                            <Field
-                                label="Countermeasure"
-                                error={
-                                    abnormalityErrors.countermeasure
-                                }
-                            >
-                                <textarea
-                                    value={
-                                        abnormalityData.countermeasure
-                                    }
-                                    onChange={(e) =>
-                                        setAbnormalityData(
-                                            'countermeasure',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    placeholder="Contoh: Mengganti seal oli"
-                                    className={inputClass}
-                                />
-                            </Field>
-
-                            <Field
-                                label="PIC"
-                                error={abnormalityErrors.pic}
-                                className="md:col-span-2"
-                            >
-                                <input
-                                    type="text"
-                                    value={abnormalityData.pic}
-                                    onChange={(e) =>
-                                        setAbnormalityData(
-                                            'pic',
-                                            e.target.value
-                                        )
-                                    }
-                                    placeholder="Contoh: Budi"
-                                    className={inputClass}
-                                />
-                            </Field>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+                        <Field
+                            label="Abnormality"
+                            required
+                            error={
+                                abnormalityErrors.abnormality
+                            }
+                        >
+                            <textarea
+                                value={
+                                    abnormalityData.abnormality
+                                }
+                                onChange={(e) =>
+                                    setAbnormalityData(
+                                        'abnormality',
+                                        e.target.value
+                                    )
+                                }
+                                rows="4"
+                                className={inputClass}
+                                placeholder="Jelaskan kondisi abnormal yang ditemukan"
+                            />
+                        </Field>
+
+                        <Field
+                            label="Countermeasure"
+                            error={
+                                abnormalityErrors.countermeasure
+                            }
+                        >
+                            <textarea
+                                value={
+                                    abnormalityData.countermeasure
+                                }
+                                onChange={(e) =>
+                                    setAbnormalityData(
+                                        'countermeasure',
+                                        e.target.value
+                                    )
+                                }
+                                rows="4"
+                                className={inputClass}
+                                placeholder="Tindakan perbaikan yang dilakukan"
+                            />
+                        </Field>
+
+                        <Field
+                            label="PIC"
+                            error={abnormalityErrors.pic}
+                        >
+                            <input
+                                type="text"
+                                value={abnormalityData.pic}
+                                onChange={(e) =>
+                                    setAbnormalityData(
+                                        'pic',
+                                        e.target.value
+                                    )
+                                }
+                                className={inputClass}
+                                placeholder="Nama PIC"
+                            />
+                        </Field>
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    resetAbnormality();
+                                onClick={() =>
                                     setShowAddAbnormalityModal(
                                         false
-                                    );
-                                }}
-                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                    )
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Batal
                             </button>
 
                             <button
                                 type="submit"
-                                disabled={processingAbnormality}
-                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={
+                                    processingAbnormality
+                                }
+                                className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:from-amber-600 hover:to-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processingAbnormality
                                     ? 'Menyimpan...'
-                                    : 'Simpan'}
+                                    : 'Simpan Data'}
                             </button>
                         </div>
                     </form>
                 </Modal>
             )}
 
-            {/* =========================================================
-                MODAL EDIT ABNORMALITY
-            ========================================================== */}
+            {/* =====================================================
+                MODAL - EDIT ABNORMALITY
+            ====================================================== */}
 
             {editingAbnormality && (
                 <Modal
                     title="Edit Abnormality"
-                    description="Perbarui data abnormality."
+                    description="Perbarui data abnormality yang sudah tersimpan."
                     icon="alert"
                     onClose={() => {
                         setEditingAbnormality(null);
@@ -1730,14 +1948,25 @@ export default function Show({
                 >
                     <form
                         onSubmit={submitEditAbnormality}
-                        className="p-6"
+                        className="space-y-6"
                     >
-                        <div className="grid gap-5 md:grid-cols-2">
+                        <div className="rounded-2xl border border-orange-100 bg-gradient-to-r from-orange-50/80 to-amber-50/50 p-5">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
 
+                                <h4 className="text-sm font-extrabold text-slate-800">
+                                    Perbarui Data Abnormality
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-5 sm:grid-cols-2">
                             <Field
                                 label="Tanggal"
                                 required
-                                error={editAbnormalityErrors.tanggal}
+                                error={
+                                    editAbnormalityErrors.tanggal
+                                }
                             >
                                 <input
                                     type="date"
@@ -1757,7 +1986,9 @@ export default function Show({
                             <Field
                                 label="Status"
                                 required
-                                error={editAbnormalityErrors.status}
+                                error={
+                                    editAbnormalityErrors.status
+                                }
                             >
                                 <select
                                     value={
@@ -1774,97 +2005,96 @@ export default function Show({
                                     <option value="Open">
                                         Open
                                     </option>
-
                                     <option value="Progress">
                                         Progress
                                     </option>
-
                                     <option value="Closed">
                                         Closed
                                     </option>
                                 </select>
                             </Field>
-
-                            <Field
-                                label="Abnormality"
-                                required
-                                error={
-                                    editAbnormalityErrors.abnormality
-                                }
-                            >
-                                <textarea
-                                    value={
-                                        editAbnormalityData.abnormality
-                                    }
-                                    onChange={(e) =>
-                                        setEditAbnormalityData(
-                                            'abnormality',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    className={inputClass}
-                                />
-                            </Field>
-
-                            <Field
-                                label="Countermeasure"
-                                error={
-                                    editAbnormalityErrors.countermeasure
-                                }
-                            >
-                                <textarea
-                                    value={
-                                        editAbnormalityData.countermeasure
-                                    }
-                                    onChange={(e) =>
-                                        setEditAbnormalityData(
-                                            'countermeasure',
-                                            e.target.value
-                                        )
-                                    }
-                                    rows={3}
-                                    className={inputClass}
-                                />
-                            </Field>
-
-                            <Field
-                                label="PIC"
-                                error={editAbnormalityErrors.pic}
-                                className="md:col-span-2"
-                            >
-                                <input
-                                    type="text"
-                                    value={
-                                        editAbnormalityData.pic
-                                    }
-                                    onChange={(e) =>
-                                        setEditAbnormalityData(
-                                            'pic',
-                                            e.target.value
-                                        )
-                                    }
-                                    className={inputClass}
-                                />
-                            </Field>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+                        <Field
+                            label="Abnormality"
+                            required
+                            error={
+                                editAbnormalityErrors.abnormality
+                            }
+                        >
+                            <textarea
+                                value={
+                                    editAbnormalityData.abnormality
+                                }
+                                onChange={(e) =>
+                                    setEditAbnormalityData(
+                                        'abnormality',
+                                        e.target.value
+                                    )
+                                }
+                                rows="4"
+                                className={inputClass}
+                            />
+                        </Field>
+
+                        <Field
+                            label="Countermeasure"
+                            error={
+                                editAbnormalityErrors.countermeasure
+                            }
+                        >
+                            <textarea
+                                value={
+                                    editAbnormalityData.countermeasure
+                                }
+                                onChange={(e) =>
+                                    setEditAbnormalityData(
+                                        'countermeasure',
+                                        e.target.value
+                                    )
+                                }
+                                rows="4"
+                                className={inputClass}
+                            />
+                        </Field>
+
+                        <Field
+                            label="PIC"
+                            error={editAbnormalityErrors.pic}
+                        >
+                            <input
+                                type="text"
+                                value={
+                                    editAbnormalityData.pic
+                                }
+                                onChange={(e) =>
+                                    setEditAbnormalityData(
+                                        'pic',
+                                        e.target.value
+                                    )
+                                }
+                                className={inputClass}
+                            />
+                        </Field>
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setEditingAbnormality(null);
                                     resetEditAbnormality();
                                 }}
-                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Batal
                             </button>
 
                             <button
                                 type="submit"
-                                disabled={processingEditAbnormality}
-                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={
+                                    processingEditAbnormality
+                                }
+                                className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:from-amber-600 hover:to-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {processingEditAbnormality
                                     ? 'Menyimpan...'

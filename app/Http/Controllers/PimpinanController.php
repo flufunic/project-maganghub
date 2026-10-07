@@ -56,62 +56,60 @@ class PimpinanController extends Controller
             ->get();
 
         $data = $preventifMesins
-            ->map(function ($preventif) use ($bulan, $tahun, $tanggal) {
+        ->map(function ($preventif) use ($bulan, $tahun, $tanggal) {
 
-                $tanggalPlan = $this->generateTanggalPlan(
-                    $preventif,
-                    $tahun,
-                    $bulan
-                );
+            $tanggalPlan = $this->generateTanggalPlan(
+                $preventif,
+                $tahun,
+                $bulan
+            );
 
-                // Hanya tampilkan mesin yang memang Plan
-                // pada tanggal yang dikirim Admin
-                if (!in_array($tanggal, $tanggalPlan, true)) {
-                    return null;
-                }
+            $adaPlan = in_array($tanggal, $tanggalPlan, true);
 
-                return [
-                    'id' => $preventif->no,
-                    'divisi' => $preventif->divisi,
-                    'no_item' => $preventif->no_item,
-                    'item_preventif' => $preventif->item_preventif,
+            return [
+                'id' => $preventif->no,
+                'divisi' => $preventif->divisi,
+                'no_item' => $preventif->no_item,
+                'item_preventif' => $preventif->item_preventif,
 
-                    'periode' => $preventif->periode_nilai
-                        ? rtrim(
-                            rtrim(
-                                number_format(
-                                    (float) $preventif->periode_nilai,
-                                    2,
-                                    '.',
-                                    ''
-                                ),
-                                '0'
+                'periode' => $preventif->periode_nilai
+                    ? rtrim(
+                        rtrim(
+                            number_format(
+                                (float) $preventif->periode_nilai,
+                                2,
+                                '.',
+                                ''
                             ),
-                            '.'
-                        ) . ' ' . $preventif->periode_satuan
-                        : '',
+                            '0'
+                        ),
+                        '.'
+                    ) . ' ' . $preventif->periode_satuan
+                    : '',
 
-                    'durasi' => $preventif->durasi,
-                    'total_durasi' => $preventif->total_durasi,
-                    'dot' => $preventif->dot,
-                    'hot' => $preventif->hot,
+                'durasi' => $preventif->durasi,
+                'total_durasi' => $preventif->total_durasi,
+                'dot' => $preventif->dot,
+                'hot' => $preventif->hot,
 
-                    'tanggal_plan' => [$tanggal],
+                // Tetap kirim tanggal yang dikirim saja
+                'tanggal_plan' => $adaPlan
+                    ? [$tanggal]
+                    : [],
 
-                    'checklists' => $preventif->checklists
-                        ->map(function ($checklist) {
-                            return [
-                                'tanggal' => Carbon::parse($checklist->tanggal)
-                                    ->format('Y-m-d'),
-                                'status' => (bool) $checklist->status,
-                                'catatan' => $checklist->catatan,
-                            ];
-                        })
-                        ->values(),
-                ];
-            })
-            ->filter()
-            ->values();
+                'checklists' => $preventif->checklists
+                    ->map(function ($checklist) {
+                        return [
+                            'tanggal' => Carbon::parse($checklist->tanggal)
+                                ->format('Y-m-d'),
+                            'status' => (bool) $checklist->status,
+                            'catatan' => $checklist->catatan,
+                        ];
+                    })
+                    ->values(),
+            ];
+        })
+        ->values();
 
         return Inertia::render('Pimpinan/Detail', [
             'user' => [

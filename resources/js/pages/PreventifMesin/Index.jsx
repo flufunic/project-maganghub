@@ -481,53 +481,63 @@ export default function Index({
             <div className="min-h-screen bg-slate-50">
 
                 {/* HEADER */}
-                <header className="border-b border-slate-200 bg-white">
-                    <div className="mx-auto w-full max-w-[1800px] px-4 py-4 sm:px-6 sm:py-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
-                            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                            {/* HAMBURGER */}
-                            <button
-                                type="button"
-                                onClick={() => setShowSidebar(true)}
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-white hover:text-blue-600"
-                                title="Menu"
-                            >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    className="h-6 w-6"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                </svg>
-                            </button>
+                <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-xl">
+                    <div className="mx-auto w-full max-w-[1800px] px-4 py-4 sm:px-6">
+                        <div className="flex items-center justify-between gap-4">
 
-                            {/* ICON + JUDUL */}
-                            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-200 sm:h-12 sm:w-12 sm:rounded-2xl">
+                            {/* LEFT */}
+                            <div className="flex min-w-0 items-center gap-3">
+
+                                {/* HAMBURGER */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSidebar(true)}
+                                    className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-300"
+                                    title="Menu"
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        className="h-5 w-5 transition-transform duration-200 group-hover:scale-105"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M4 6h16M4 12h16M4 18h16"
+                                        />
+                                    </svg>
+                                </button>
+
+                                {/* ICON */}
+                                <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 shadow-lg shadow-blue-200 sm:flex">
                                     <Icon
                                         type="clipboard"
-                                        className="h-5 w-5 text-white sm:h-6 sm:w-6"
+                                        className="h-6 w-6 text-white"
                                     />
                                 </div>
 
+                                {/* TITLE */}
                                 <div className="min-w-0">
-                                    <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                                        Schedule Preventif Mesin
-                                    </h1>
+                                    <div className="flex items-center gap-2">
+                                        <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                                            Schedule Preventif Mesin
+                                        </h1>
+
+                                        {/* <span className="hidden rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 sm:inline-flex">
+                                            Admin
+                                        </span> */}
+                                    </div>
 
                                     <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                                         Sistem pengelolaan dan monitoring preventif mesin
                                     </p>
                                 </div>
                             </div>
-                        </div>
-                            <div className="flex w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5 sm:gap-2 md:w-auto">
+
+                            {/* RIGHT */}
+                            <div className="relative flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5">
 
                                 {/* NOTIFIKASI */}
                                 <div className="relative">
@@ -536,10 +546,13 @@ export default function Index({
                                         onClick={() =>
                                             setShowNotifications(!showNotifications)
                                         }
-                                        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-white hover:text-blue-600"
+                                        className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
+                                            notifikasi.length + jumlahPengirimanDitolak > 0
+                                                ? 'bg-blue-50 text-blue-600 shadow-sm shadow-blue-100 hover:bg-blue-100'
+                                                : 'text-slate-500 hover:bg-white hover:text-blue-600'
+                                        }`}
                                         title="Notifikasi"
                                     >
-                                        {/* BELL */}
                                         <svg
                                             viewBox="0 0 24 24"
                                             fill="none"
@@ -547,7 +560,7 @@ export default function Index({
                                             strokeWidth="1.8"
                                             className={`h-5 w-5 ${
                                                 notifikasi.length + jumlahPengirimanDitolak > 0
-                                                    ? 'animate-wiggle text-blue-600 drop-shadow-[0_0_6px_rgba(59,130,246,0.8)]'
+                                                    ? 'animate-wiggle text-blue-600 drop-shadow-[0_0_6px_rgba(59,130,246,0.55)]'
                                                     : ''
                                             }`}
                                         >
@@ -563,9 +576,8 @@ export default function Index({
                                             />
                                         </svg>
 
-                                        {/* JUMLAH NOTIF */}
                                         {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
-                                            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                                            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-extrabold text-white shadow-md shadow-red-200">
                                                 {(notifikasi.length + jumlahPengirimanDitolak) > 99
                                                     ? '99+'
                                                     : notifikasi.length + jumlahPengirimanDitolak}
@@ -575,151 +587,415 @@ export default function Index({
 
                                     {/* DROPDOWN */}
                                     {showNotifications && (
-                                        <div className="absolute right-0 top-12 z-[80] w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                                        <div className="absolute right-0 top-12 z-[80] w-[400px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-400/20">
 
-                                            {/* HEADER NOTIF */}
-                                            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                                                <div>
-                                                    <h3 className="text-sm font-bold text-slate-900">
-                                                        Notifikasi
-                                                    </h3>
+                                            {/* =========================
+                                                HEADER NOTIFIKASI
+                                            ========================== */}
+                                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 px-5 pb-5 pt-5 text-white">
 
-                                                    <p className="mt-0.5 text-xs text-slate-400">
-                                                        Jadwal preventif mesin
-                                                    </p>
+                                                {/* DECORATION */}
+                                                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+                                                <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-indigo-400/20 blur-xl" />
+
+                                                <div className="relative">
+
+                                                    {/* TITLE */}
+                                                    <div className="flex items-start justify-between gap-3">
+
+                                                        <div className="flex items-center gap-3">
+
+                                                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+                                                                <svg
+                                                                    viewBox="0 0 24 24"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="1.8"
+                                                                    className="h-5 w-5"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5"
+                                                                    />
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        d="M10 20h4"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+
+                                                            <div>
+                                                                <h3 className="text-sm font-bold tracking-tight">
+                                                                    Notifikasi
+                                                                </h3>
+
+                                                                <p className="mt-0.5 text-[11px] text-blue-100">
+                                                                    Informasi jadwal & aktivitas preventif
+                                                                </p>
+                                                            </div>
+
+                                                        </div>
+
+                                                        {/* JUMLAH */}
+                                                        <div className="flex min-w-[52px] flex-col items-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+                                                            <span className="text-base font-extrabold leading-none">
+                                                                {notifikasi.length + jumlahPengirimanDitolak}
+                                                            </span>
+
+                                                            <span className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-blue-100">
+                                                                Notif
+                                                            </span>
+                                                        </div>
+
+                                                    </div>
+
+                                                    {/* SUMMARY */}
+                                                    {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
+                                                        <div className="mt-4 flex items-center gap-2">
+
+                                                            {jumlahPengirimanDitolak > 0 && (
+                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-red-300/20 bg-red-500/20 px-2.5 py-1 text-[10px] font-bold text-red-100">
+                                                                    <span className="h-1.5 w-1.5 rounded-full bg-red-300" />
+                                                                    {jumlahPengirimanDitolak} Ditolak
+                                                                </div>
+                                                            )}
+
+                                                            {notifikasi.length > 0 && (
+                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-blue-100">
+                                                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                                                                    {notifikasi.length} Jadwal
+                                                                </div>
+                                                            )}
+
+                                                        </div>
+                                                    )}
+
                                                 </div>
-
-                                                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
-                                                    {notifikasi.length + jumlahPengirimanDitolak} Notif
-                                                </span>
                                             </div>
 
-                                            {/* ISI */}
-                                            <div className="max-h-[400px] overflow-y-auto">
-                                                {/* NOTIFIKASI PENGIRIMAN DITOLAK */}
+
+                                            {/* =========================
+                                                ISI NOTIFIKASI
+                                            ========================== */}
+                                            <div className="max-h-[430px] overflow-y-auto bg-slate-50/70">
+
+                                                {/* =========================
+                                                    PENGIRIMAN DITOLAK
+                                                ========================== */}
                                                 {notifikasiPengiriman
                                                     .filter((item) => item.status === 'ditolak')
                                                     .map((notif, index) => (
                                                         <div
                                                             key={`ditolak-${notif.tanggal}-${index}`}
-                                                            className="border-b border-red-100 bg-red-50/50 px-4 py-3"
+                                                            className="border-b border-red-100 bg-gradient-to-r from-red-50 via-rose-50/60 to-white px-4 py-3.5 transition-all duration-200 hover:from-red-100/80 hover:via-rose-50 hover:to-white"
                                                         >
                                                             <div className="flex items-start gap-3">
 
-                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                                                                    <span className="text-base">
-                                                                        ✕
+                                                                {/* ICON */}
+                                                                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200">
+                                                                    <svg
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="2"
+                                                                        className="h-4.5 w-4.5"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            d="M6 6l12 12M18 6L6 18"
+                                                                        />
+                                                                    </svg>
+
+                                                                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-red-600 text-[8px] font-bold text-white">
+                                                                        !
                                                                     </span>
                                                                 </div>
 
+                                                                {/* CONTENT */}
                                                                 <div className="min-w-0 flex-1">
 
-                                                                    <div className="flex items-center justify-between gap-2">
-                                                                        <p className="text-xs font-bold text-red-700">
-                                                                            Pengiriman Ditolak
-                                                                        </p>
+                                                                    <div className="flex items-start justify-between gap-2">
 
-                                                                        <span className="shrink-0 text-[10px] font-medium text-red-400">
+                                                                        <div>
+                                                                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-600">
+                                                                                Ditolak
+                                                                            </span>
+
+                                                                            <p className="mt-1 text-xs font-bold text-slate-800">
+                                                                                Pengiriman Preventif
+                                                                            </p>
+                                                                        </div>
+
+                                                                        <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm ring-1 ring-red-100">
                                                                             {notif.tanggal_format}
                                                                         </span>
+
                                                                     </div>
 
-                                                                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
                                                                         Data preventif tanggal{' '}
-                                                                        <span className="font-semibold">
+                                                                        <span className="font-semibold text-slate-700">
                                                                             {notif.tanggal_format}
                                                                         </span>{' '}
                                                                         ditolak oleh pimpinan.
                                                                     </p>
 
-                                                                    <div className="mt-2 rounded-lg border border-red-100 bg-white px-3 py-2">
-                                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-red-500">
-                                                                            Alasan Penolakan
-                                                                        </p>
+                                                                    {/* ALASAN */}
+                                                                    <div className="mt-2.5 rounded-xl border border-red-100 bg-white/80 px-3 py-2.5 shadow-sm">
 
-                                                                        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="flex h-4 w-4 items-center justify-center rounded-md bg-red-100 text-[9px] text-red-500">
+                                                                                !
+                                                                            </span>
+
+                                                                            <p className="text-[9px] font-extrabold uppercase tracking-wider text-red-500">
+                                                                                Alasan Penolakan
+                                                                            </p>
+                                                                        </div>
+
+                                                                        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">
                                                                             {notif.alasan_penolakan || '-'}
                                                                         </p>
+
                                                                     </div>
 
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     ))}
-                                                {notifikasi.length > 0 ? (
-                                                    notifikasi.map((notif, index) => (
-                                                        <div
-                                                            key={`${notif.tanggal}-${notif.no_item}-${index}`}
-                                                            className="border-b border-slate-100 px-4 py-3 last:border-b-0"
-                                                        >
-                                                            <div className="flex items-start gap-3">
 
-                                                                {/* ICON */}
-                                                                <div
-                                                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                                                                        notif.tipe === 'terlambat'
-                                                                            ? 'bg-red-50'
-                                                                            : 'bg-amber-50'
-                                                                    }`}
-                                                                >
-                                                                    {notif.tipe === 'terlambat' ? (
-                                                                        <span className="text-base">
-                                                                            ⚠️
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-base">
-                                                                            🔔
-                                                                        </span>
-                                                                    )}
-                                                                </div>
 
-                                                                {/* TEXT */}
-                                                                <div className="min-w-0 flex-1">
+                                                {/* =========================
+                                                    NOTIFIKASI JADWAL
+                                                ========================== */}
+                                                {notifikasi.length > 0 &&
+                                                    notifikasi.map((notif, index) => {
 
-                                                                    <div className="flex items-center justify-between gap-2">
-                                                                        <p className="text-xs font-bold text-slate-800">
-                                                                            {notif.tipe === 'terlambat'
-                                                                                ? 'Pengecekan Belum Dilakukan'
-                                                                                : 'Pengecekan Besok'}
-                                                                        </p>
+                                                        const terlambat = notif.tipe === 'terlambat';
 
-                                                                        <span className="shrink-0 text-[10px] font-medium text-slate-400">
-                                                                            {notif.divisi}
-                                                                        </span>
+                                                        return (
+                                                            <div
+                                                                key={`${notif.tanggal}-${notif.no_item}-${index}`}
+                                                                className={`border-b px-4 py-3.5 transition-all duration-200 ${
+                                                                    terlambat
+                                                                        ? 'border-amber-100 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-white hover:from-amber-100/70'
+                                                                        : 'border-blue-100 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white hover:from-blue-100/60'
+                                                                }`}
+                                                            >
+
+                                                                <div className="flex items-start gap-3">
+
+                                                                    {/* ICON */}
+                                                                    <div
+                                                                        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ${
+                                                                            terlambat
+                                                                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-200'
+                                                                                : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
+                                                                        }`}
+                                                                    >
+
+                                                                        {terlambat ? (
+                                                                            <svg
+                                                                                viewBox="0 0 24 24"
+                                                                                fill="none"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth="1.8"
+                                                                                className="h-5 w-5"
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M12 9v4"
+                                                                                />
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M12 17h.01"
+                                                                                />
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M10.3 4.5L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.5a2 2 0 00-3.4 0z"
+                                                                                />
+                                                                            </svg>
+                                                                        ) : (
+                                                                            <svg
+                                                                                viewBox="0 0 24 24"
+                                                                                fill="none"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth="1.8"
+                                                                                className="h-5 w-5"
+                                                                            >
+                                                                                <rect
+                                                                                    x="3.5"
+                                                                                    y="4.5"
+                                                                                    width="17"
+                                                                                    height="16"
+                                                                                    rx="2"
+                                                                                />
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    d="M8 2.5v4M16 2.5v4M3.5 9h17"
+                                                                                />
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"
+                                                                                />
+                                                                            </svg>
+                                                                        )}
+
                                                                     </div>
 
-                                                                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                                                        {notif.pesan}
-                                                                    </p>
 
-                                                                    <p className="mt-1 text-[10px] font-medium text-slate-400">
-                                                                        No. {notif.no_item}
-                                                                    </p>
+                                                                    {/* CONTENT */}
+                                                                    <div className="min-w-0 flex-1">
+
+                                                                        <div className="flex items-start justify-between gap-2">
+
+                                                                            <div className="min-w-0">
+
+                                                                                <span
+                                                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                                                                                        terlambat
+                                                                                            ? 'bg-amber-100 text-amber-700'
+                                                                                            : 'bg-blue-100 text-blue-700'
+                                                                                    }`}
+                                                                                >
+                                                                                    {terlambat
+                                                                                        ? 'Perlu Perhatian'
+                                                                                        : 'Besok'}
+                                                                                </span>
+
+                                                                                <p className="mt-1 text-xs font-bold text-slate-800">
+                                                                                    {terlambat
+                                                                                        ? 'Pengecekan Belum Dilakukan'
+                                                                                        : 'Pengecekan Besok'}
+                                                                                </p>
+
+                                                                            </div>
+
+                                                                            {/* DIVISI */}
+                                                                            <span
+                                                                                className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-bold ${
+                                                                                    terlambat
+                                                                                        ? 'bg-amber-100/80 text-amber-700'
+                                                                                        : 'bg-blue-100/80 text-blue-700'
+                                                                                }`}
+                                                                            >
+                                                                                {notif.divisi}
+                                                                            </span>
+
+                                                                        </div>
+
+
+                                                                        {/* PESAN */}
+                                                                        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                                                                            {notif.pesan}
+                                                                        </p>
+
+
+                                                                        {/* NO ITEM */}
+                                                                        <div className="mt-2.5 flex items-center gap-2">
+
+                                                                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                                                                                <svg
+                                                                                    viewBox="0 0 24 24"
+                                                                                    fill="none"
+                                                                                    stroke="currentColor"
+                                                                                    strokeWidth="1.8"
+                                                                                    className="h-3 w-3"
+                                                                                >
+                                                                                    <path
+                                                                                        strokeLinecap="round"
+                                                                                        strokeLinejoin="round"
+                                                                                        d="M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10"
+                                                                                    />
+                                                                                </svg>
+                                                                            </span>
+
+                                                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                                                No. {notif.no_item}
+                                                                            </span>
+
+                                                                        </div>
+
+                                                                    </div>
 
                                                                 </div>
                                                             </div>
+                                                        );
+                                                    })}
+
+
+                                                {/* =========================
+                                                    EMPTY STATE
+                                                ========================== */}
+                                                {notifikasi.length === 0 &&
+                                                    jumlahPengirimanDitolak === 0 && (
+                                                        <div className="flex flex-col items-center px-6 py-12 text-center">
+
+                                                            <div className="relative mb-4">
+
+                                                                <div className="absolute inset-0 rounded-3xl bg-blue-100 blur-xl" />
+
+                                                                <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-500 shadow-sm ring-1 ring-blue-100">
+
+                                                                    <svg
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="1.6"
+                                                                        className="h-7 w-7"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5"
+                                                                        />
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            d="M10 20h4"
+                                                                        />
+                                                                    </svg>
+
+                                                                </div>
+
+                                                            </div>
+
+                                                            <p className="text-sm font-bold text-slate-700">
+                                                                Semua aman ✨
+                                                            </p>
+
+                                                            <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-slate-400">
+                                                                Belum ada jadwal atau aktivitas yang perlu diperhatikan.
+                                                            </p>
+
                                                         </div>
-                                                    ))
-                                                ) : jumlahPengirimanDitolak === 0 ? (
-                                                    <div className="flex flex-col items-center px-6 py-10 text-center">
+                                                    )}
 
-                                                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
-                                                            <span className="text-xl">
-                                                                🔔
-                                                            </span>
-                                                        </div>
-
-                                                        <p className="text-sm font-semibold text-slate-700">
-                                                            Tidak ada notifikasi
-                                                        </p>
-
-                                                        <p className="mt-1 text-xs text-slate-400">
-                                                            Belum ada jadwal atau pengecekan yang perlu diperhatikan.
-                                                        </p>
-
-                                                    </div>
-                                                ) : null}
                                             </div>
+
+                                            {/* =========================
+                                                FOOTER DROPDOWN
+                                            ========================== */}
+                                            {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
+                                                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3">
+
+                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                        Sistem Schedule Preventif
+                                                    </span>
+
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                                                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                                                        Sistem aktif
+                                                    </span>
+
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -729,181 +1005,397 @@ export default function Index({
                 </header>
 
                 {/* GREETING */}
-                <div className="mx-auto max-w-[1800px] px-6 pt-5">
-                    <h2 className="text-xl font-semibold text-slate-800">
-                        {greeting}, <span className="font-bold">Admin!</span> 👋
-                    </h2>
+                <div className="mx-auto max-w-[1800px] px-4 pt-6 sm:px-6">
+                    <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 px-6 py-5 shadow-lg shadow-blue-100">
+                        
+                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                        <div className="absolute -bottom-12 right-24 h-28 w-28 rounded-full bg-indigo-300/20 blur-2xl" />
+
+                        <div className="relative flex items-center justify-between gap-4">
+                            <div>
+                                <p className="text-sm font-medium text-blue-100">
+                                    Dashboard Admin
+                                </p>
+
+                                <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">
+                                    {greeting}, Admin! 👋
+                                </h2>
+
+                                <p className="mt-1 text-xs text-blue-100 sm:text-sm">
+                                    Kelola jadwal dan pantau aktivitas preventif mesin dengan mudah.
+                                </p>
+                            </div>
+
+                            <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl backdrop-blur-sm sm:flex">
+                                ⚙️
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* MAIN */}
                 <main className="mx-auto max-w-[1800px] px-6 py-7">
 
                     {/* TOOLBAR */}
-                    <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/60">
 
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="flex flex-col gap-6 p-5 lg:p-6 xl:flex-row xl:items-center xl:justify-between">
 
-                            <div className="flex items-center gap-4">
+                            {/* =========================
+                                LEFT - INFO DATA
+                            ========================= */}
+                            <div className="flex min-w-0 items-center gap-4">
 
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200">
+                                    <div className="absolute inset-0 rounded-2xl bg-white/10" />
+
                                     <Icon
                                         type="calendar"
-                                        className="h-5 w-5"
+                                        className="relative h-6 w-6"
                                     />
                                 </div>
 
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base font-bold text-slate-900">
+                                <div className="min-w-0">
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
                                             Data Preventif Mesin
                                         </h2>
 
-                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                                             {preventifMesins.total} Data
                                         </span>
                                     </div>
 
-                                    <p className="mt-0.5 text-sm text-slate-500">
-                                        Jadwal checklist bulan {months[selectedMonth]} {selectedYear}
+                                    <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+                                        Jadwal checklist
+                                        <span className="font-semibold text-slate-700">
+                                            {' '}
+                                            {months[selectedMonth]} {selectedYear}
+                                        </span>
                                     </p>
+
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 
-                                {/* FILTER */}
-                                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <Icon
-                                        type="filter"
-                                        className="h-4 w-4 text-slate-400"
-                                    />
+                            {/* =========================
+                                RIGHT - CONTROLS
+                            ========================= */}
+                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
 
-                                    <select
-                                        value={statusFilter}
-                                        onChange={(e) => {
-                                            const status = e.target.value;
+                                {/* =========================
+                                    STATUS FILTER
+                                ========================= */}
+                                <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
 
-                                            setStatusFilter(status);
+                                    {/* LABEL */}
+                                    <div className="flex items-center gap-2 px-2.5">
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm">
+                                            <Icon
+                                                type="filter"
+                                                className="h-3.5 w-3.5"
+                                            />
+                                        </div>
 
-                                            router.get(
-                                                '/preventif-mesin',
-                                                {
-                                                    bulan: selectedMonth + 1,
-                                                    tahun: selectedYear,
-                                                    status: status,
-                                                },
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                    replace: true,
-                                                }
-                                            );
-                                        }}
-                                        className="bg-transparent text-sm font-medium text-slate-700 focus:outline-none"
-                                    >
-                                        <option value="all">Semua</option>
-                                        <option value="ACT">ACT</option>
-                                        <option value="Plan">Plan</option>
-                                    </select>
+                                        <span className="hidden text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:block">
+                                            Status
+                                        </span>
+                                    </div>
+
+                                    {/* SEGMENTED CONTROL */}
+                                    <div className="flex items-center gap-0.5 rounded-xl bg-white p-0.5 shadow-sm">
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const status = 'all';
+
+                                                setStatusFilter(status);
+
+                                                router.get(
+                                                    '/preventif-mesin',
+                                                    {
+                                                        bulan: selectedMonth + 1,
+                                                        tahun: selectedYear,
+                                                        status: status,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true,
+                                                    }
+                                                );
+                                            }}
+                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                                                statusFilter === 'all'
+                                                    ? 'bg-slate-800 text-white shadow-sm'
+                                                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            Semua
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const status = 'ACT';
+
+                                                setStatusFilter(status);
+
+                                                router.get(
+                                                    '/preventif-mesin',
+                                                    {
+                                                        bulan: selectedMonth + 1,
+                                                        tahun: selectedYear,
+                                                        status: status,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true,
+                                                    }
+                                                );
+                                            }}
+                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                                                statusFilter === 'ACT'
+                                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                                                    : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
+                                            }`}
+                                        >
+                                            ACT
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const status = 'Plan';
+
+                                                setStatusFilter(status);
+
+                                                router.get(
+                                                    '/preventif-mesin',
+                                                    {
+                                                        bulan: selectedMonth + 1,
+                                                        tahun: selectedYear,
+                                                        status: status,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true,
+                                                    }
+                                                );
+                                            }}
+                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                                                statusFilter === 'Plan'
+                                                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
+                                                    : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600'
+                                            }`}
+                                        >
+                                            Plan
+                                        </button>
+
+                                    </div>
                                 </div>
 
-                                {/* BULAN & TAHUN */}
+
+                                {/* =========================
+                                    PERIODE
+                                ========================= */}
+                                <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
+
+                                    {/* ICON */}
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-blue-500 shadow-sm">
+                                        <Icon
+                                            type="calendar"
+                                            className="h-4 w-4"
+                                        />
+                                    </div>
+
+                                    {/* BULAN */}
+                                    <div className="relative">
+                                        <select
+                                            value={selectedMonth}
+                                            onChange={(e) => {
+                                                const month = Number(e.target.value);
+
+                                                setSelectedMonth(month);
+
+                                                router.get(
+                                                    '/preventif-mesin',
+                                                    {
+                                                        bulan: month + 1,
+                                                        tahun: selectedYear,
+                                                        status: statusFilter,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true
+                                                    }
+                                                );
+                                            }}
+                                            className="cursor-pointer appearance-none bg-transparent py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none"
+                                        >
+                                            {months.map((month, index) => (
+                                                <option
+                                                    key={index}
+                                                    value={index}
+                                                >
+                                                    {month}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="m6 9 6 6 6-6"
+                                            />
+                                        </svg>
+                                    </div>
+
+                                    <div className="h-6 w-px bg-slate-200" />
+
+                                    {/* TAHUN */}
+                                    <div className="relative">
+                                        <select
+                                            value={selectedYear}
+                                            onChange={(e) => {
+                                                const year = Number(e.target.value);
+
+                                                setSelectedYear(year);
+
+                                                router.get(
+                                                    '/preventif-mesin',
+                                                    {
+                                                        bulan: selectedMonth + 1,
+                                                        tahun: year,
+                                                        status: statusFilter,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        replace: true
+                                                    }
+                                                );
+                                            }}
+                                            className="cursor-pointer appearance-none bg-transparent py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none"
+                                        >
+                                            {Array.from(
+                                                { length: 16 },
+                                                (_, index) => 2020 + index
+                                            ).map((year) => (
+                                                <option
+                                                    key={year}
+                                                    value={year}
+                                                >
+                                                    {year}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="m6 9 6 6 6-6"
+                                            />
+                                        </svg>
+                                    </div>
+
+                                </div>
+
+
+                                {/* =========================
+                                    ACTIONS
+                                ========================= */}
                                 <div className="flex items-center gap-2">
 
-                                    <select
-                                        value={selectedMonth}
-                                        onChange={(e) => {
-                                            const month = Number(e.target.value);
-
-                                            setSelectedMonth(month);
-
-                                            router.get(
-                                                '/preventif-mesin',
-                                                {
-                                                    bulan: month + 1,
-                                                    tahun: selectedYear,
-                                                    status: statusFilter,   // <- tambah
-                                                },
-                                                { preserveState: true, preserveScroll: true, replace: true }
-                                            );
-                                        }}
-                                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                    {/* DOWNLOAD */}
+                                    <a
+                                        href={`/preventif-mesin/export?bulan=${selectedMonth + 1}&tahun=${selectedYear}`}
+                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
                                     >
-                                        {months.map((month, index) => (
-                                            <option
-                                                key={index}
-                                                value={index}
-                                            >
-                                                {month}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M12 3v12m0 0 4-4m-4 4-4-4"
+                                            />
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M5 21h14"
+                                            />
+                                        </svg>
 
-                                    <select
-                                        value={selectedYear}
-                                        onChange={(e) => {
-                                            const year = Number(e.target.value);
+                                        <span className="hidden sm:inline">
+                                            Excel
+                                        </span>
+                                    </a>
 
-                                            setSelectedYear(year);
 
-                                            router.get(
-                                                '/preventif-mesin',
-                                                {
-                                                    bulan: selectedMonth + 1,
-                                                    tahun: year,
-                                                    status: statusFilter,   // <- tambah
-                                                },
-                                                { preserveState: true, preserveScroll: true, replace: true }
-                                            );
-                                        }}
-                                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                    {/* TAMBAH */}
+                                    <Link
+                                        href="/preventif-mesin/create"
+                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-300"
                                     >
-                                        {Array.from(
-                                            { length: 16 },
-                                            (_, index) => 2020 + index
-                                        ).map((year) => (
-                                            <option
-                                                key={year}
-                                                value={year}
-                                            >
-                                                {year}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/15">
+                                            <Icon
+                                                type="plus"
+                                                className="h-3.5 w-3.5"
+                                            />
+                                        </span>
+
+                                        <span className="hidden sm:inline">
+                                            Tambah Data
+                                        </span>
+                                    </Link>
+
                                 </div>
-                                {/* DOWNLOAD EXCEL */}
-                                <a
-                                    href={`/preventif-mesin/export?bulan=${selectedMonth + 1}&tahun=${selectedYear}`}
-                                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                                >
-                                    ↓ Download Excel
-                                </a>
 
-                                {/* TAMBAH */}
-                                <Link
-                                    href="/preventif-mesin/create"
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 hover:shadow-md"
-                                >
-                                    <Icon
-                                        type="plus"
-                                        className="h-4 w-4"
-                                    />
-
-                                    Tambah Data
-                                </Link>
                             </div>
                         </div>
+
+                        {/* ACCENT LINE */}
+                        <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+
                     </div>
 
                     {/* TABLE */}
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/50">
 
                         <div className="overflow-x-auto">
                             <table className="w-full border-separate border-spacing-0 text-sm">
 
-                                <thead className="bg-slate-100/80 text-slate-700">
+                                <thead className="text-white">
+                                    {/* =========================
+                                        HEADER UTAMA
+                                    ========================== */}
+                                    <tr className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800">
 
-                                    <tr>
                                         {[
                                             'Divisi',
                                             'No',
@@ -917,45 +1409,91 @@ export default function Index({
                                             <th
                                                 key={header}
                                                 rowSpan="2"
-                                                className={`border-b border-r border-slate-200 px-4 py-3.5 font-semibold whitespace-nowrap first:border-l ${
+                                                className={`border-b border-r border-white/10 px-4 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap first:border-l ${
                                                     header === 'Item Preventif'
                                                         ? 'min-w-[300px] text-left'
                                                         : 'text-center'
                                                 }`}
                                             >
-                                                {header}
+                                                <div
+                                                    className={`flex items-center gap-2 ${
+                                                        header === 'Item Preventif'
+                                                            ? 'justify-start'
+                                                            : 'justify-center'
+                                                    }`}
+                                                >
+                                                    {/* titik indikator */}
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]" />
+
+                                                    {header}
+                                                </div>
                                             </th>
                                         ))}
 
+                                        {/* STATUS */}
                                         <th
                                             rowSpan="2"
-                                            className="border border-slate-200 px-4 py-3.5 text-center font-semibold whitespace-nowrap"
+                                            className="border-b border-r border-white/10 px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
-                                            Status
+                                            <div className="flex items-center justify-center gap-2">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_6px_rgba(110,231,183,0.8)]" />
+                                                Status
+                                            </div>
                                         </th>
 
+                                        {/* =========================
+                                            BULAN
+                                        ========================== */}
                                         <th
                                             colSpan={jumlahHari}
-                                            className="border-b border-r border-blue-100 bg-blue-50/80 px-4 py-3.5 text-center font-bold tracking-wide text-blue-700"
+                                            className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-3 text-center"
                                         >
-                                            {months[selectedMonth].toUpperCase()} {selectedYear}
+                                            <div className="flex items-center justify-center gap-3">
+
+                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+                                                    <Icon
+                                                        type="calendar"
+                                                        className="h-3.5 w-3.5 text-white"
+                                                    />
+                                                </span>
+
+                                                <div className="flex flex-col items-center leading-none">
+                                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-100">
+                                                        Jadwal Checklist
+                                                    </span>
+
+                                                    <span className="mt-1 text-sm font-extrabold tracking-wide text-white">
+                                                        {months[selectedMonth].toUpperCase()} {selectedYear}
+                                                    </span>
+                                                </div>
+
+                                            </div>
                                         </th>
 
+                                        {/* AKSI */}
                                         <th
                                             rowSpan="2"
-                                            className="border border-slate-200 px-4 py-3.5 text-center font-semibold whitespace-nowrap"
+                                            className="border-b border-white/10 px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
-                                            Aksi
+                                            <div className="flex items-center justify-center gap-2">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]" />
+                                                Aksi
+                                            </div>
                                         </th>
                                     </tr>
 
-                                    <tr>
+                                    {/* =========================
+                                        HEADER TANGGAL
+                                    ========================== */}
+                                    <tr className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-800">
                                         {tanggal.map((day) => (
                                             <th
                                                 key={day}
-                                                className="min-w-[50px] border-b border-r border-slate-200 px-2 py-3 text-center text-xs font-semibold text-slate-500"
+                                                className="min-w-[50px] border-b border-r border-white/10 px-2 py-2.5 text-center"
                                             >
-                                                {day}
+                                                <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-white ring-1 ring-white/10 transition-all duration-200 hover:bg-white/20">
+                                                    {day}
+                                                </div>
                                             </th>
                                         ))}
                                     </tr>
@@ -1043,13 +1581,13 @@ export default function Index({
                                                             {/* STATUS */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap">
                                                                 {status === 'ACT' ? (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.7)]" />
                                                                         ACT
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 text-xs font-bold text-amber-700 shadow-sm">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.7)]" />
                                                                         Plan
                                                                     </span>
                                                                 )}
@@ -1101,12 +1639,12 @@ export default function Index({
                                                                                             );
                                                                                         }
                                                                                     }}
-                                                                                    className={`flex h-7 w-7 items-center justify-center rounded-lg border-2 shadow-sm transition-all ${
+                                                                                    className={`flex h-8 w-8 items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 ${
                                                                                         !canChecklist
-                                                                                            ? 'cursor-default border-slate-300 bg-white'
+                                                                                            ? 'cursor-default border-slate-200 bg-slate-50 text-slate-300'
                                                                                             : checked
-                                                                                            ? 'cursor-pointer border-emerald-500 bg-emerald-500 text-white shadow-emerald-200 hover:bg-emerald-600 hover:shadow-md'
-                                                                                            : 'cursor-pointer border-blue-300 bg-white text-blue-500 hover:border-blue-500 hover:bg-blue-50 hover:shadow-sm'
+                                                                                            ? 'cursor-pointer border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-200'
+                                                                                            : 'cursor-pointer border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100'
                                                                                     }`}
                                                                                     title={
                                                                                         !canChecklist
@@ -1166,7 +1704,7 @@ export default function Index({
                                                                     <Link
                                                                         href={`/preventif-mesin/${preventif.no}/edit`}
                                                                         title="Edit data"
-                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:border-blue-300 hover:bg-blue-100"
+                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
                                                                     >
                                                                         <Icon
                                                                             type="edit"
@@ -1185,7 +1723,7 @@ export default function Index({
                                                                                 true
                                                                             );
                                                                         }}
-                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
                                                                     >
                                                                         <Icon
                                                                             type="trash"
@@ -1200,25 +1738,66 @@ export default function Index({
                                             )}
 
                                             {/* TOTAL */}
-                                            <tr className="bg-slate-100/80">
+                                            <tr className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800">
 
+                                                {/* TOTAL PREVENTIF */}
                                                 <td
                                                     colSpan={6}
-                                                    className="border border-slate-200 px-4 py-3.5 text-center font-bold text-slate-700"
+                                                    className="border-r border-white/10 px-4 py-4 text-center"
                                                 >
-                                                    Total Preventif Mesin
+                                                    <div className="flex items-center justify-center gap-3">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
+                                                            <Icon
+                                                                type="clipboard"
+                                                                className="h-4 w-4 text-blue-200"
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex flex-col items-start leading-none">
+                                                            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200">
+                                                                Rekapitulasi
+                                                            </span>
+
+                                                            <span className="mt-1 text-xs font-extrabold text-white">
+                                                                Total Preventif Mesin
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </td>
 
-                                                <td className="border border-slate-200 px-4 py-3 text-center font-bold text-slate-700">
-                                                    {formatJam(totalDotAll)}
+                                                {/* TOTAL DOT */}
+                                                <td className="border-r border-white/10 px-4 py-3 text-center">
+                                                    <div className="flex flex-col items-center justify-center">
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200">
+                                                            DOT
+                                                        </span>
+
+                                                        <span className="mt-1 text-xs font-extrabold text-white">
+                                                            {formatJam(totalDotAll)}
+                                                        </span>
+                                                    </div>
                                                 </td>
 
-                                                <td className="border border-slate-200 px-4 py-3 text-center font-bold text-slate-700">
-                                                    {formatJam(totalHotAll)}
+                                                {/* TOTAL HOT */}
+                                                <td className="border-r border-white/10 px-4 py-3 text-center">
+                                                    <div className="flex flex-col items-center justify-center">
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-200">
+                                                            HOT
+                                                        </span>
+
+                                                        <span className="mt-1 text-xs font-extrabold text-white">
+                                                            {formatJam(totalHotAll)}
+                                                        </span>
+                                                    </div>
                                                 </td>
 
                                                 {/* STATUS */}
-                                                <td className="border border-slate-200 px-4 py-3"></td>
+                                                <td className="border-r border-white/10 px-4 py-3 text-center">
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-100 backdrop-blur-sm">
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_6px_rgba(110,231,183,0.9)]" />
+                                                        Kirim
+                                                    </span>
+                                                </td>
 
                                                 {/* TOMBOL KIRIM PER TANGGAL */}
                                                 {tanggal.map((day) => {
@@ -1236,7 +1815,7 @@ export default function Index({
                                                     return (
                                                         <td
                                                             key={day}
-                                                            className="border border-slate-200 px-1 py-2 text-center"
+                                                            className="border-r border-white/10 px-1 py-3 text-center"
                                                         >
                                                             <div className="relative inline-flex">
 
@@ -1263,7 +1842,8 @@ export default function Index({
                                                                     className={`
                                                                         group inline-flex h-8 w-8
                                                                         items-center justify-center
-                                                                        rounded-lg
+                                                                        rounded-xl
+                                                                        border
                                                                         text-white
                                                                         shadow-sm
                                                                         transition-all duration-200
@@ -1271,10 +1851,10 @@ export default function Index({
                                                                         active:translate-y-0
                                                                         ${
                                                                             ditolak
-                                                                                ? 'bg-red-600 shadow-red-200 hover:bg-red-700'
+                                                                                ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:bg-red-400'
                                                                                 : diperiksa
-                                                                                ? 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700'
-                                                                                : 'bg-blue-600 shadow-blue-200 hover:bg-blue-700'
+                                                                                ? 'border-emerald-400/30 bg-emerald-500 shadow-emerald-900/20 hover:bg-emerald-400'
+                                                                                : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:bg-blue-400'
                                                                         }
                                                                     `}
                                                                 >
@@ -1306,7 +1886,7 @@ export default function Index({
                                                                             flex h-4 min-w-4
                                                                             items-center justify-center
                                                                             rounded-full
-                                                                            border-2 border-white
+                                                                            border-2 border-slate-800
                                                                             bg-red-500
                                                                             px-1
                                                                             text-[8px]
@@ -1324,9 +1904,8 @@ export default function Index({
                                                     );
                                                 })}
 
-
-                                                {/* Kolom aksi */}
-                                                <td className="border border-slate-200"></td>
+                                                {/* KOLOM AKSI */}
+                                                <td className="border-white/10"></td>
                                             </tr>
                                         </>
                                     ) : (
@@ -1410,9 +1989,11 @@ export default function Index({
 
             {/* SUCCESS TOAST */}
             {showSuccess && (
-                <div className="fixed right-6 top-6 z-[100] flex w-[360px] items-start gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-4 shadow-xl">
+                <div className="fixed right-5 top-5 z-[100] flex w-[360px] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-emerald-100/50">
 
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
+
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-green-100">
                         <span className="font-bold text-emerald-600">
                             ✓
                         </span>
@@ -1431,7 +2012,7 @@ export default function Index({
                     <button
                         type="button"
                         onClick={() => setShowSuccess(false)}
-                        className="text-lg leading-none text-slate-300 transition hover:text-slate-500"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
                     >
                         ×
                     </button>
@@ -1440,15 +2021,15 @@ export default function Index({
 
             {/* MODAL CATATAN */}
             {showCatatan && selectedChecklist && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-md">
 
-                    <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-900/20">
 
                         <div className="border-b border-slate-100 px-6 py-5">
                             <div className="flex items-start justify-between">
 
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 shadow-sm">
                                         📝
                                     </div>
 
@@ -1515,7 +2096,7 @@ export default function Index({
                             <button
                                 type="button"
                                 onClick={saveCatatan}
-                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg"
                             >
                                 Simpan Catatan
                             </button>
@@ -1526,18 +2107,18 @@ export default function Index({
 
             {/* MODAL HAPUS */}
             {showDeleteModal && selectedPreventif && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-md">
 
-                    <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-900/20">
 
                         <div className="px-6 pb-4 pt-6">
                             <div className="flex items-start justify-between">
 
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-50 to-rose-100 text-red-600 shadow-sm">
                                         <Icon
                                             type="trash"
-                                            className="h-5 w-5 text-red-600"
+                                            className="h-5 w-5"
                                         />
                                     </div>
 
@@ -1599,7 +2180,7 @@ export default function Index({
                                         }
                                     );
                                 }}
-                                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-red-600 hover:to-rose-700 hover:shadow-lg"
                             >
                                 <Icon
                                     type="trash"
@@ -1613,9 +2194,11 @@ export default function Index({
             )}
 
             {/* FOOTER */}
-            <footer className="mt-10 border-t border-slate-200 bg-white py-5">
-                <div className="mx-auto max-w-[1800px] px-6 text-center text-sm text-slate-500">
-                    © 2026 Emma Sarkilla
+            <footer className="mt-10 border-t border-slate-200 bg-white">
+                <div className="mx-auto max-w-[1800px] px-6 py-5 text-center">
+                    <p className="text-xs text-slate-400">
+                        © {new Date().getFullYear()} Sistem Schedule Preventif
+                    </p>
                 </div>
             </footer>
         </>
