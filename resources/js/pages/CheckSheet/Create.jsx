@@ -1,6 +1,76 @@
 import React from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 
+// =========================================================
+// ICONS  (UI saja, tidak ada logic)
+// =========================================================
+
+const ICONS = {
+    file: {
+        paths: [
+            'M7 3.5h7.5L19 8v12.5H7a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z',
+            'M14 3.5V8h5',
+            'M9 12h6',
+            'M9 15.5h6',
+            'M9 9h2',
+        ],
+    },
+    back: { sw: 2, paths: ['m15 18-6-6 6-6'] },
+    list: { paths: ['M4 6h16', 'M4 12h16', 'M4 18h10'] },
+    down: { sw: 2, paths: ['m6 9 6 6 6-6'] },
+    save: {
+        sw: 2,
+        paths: [
+            'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z',
+            'M17 21v-8H7v8',
+            'M7 3v5h8',
+        ],
+    },
+    info: {
+        circle: { cx: 12, cy: 12, r: 9 },
+        paths: ['M12 11v5', 'M12 8h.01'],
+    },
+};
+
+const Icon = ({ type, className = 'h-4 w-4' }) => {
+    const icon = ICONS[type];
+
+    if (!icon) {
+        return null;
+    }
+
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={icon.sw ?? 1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            {icon.circle && <circle {...icon.circle} />}
+            {icon.paths.map((d, i) => (
+                <path key={i} d={d} />
+            ))}
+        </svg>
+    );
+};
+
+// =========================================================
+// STYLE TOKENS
+// =========================================================
+
+const glassCard =
+    'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
+
+const inputBase =
+    'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:ring-4';
+
+const labelClass =
+    'mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600';
+
 export default function Create({ divisis }) {
     const { data, setData, post, processing, errors } = useForm({
         divisi_id: '',
@@ -18,21 +88,62 @@ export default function Create({ divisis }) {
         <>
             <Head title="Tambah Check Sheet" />
 
-            <div className="min-h-screen bg-slate-50">
+            <style>{`
+                @keyframes idxGradient {
+                    0%, 100% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                }
+                @keyframes idxFloat {
+                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+                    50% { transform: translate3d(30px, -30px, 0) scale(1.08); }
+                }
+                @keyframes idxFloatReverse {
+                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+                    50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
+                }
+                @keyframes idxRise {
+                    from { opacity: 0; transform: translateY(18px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+                .idx-gradient {
+                    background-size: 250% 250%;
+                    animation: idxGradient 20s ease infinite;
+                }
+                .idx-float { animation: idxFloat 14s ease-in-out infinite; }
+                .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
+                .idx-rise { animation: idxRise 0.7s ease-out both; }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .idx-gradient,
+                    .idx-float,
+                    .idx-float-reverse,
+                    .idx-rise { animation: none !important; }
+                }
+            `}</style>
+
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden">
 
                 {/* =====================================================
-                    HEADER
+                    BACKGROUND
                 ====================================================== */}
-                <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900">
+                <div className="fixed inset-0 -z-20 overflow-hidden">
+                    <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
-                    {/* Decorative background */}
-                    <div className="absolute -right-24 -top-32 h-80 w-80 rounded-full bg-blue-500/20 blur-3xl" />
-                    <div className="absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+                    <div className="idx-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
+                    <div className="idx-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
+                    <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
+                </div>
 
-                    <div className="relative mx-auto max-w-6xl px-5 py-6 sm:px-6">
+                {/* =====================================================
+                    HEADER (TRANSPARAN)
+                ====================================================== */}
+                <header className="border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
+
+                    <div className="mx-auto max-w-6xl px-5 py-6 sm:px-6">
 
                         {/* Breadcrumb */}
-                        <div className="mb-5 flex items-center gap-2 text-xs font-medium text-blue-200">
+                        <div className="mb-5 flex items-center gap-2 text-xs font-medium text-blue-200/80">
 
                             <Link
                                 href="/check-sheets"
@@ -41,146 +152,76 @@ export default function Create({ divisis }) {
                                 Check Sheet Prediktif
                             </Link>
 
-                            <span className="text-blue-400">
-                                /
-                            </span>
+                            <span className="text-blue-300/60">/</span>
 
-                            <span className="text-white">
-                                Tambah Data
-                            </span>
-
+                            <span className="text-white">Tambah Data</span>
                         </div>
-
 
                         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 
                             {/* TITLE */}
                             <div className="flex items-center gap-4">
 
-                                {/* ICON */}
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white shadow-lg shadow-blue-950/20 backdrop-blur-sm">
+                                <div className="relative shrink-0">
+                                    <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
 
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.8"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="h-7 w-7"
-                                    >
-                                        <path d="M7 3.5h7.5L19 8v12.5H7a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z" />
-
-                                        <path d="M14 3.5V8h5" />
-
-                                        <path d="M9 12h6" />
-
-                                        <path d="M9 15.5h6" />
-
-                                        <path d="M9 9h2" />
-                                    </svg>
-
+                                    <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 text-white shadow-lg">
+                                        <Icon type="file" className="h-7 w-7" />
+                                    </div>
                                 </div>
 
-
                                 <div>
-
                                     <div className="flex flex-wrap items-center gap-2">
-
-                                        <h1 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                                        <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
                                             Tambah Check Sheet
                                         </h1>
 
-                                        <span className="rounded-full border border-blue-300/20 bg-blue-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-200">
+                                        <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-blue-100 backdrop-blur-sm">
                                             Data Baru
                                         </span>
-
                                     </div>
 
-                                    <p className="mt-1.5 text-sm text-blue-200">
+                                    <p className="mt-1.5 text-sm text-white/65">
                                         Tambahkan data check sheet baru ke dalam sistem.
                                     </p>
-
                                 </div>
-
                             </div>
-
 
                             {/* BACK BUTTON */}
                             <Link
                                 href="/check-sheets"
-                                className="group inline-flex items-center justify-center gap-2 self-start rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 sm:self-auto"
+                                className="group inline-flex items-center justify-center gap-2 self-start rounded-xl border border-white/20 bg-white/15 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/25 sm:self-auto"
                             >
-
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                                <Icon
+                                    type="back"
                                     className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5"
-                                >
-                                    <path d="m15 18-6-6 6-6" />
-                                </svg>
-
+                                />
                                 Kembali
-
                             </Link>
-
                         </div>
-
                     </div>
-
-
-                    {/* Bottom accent */}
-                    <div className="h-1 bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400" />
-
                 </header>
-
 
                 {/* =====================================================
                     MAIN
                 ====================================================== */}
-                <main className="mx-auto max-w-6xl px-5 py-8 sm:px-6 lg:py-10">
+                <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 sm:px-6 lg:py-10">
 
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-
 
                         {/* =================================================
                             FORM CARD
                         ================================================== */}
-                        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
+                        <div className={`idx-rise overflow-hidden rounded-3xl ${glassCard}`}>
 
                             {/* CARD HEADER */}
-                            <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/30 to-indigo-50/30 px-6 py-5 sm:px-8">
-
+                            <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-5 sm:px-8">
                                 <div className="flex items-center gap-3">
-
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-200">
-
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="h-5 w-5"
-                                        >
-                                            <path d="M4 6h16" />
-                                            <path d="M4 12h16" />
-                                            <path d="M4 18h10" />
-                                        </svg>
-
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-300/50">
+                                        <Icon type="list" className="h-5 w-5" />
                                     </div>
 
-
                                     <div>
-
                                         <h2 className="text-base font-bold text-slate-900">
                                             Informasi Check Sheet
                                         </h2>
@@ -188,32 +229,19 @@ export default function Create({ divisis }) {
                                         <p className="mt-0.5 text-xs text-slate-500">
                                             Lengkapi informasi dasar check sheet.
                                         </p>
-
                                     </div>
-
                                 </div>
-
                             </div>
 
-
                             {/* FORM */}
-                            <form
-                                onSubmit={submit}
-                                className="space-y-7 p-6 sm:p-8"
-                            >
+                            <form onSubmit={submit} className="space-y-7 p-6 sm:p-8">
 
-
-                                {/* =================================================
-                                    IDENTITAS CHECK SHEET
-                                ================================================== */}
+                                {/* IDENTITAS CHECK SHEET */}
                                 <section>
-
                                     <div className="mb-4 flex items-center gap-3">
-
                                         <div className="h-8 w-1 rounded-full bg-gradient-to-b from-blue-500 to-indigo-500" />
 
                                         <div>
-
                                             <h3 className="text-sm font-bold text-slate-800">
                                                 Identitas Check Sheet
                                             </h3>
@@ -221,31 +249,19 @@ export default function Create({ divisis }) {
                                             <p className="text-xs text-slate-400">
                                                 Informasi dasar dokumen check sheet.
                                             </p>
-
                                         </div>
-
                                     </div>
-
 
                                     <div className="space-y-5">
 
-
                                         {/* DIVISI */}
                                         <div>
-
-                                            <label className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">
-
+                                            <label className={labelClass}>
                                                 Divisi
-
-                                                <span className="text-red-500">
-                                                    *
-                                                </span>
-
+                                                <span className="text-red-500">*</span>
                                             </label>
 
-
                                             <div className="relative">
-
                                                 <select
                                                     value={data.divisi_id}
                                                     onChange={(e) =>
@@ -254,9 +270,8 @@ export default function Create({ divisis }) {
                                                             e.target.value
                                                         )
                                                     }
-                                                    className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none transition-all duration-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                                                    className={`${inputBase} appearance-none pr-10 focus:border-blue-400 focus:ring-blue-100`}
                                                 >
-
                                                     <option value="">
                                                         Pilih Divisi
                                                     </option>
@@ -269,91 +284,56 @@ export default function Create({ divisis }) {
                                                             {divisi.nama_divisi}
                                                         </option>
                                                     ))}
-
                                                 </select>
 
-
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
+                                                <Icon
+                                                    type="down"
                                                     className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                                                >
-                                                    <path d="m6 9 6 6 6-6" />
-                                                </svg>
-
+                                                />
                                             </div>
-
 
                                             {errors.divisi_id && (
                                                 <p className="mt-1.5 text-xs font-medium text-red-500">
                                                     {errors.divisi_id}
                                                 </p>
                                             )}
-
                                         </div>
-
 
                                         {/* NOMOR DOKUMEN */}
                                         <div>
-
-                                            <label className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">
-
+                                            <label className={labelClass}>
                                                 Nomor Dokumen
-
-                                                <span className="text-red-500">
-                                                    *
-                                                </span>
-
+                                                <span className="text-red-500">*</span>
                                             </label>
 
-
-                                            <div className="relative">
-
-                                                <input
-                                                    type="text"
-                                                    value={data.nomor_dokumen}
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            'nomor_dokumen',
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    placeholder="Contoh: CS-001"
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-                                                />
-
-                                            </div>
-
+                                            <input
+                                                type="text"
+                                                value={data.nomor_dokumen}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'nomor_dokumen',
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="Contoh: CS-001"
+                                                className={`${inputBase} focus:border-indigo-400 focus:ring-indigo-100`}
+                                            />
 
                                             {errors.nomor_dokumen && (
                                                 <p className="mt-1.5 text-xs font-medium text-red-500">
                                                     {errors.nomor_dokumen}
                                                 </p>
                                             )}
-
                                         </div>
-
                                     </div>
-
                                 </section>
 
-
-                                {/* =================================================
-                                    DETAIL CHECK SHEET
-                                ================================================== */}
+                                {/* DETAIL CHECK SHEET */}
                                 <section>
-
                                     <div className="mb-4 flex items-center gap-3">
-
                                         <div className="h-8 w-1 rounded-full bg-gradient-to-b from-indigo-500 to-violet-500" />
 
                                         <div>
-
                                             <h3 className="text-sm font-bold text-slate-800">
                                                 Detail Check Sheet
                                             </h3>
@@ -361,25 +341,15 @@ export default function Create({ divisis }) {
                                             <p className="text-xs text-slate-400">
                                                 Tentukan nama atau judul check sheet.
                                             </p>
-
                                         </div>
-
                                     </div>
-
 
                                     {/* NAMA CHECK SHEET */}
                                     <div>
-
-                                        <label className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">
-
+                                        <label className={labelClass}>
                                             Nama Check Sheet
-
-                                            <span className="text-red-500">
-                                                *
-                                            </span>
-
+                                            <span className="text-red-500">*</span>
                                         </label>
-
 
                                         <input
                                             type="text"
@@ -391,40 +361,32 @@ export default function Create({ divisis }) {
                                                 )
                                             }
                                             placeholder="Contoh: Check Sheet Preventif Mesin"
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                                            className={`${inputBase} focus:border-violet-400 focus:ring-violet-100`}
                                         />
-
 
                                         {errors.nama_checksheet && (
                                             <p className="mt-1.5 text-xs font-medium text-red-500">
                                                 {errors.nama_checksheet}
                                             </p>
                                         )}
-
                                     </div>
-
                                 </section>
 
-
-                                {/* =================================================
-                                    BUTTON
-                                ================================================== */}
+                                {/* BUTTON */}
                                 <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
 
                                     <Link
                                         href="/check-sheets"
-                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 text-sm font-bold text-slate-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
                                     >
                                         Batal
                                     </Link>
 
-
                                     <button
                                         type="submit"
                                         disabled={processing}
-                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-7 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-300 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-7 text-sm font-semibold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                                     >
-
                                         {processing ? (
                                             <>
                                                 <svg
@@ -453,170 +415,107 @@ export default function Create({ divisis }) {
                                             </>
                                         ) : (
                                             <>
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
+                                                <Icon
+                                                    type="save"
                                                     className="h-4 w-4 transition-transform duration-200 group-hover:scale-110"
-                                                >
-                                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                                                    <path d="M17 21v-8H7v8" />
-                                                    <path d="M7 3v5h8" />
-                                                </svg>
+                                                />
 
                                                 Simpan Data
                                             </>
                                         )}
-
                                     </button>
-
                                 </div>
-
                             </form>
-
                         </div>
 
-
                         {/* =================================================
-                            SIDE INFO CARD
+                            SIDE INFO
                         ================================================== */}
-                        <aside className="space-y-4">
-
+                        <aside
+                            style={{ animationDelay: '150ms' }}
+                            className="idx-rise space-y-4"
+                        >
 
                             {/* INFO CARD */}
-                            <div className="overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 text-white shadow-xl shadow-blue-200/50">
+                            <div className="relative overflow-hidden rounded-3xl border border-white/25 bg-gradient-to-br from-white/20 via-white/10 to-white/5 p-5 text-white shadow-[0_20px_50px_rgba(2,6,23,0.30)] backdrop-blur-xl">
 
-                                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+                                <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-sky-300/20 blur-3xl" />
+                                <div className="absolute -bottom-12 left-4 h-28 w-28 rounded-full bg-indigo-300/20 blur-3xl" />
 
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.8"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="h-5 w-5"
-                                    >
-                                        <circle
-                                            cx="12"
-                                            cy="12"
-                                            r="9"
-                                        />
+                                <div className="relative">
+                                    <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/15">
+                                        <Icon type="info" className="h-5 w-5" />
+                                    </div>
 
-                                        <path d="M12 11v5" />
+                                    <h3 className="text-sm font-bold">
+                                        Informasi Pengisian
+                                    </h3>
 
-                                        <path d="M12 8h.01" />
-                                    </svg>
+                                    <p className="mt-2 text-xs leading-relaxed text-blue-100">
+                                        Lengkapi informasi check sheet dengan data
+                                        yang sesuai agar dokumen mudah dikelola.
+                                    </p>
 
+                                    <div className="mt-5 space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]" />
+
+                                            <p className="text-xs leading-relaxed text-blue-100">
+                                                Pilih divisi yang menggunakan check sheet.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-300 shadow-[0_0_6px_rgba(165,180,252,0.8)]" />
+
+                                            <p className="text-xs leading-relaxed text-blue-100">
+                                                Gunakan nomor dokumen yang sesuai dengan dokumen check sheet.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]" />
+
+                                            <p className="text-xs leading-relaxed text-blue-100">
+                                                Nama check sheet sebaiknya dibuat singkat dan mudah dikenali.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-
-
-                                <h3 className="text-sm font-bold">
-                                    Informasi Pengisian
-                                </h3>
-
-
-                                <p className="mt-2 text-xs leading-relaxed text-blue-100">
-                                    Lengkapi informasi check sheet dengan data
-                                    yang sesuai agar dokumen mudah dikelola.
-                                </p>
-
-
-                                <div className="mt-5 space-y-3">
-
-                                    <div className="flex items-start gap-3">
-
-                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-200" />
-
-                                        <p className="text-xs leading-relaxed text-blue-100">
-                                            Pilih divisi yang menggunakan check sheet.
-                                        </p>
-
-                                    </div>
-
-
-                                    <div className="flex items-start gap-3">
-
-                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-200" />
-
-                                        <p className="text-xs leading-relaxed text-blue-100">
-                                            Gunakan nomor dokumen yang sesuai dengan dokumen check sheet.
-                                        </p>
-
-                                    </div>
-
-
-                                    <div className="flex items-start gap-3">
-
-                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-200" />
-
-                                        <p className="text-xs leading-relaxed text-blue-100">
-                                            Nama check sheet sebaiknya dibuat singkat dan mudah dikenali.
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
                             </div>
 
-
                             {/* REQUIRED CARD */}
-                            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
+                            <div className={`rounded-3xl p-5 ${glassCard}`}>
                                 <div className="flex items-center gap-2">
-
                                     <span className="h-2 w-2 rounded-full bg-red-500" />
 
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                                         Field Wajib
                                     </h3>
-
                                 </div>
 
-
-                                <p className="mt-2 text-xs leading-relaxed text-slate-400">
-
+                                <p className="mt-2 text-xs leading-relaxed text-slate-500">
                                     Field bertanda
-
                                     <span className="mx-1 font-bold text-red-500">
                                         *
                                     </span>
-
                                     wajib diisi sebelum data disimpan.
-
                                 </p>
-
                             </div>
-
-
                         </aside>
-
                     </div>
-
                 </main>
 
-
                 {/* =====================================================
-                    FOOTER
+                    FOOTER (TRANSPARAN)
                 ====================================================== */}
-                <footer className="border-t border-slate-200 bg-white">
-
-                    <div className="mx-auto max-w-6xl px-5 py-5 text-center sm:px-6">
-
-                        <p className="text-xs text-slate-400">
-                            © {new Date().getFullYear()} Emma Sarkilla
+                <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                    <div className="mx-auto flex min-h-[60px] max-w-6xl items-center justify-center px-5 py-4 text-center sm:px-6">
+                        <p className="text-xs font-medium text-white/70">
+                            © {new Date().getFullYear()} Emma Sarkilla · Check Sheet Prediktif
                         </p>
-
                     </div>
-
                 </footer>
-
             </div>
         </>
     );

@@ -2,12 +2,108 @@ import Sidebar from '@/Components/Sidebar';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 
+/* ------------------------------------------------------------------
+| ICON  (UI saja, tidak ada logic)
+------------------------------------------------------------------ */
+const ICONS = {
+    plus: { sw: 2, paths: ['M12 5v14M5 12h14'] },
+    edit: {
+        paths: [
+            'M16.862 3.487a2.25 2.25 0 013.182 3.182L8.25 18.463 4 19.5l1.037-4.25L16.862 3.487z',
+            'M15 5l4 4',
+        ],
+    },
+    trash: {
+        paths: [
+            'M4.5 7.5h15M9.75 3.75h4.5l1.5 3.75h-7.5l1.5-3.75zM6.75 7.5v11.25A1.5 1.5 0 008.25 20.25h7.5a1.5 1.5 0 001.5-1.5V7.5',
+            'M10 11v5.5M14 11v5.5',
+        ],
+    },
+    'arrow-left': { paths: ['M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18'] },
+    logout: {
+        paths: [
+            'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15',
+            'M18 12H9m9 0l-3.75-3.75M18 12l-3.75 3.75',
+        ],
+    },
+    calendar: {
+        rect: { x: 3.75, y: 4.5, width: 16.5, height: 16, rx: 2 },
+        paths: ['M8 2.75v3.5M16 2.75v3.5M3.75 9h16.5'],
+    },
+    filter: { paths: ['M4 6h16M7 12h10M10 18h4'] },
+    clipboard: {
+        rect: { x: 5, y: 4, width: 14, height: 17, rx: 2 },
+        paths: ['M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4'],
+    },
+    bell: {
+        paths: ['M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5', 'M10 20h4'],
+    },
+    menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
+    close: { sw: 2, paths: ['M6 6l12 12M18 6L6 18'] },
+    chevron: { sw: 2, paths: ['m6 9 6 6 6-6'] },
+    download: { sw: 2, paths: ['M12 3v12m0 0 4-4m-4 4-4-4', 'M5 21h14'] },
+    send: { sw: 2, paths: ['M22 2 11 13', 'm22 2-7 20-4-9-9-4Z'] },
+    approve: {
+        sw: 2,
+        paths: [
+            'M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z',
+        ],
+    },
+    alert: {
+        paths: [
+            'M12 9v4',
+            'M12 17h.01',
+            'M10.3 4.5L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.5a2 2 0 00-3.4 0z',
+        ],
+    },
+    schedule: {
+        rect: { x: 3.5, y: 4.5, width: 17, height: 16, rx: 2 },
+        paths: [
+            'M8 2.5v4M16 2.5v4M3.5 9h17',
+            'M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01',
+        ],
+    },
+    list: { paths: ['M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10'] },
+};
+
+function Icon({ type, className = 'h-4 w-4' }) {
+    const icon = ICONS[type];
+
+    if (!icon) {
+        return null;
+    }
+
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={icon.sw ?? 1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            {icon.rect && <rect {...icon.rect} />}
+            {icon.paths.map((d, i) => (
+                <path key={i} d={d} />
+            ))}
+        </svg>
+    );
+}
+
+/* ------------------------------------------------------------------
+| STYLE TOKENS
+------------------------------------------------------------------ */
+const glassCard =
+    'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
+
 export default function Index({
     preventifMesins,
     flash,
     bulan,
     tahun,
-    status, 
+    status,
     totalDotAll = 0,
     totalHotAll = 0,
     notifikasi = [],
@@ -292,197 +388,116 @@ export default function Index({
     };
 
     // =========================
-    // ICON
+    // FILTER STATUS (klik tombol)
     // =========================
-    const Icon = ({ type, className = 'h-4 w-4' }) => {
-        if (type === 'plus') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 5v14M5 12h14"
-                    />
-                </svg>
-            );
-        }
+    const applyStatusFilter = (nextStatus) => {
+        setStatusFilter(nextStatus);
 
-        if (type === 'edit') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.862 3.487a2.25 2.25 0 013.182 3.182L8.25 18.463 4 19.5l1.037-4.25L16.862 3.487z"
-                    />
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 5l4 4"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'trash') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 7.5h15M9.75 3.75h4.5l1.5 3.75h-7.5l1.5-3.75zM6.75 7.5v11.25A1.5 1.5 0 008.25 20.25h7.5a1.5 1.5 0 001.5-1.5V7.5"
-                    />
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M10 11v5.5M14 11v5.5"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'arrow-left') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'logout') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15"
-                    />
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M18 12H9m9 0l-3.75-3.75M18 12l-3.75 3.75"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'calendar') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <rect
-                        x="3.75"
-                        y="4.5"
-                        width="16.5"
-                        height="16"
-                        rx="2"
-                    />
-                    <path
-                        strokeLinecap="round"
-                        d="M8 2.75v3.5M16 2.75v3.5M3.75 9h16.5"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'filter') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 6h16M7 12h10M10 18h4"
-                    />
-                </svg>
-            );
-        }
-
-        if (type === 'clipboard') {
-            return (
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={className}
-                >
-                    <rect
-                        x="5"
-                        y="4"
-                        width="14"
-                        height="17"
-                        rx="2"
-                    />
-                    <path
-                        strokeLinecap="round"
-                        d="M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4"
-                    />
-                </svg>
-            );
-        }
-
-        return null;
+        router.get(
+            '/preventif-mesin',
+            {
+                bulan: selectedMonth + 1,
+                tahun: selectedYear,
+                status: nextStatus,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
     };
+
+    const totalNotif = notifikasi.length + jumlahPengirimanDitolak;
+
+    const statusOptions = [
+        {
+            value: 'all',
+            label: 'Semua',
+            active: 'bg-slate-800 text-white shadow-sm',
+            idle: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+        },
+        {
+            value: 'ACT',
+            label: 'ACT',
+            active: 'bg-emerald-500 text-white shadow-sm shadow-emerald-200',
+            idle: 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600',
+        },
+        {
+            value: 'Plan',
+            label: 'Plan',
+            active: 'bg-amber-500 text-white shadow-sm shadow-amber-200',
+            idle: 'text-slate-500 hover:bg-amber-50 hover:text-amber-600',
+        },
+    ];
 
     return (
         <>
-
             <Sidebar
                 open={showSidebar}
                 onClose={() => setShowSidebar(false)}
             />
             <Head title="Data Preventif Mesin" />
 
-            <div className="min-h-screen bg-slate-50">
+            <style>{`
+                @keyframes idxGradient {
+                    0%, 100% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                }
+                @keyframes idxFloat {
+                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+                    50% { transform: translate3d(30px, -30px, 0) scale(1.08); }
+                }
+                @keyframes idxFloatReverse {
+                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+                    50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
+                }
+                @keyframes idxRise {
+                    from { opacity: 0; transform: translateY(18px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
 
-                {/* HEADER */}
-                <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-xl">
-                    <div className="mx-auto w-full max-w-[1800px] px-4 py-4 sm:px-6">
+                .idx-gradient {
+                    background-size: 250% 250%;
+                    animation: idxGradient 20s ease infinite;
+                }
+                .idx-float { animation: idxFloat 14s ease-in-out infinite; }
+                .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
+                .idx-rise { animation: idxRise 0.7s ease-out both; }
+
+                .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+                .idx-scroll::-webkit-scrollbar-track { background: transparent; }
+                .idx-scroll::-webkit-scrollbar-thumb {
+                    background: rgba(100, 116, 139, 0.4);
+                    border-radius: 999px;
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .idx-gradient,
+                    .idx-float,
+                    .idx-float-reverse,
+                    .idx-rise { animation: none !important; }
+                }
+            `}</style>
+
+            <div className="relative min-h-screen overflow-x-hidden">
+
+                {/* =====================================================
+                    BACKGROUND
+                ====================================================== */}
+                <div className="fixed inset-0 -z-20 overflow-hidden">
+                    <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
+
+                    <div className="idx-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
+                    <div className="idx-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
+                    <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
+                </div>
+
+                {/* =====================================================
+                    HEADER (TRANSPARAN)
+                ====================================================== */}
+                <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
+                    <div className="mx-auto w-full max-w-[1800px] px-4 py-3.5 sm:px-6">
                         <div className="flex items-center justify-between gap-4">
 
                             {/* LEFT */}
@@ -492,52 +507,40 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={() => setShowSidebar(true)}
-                                    className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-300"
+                                    className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/25 hover:shadow-lg hover:shadow-blue-900/30"
                                     title="Menu"
                                 >
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        className="h-5 w-5 transition-transform duration-200 group-hover:scale-105"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M4 6h16M4 12h16M4 18h16"
-                                        />
-                                    </svg>
+                                    <Icon
+                                        type="menu"
+                                        className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"
+                                    />
                                 </button>
 
                                 {/* ICON */}
-                                <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 shadow-lg shadow-blue-200 sm:flex">
-                                    <Icon
-                                        type="clipboard"
-                                        className="h-6 w-6 text-white"
-                                    />
+                                <div className="relative hidden shrink-0 sm:block">
+                                    <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
+                                    <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 shadow-lg">
+                                        <Icon
+                                            type="clipboard"
+                                            className="h-6 w-6 text-white"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* TITLE */}
                                 <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                                            Schedule Preventif Mesin
-                                        </h1>
+                                    <h1 className="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
+                                        Schedule Preventif Mesin
+                                    </h1>
 
-                                        {/* <span className="hidden rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 sm:inline-flex">
-                                            Admin
-                                        </span> */}
-                                    </div>
-
-                                    <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
+                                    <p className="mt-0.5 truncate text-xs text-white/65 sm:text-sm">
                                         Sistem pengelolaan dan monitoring preventif mesin
                                     </p>
                                 </div>
                             </div>
 
                             {/* RIGHT */}
-                            <div className="relative flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5">
+                            <div className="relative flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 p-1.5 backdrop-blur-md">
 
                                 {/* NOTIFIKASI */}
                                 <div className="relative">
@@ -547,83 +550,44 @@ export default function Index({
                                             setShowNotifications(!showNotifications)
                                         }
                                         className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
-                                            notifikasi.length + jumlahPengirimanDitolak > 0
-                                                ? 'bg-blue-50 text-blue-600 shadow-sm shadow-blue-100 hover:bg-blue-100'
-                                                : 'text-slate-500 hover:bg-white hover:text-blue-600'
+                                            totalNotif > 0
+                                                ? 'bg-white/20 text-white shadow-sm hover:bg-white/30'
+                                                : 'text-white/80 hover:bg-white/15 hover:text-white'
                                         }`}
                                         title="Notifikasi"
                                     >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
+                                        <Icon
+                                            type="bell"
                                             className={`h-5 w-5 ${
-                                                notifikasi.length + jumlahPengirimanDitolak > 0
-                                                    ? 'animate-wiggle text-blue-600 drop-shadow-[0_0_6px_rgba(59,130,246,0.55)]'
+                                                totalNotif > 0
+                                                    ? 'animate-wiggle drop-shadow-[0_0_6px_rgba(147,197,253,0.8)]'
                                                     : ''
                                             }`}
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5"
-                                            />
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M10 20h4"
-                                            />
-                                        </svg>
+                                        />
 
-                                        {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
-                                            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-extrabold text-white shadow-md shadow-red-200">
-                                                {(notifikasi.length + jumlahPengirimanDitolak) > 99
-                                                    ? '99+'
-                                                    : notifikasi.length + jumlahPengirimanDitolak}
+                                        {totalNotif > 0 && (
+                                            <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0a2260] bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-extrabold text-white shadow-md">
+                                                {totalNotif > 99 ? '99+' : totalNotif}
                                             </span>
                                         )}
                                     </button>
 
                                     {/* DROPDOWN */}
                                     {showNotifications && (
-                                        <div className="absolute right-0 top-12 z-[80] w-[400px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-400/20">
+                                        <div className="absolute right-0 top-12 z-[80] w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-white/40 bg-white/[0.97] shadow-2xl shadow-slate-950/40 backdrop-blur-2xl">
 
-                                            {/* =========================
-                                                HEADER NOTIFIKASI
-                                            ========================== */}
-                                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 px-5 pb-5 pt-5 text-white">
+                                            {/* HEADER NOTIFIKASI */}
+                                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 px-5 pb-5 pt-5 text-white">
 
-                                                {/* DECORATION */}
                                                 <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-xl" />
                                                 <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-indigo-400/20 blur-xl" />
 
                                                 <div className="relative">
-
-                                                    {/* TITLE */}
                                                     <div className="flex items-start justify-between gap-3">
 
                                                         <div className="flex items-center gap-3">
-
-                                                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
-                                                                <svg
-                                                                    viewBox="0 0 24 24"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    strokeWidth="1.8"
-                                                                    className="h-5 w-5"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5"
-                                                                    />
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        d="M10 20h4"
-                                                                    />
-                                                                </svg>
+                                                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                                                                <Icon type="bell" className="h-5 w-5" />
                                                             </div>
 
                                                             <div>
@@ -635,55 +599,43 @@ export default function Index({
                                                                     Informasi jadwal & aktivitas preventif
                                                                 </p>
                                                             </div>
-
                                                         </div>
 
-                                                        {/* JUMLAH */}
-                                                        <div className="flex min-w-[52px] flex-col items-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+                                                        <div className="flex min-w-[52px] flex-col items-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5">
                                                             <span className="text-base font-extrabold leading-none">
-                                                                {notifikasi.length + jumlahPengirimanDitolak}
+                                                                {totalNotif}
                                                             </span>
 
-                                                            <span className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-blue-100">
+                                                            <span className="mt-1 text-[10px] font-semibold text-blue-100">
                                                                 Notif
                                                             </span>
                                                         </div>
-
                                                     </div>
 
-                                                    {/* SUMMARY */}
-                                                    {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
+                                                    {totalNotif > 0 && (
                                                         <div className="mt-4 flex items-center gap-2">
-
                                                             {jumlahPengirimanDitolak > 0 && (
-                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-red-300/20 bg-red-500/20 px-2.5 py-1 text-[10px] font-bold text-red-100">
+                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-red-300/20 bg-red-500/25 px-2.5 py-1 text-[11px] font-bold text-red-100">
                                                                     <span className="h-1.5 w-1.5 rounded-full bg-red-300" />
                                                                     {jumlahPengirimanDitolak} Ditolak
                                                                 </div>
                                                             )}
 
                                                             {notifikasi.length > 0 && (
-                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-blue-100">
+                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-blue-100">
                                                                     <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
                                                                     {notifikasi.length} Jadwal
                                                                 </div>
                                                             )}
-
                                                         </div>
                                                     )}
-
                                                 </div>
                                             </div>
 
+                                            {/* ISI NOTIFIKASI */}
+                                            <div className="idx-scroll max-h-[430px] overflow-y-auto bg-slate-50/70">
 
-                                            {/* =========================
-                                                ISI NOTIFIKASI
-                                            ========================== */}
-                                            <div className="max-h-[430px] overflow-y-auto bg-slate-50/70">
-
-                                                {/* =========================
-                                                    PENGIRIMAN DITOLAK
-                                                ========================== */}
+                                                {/* PENGIRIMAN DITOLAK */}
                                                 {notifikasiPengiriman
                                                     .filter((item) => item.status === 'ditolak')
                                                     .map((notif, index) => (
@@ -693,34 +645,18 @@ export default function Index({
                                                         >
                                                             <div className="flex items-start gap-3">
 
-                                                                {/* ICON */}
                                                                 <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200">
-                                                                    <svg
-                                                                        viewBox="0 0 24 24"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        strokeWidth="2"
-                                                                        className="h-4.5 w-4.5"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            d="M6 6l12 12M18 6L6 18"
-                                                                        />
-                                                                    </svg>
+                                                                    <Icon type="close" className="h-[18px] w-[18px]" />
 
                                                                     <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-red-600 text-[8px] font-bold text-white">
                                                                         !
                                                                     </span>
                                                                 </div>
 
-                                                                {/* CONTENT */}
                                                                 <div className="min-w-0 flex-1">
-
                                                                     <div className="flex items-start justify-between gap-2">
-
                                                                         <div>
-                                                                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-600">
+                                                                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-600">
                                                                                 Ditolak
                                                                             </span>
 
@@ -729,10 +665,9 @@ export default function Index({
                                                                             </p>
                                                                         </div>
 
-                                                                        <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm ring-1 ring-red-100">
+                                                                        <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[10px] font-semibold text-slate-400 shadow-sm ring-1 ring-red-100">
                                                                             {notif.tanggal_format}
                                                                         </span>
-
                                                                     </div>
 
                                                                     <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
@@ -743,15 +678,13 @@ export default function Index({
                                                                         ditolak oleh pimpinan.
                                                                     </p>
 
-                                                                    {/* ALASAN */}
                                                                     <div className="mt-2.5 rounded-xl border border-red-100 bg-white/80 px-3 py-2.5 shadow-sm">
-
                                                                         <div className="flex items-center gap-1.5">
                                                                             <span className="flex h-4 w-4 items-center justify-center rounded-md bg-red-100 text-[9px] text-red-500">
                                                                                 !
                                                                             </span>
 
-                                                                            <p className="text-[9px] font-extrabold uppercase tracking-wider text-red-500">
+                                                                            <p className="text-[10px] font-extrabold text-red-500">
                                                                                 Alasan Penolakan
                                                                             </p>
                                                                         </div>
@@ -759,21 +692,15 @@ export default function Index({
                                                                         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">
                                                                             {notif.alasan_penolakan || '-'}
                                                                         </p>
-
                                                                     </div>
-
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     ))}
 
-
-                                                {/* =========================
-                                                    NOTIFIKASI JADWAL
-                                                ========================== */}
+                                                {/* NOTIFIKASI JADWAL */}
                                                 {notifikasi.length > 0 &&
                                                     notifikasi.map((notif, index) => {
-
                                                         const terlambat = notif.tipe === 'terlambat';
 
                                                         return (
@@ -785,10 +712,8 @@ export default function Index({
                                                                         : 'border-blue-100 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white hover:from-blue-100/60'
                                                                 }`}
                                                             >
-
                                                                 <div className="flex items-start gap-3">
 
-                                                                    {/* ICON */}
                                                                     <div
                                                                         className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ${
                                                                             terlambat
@@ -796,69 +721,17 @@ export default function Index({
                                                                                 : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
                                                                         }`}
                                                                     >
-
-                                                                        {terlambat ? (
-                                                                            <svg
-                                                                                viewBox="0 0 24 24"
-                                                                                fill="none"
-                                                                                stroke="currentColor"
-                                                                                strokeWidth="1.8"
-                                                                                className="h-5 w-5"
-                                                                            >
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    strokeLinejoin="round"
-                                                                                    d="M12 9v4"
-                                                                                />
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    strokeLinejoin="round"
-                                                                                    d="M12 17h.01"
-                                                                                />
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    strokeLinejoin="round"
-                                                                                    d="M10.3 4.5L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.5a2 2 0 00-3.4 0z"
-                                                                                />
-                                                                            </svg>
-                                                                        ) : (
-                                                                            <svg
-                                                                                viewBox="0 0 24 24"
-                                                                                fill="none"
-                                                                                stroke="currentColor"
-                                                                                strokeWidth="1.8"
-                                                                                className="h-5 w-5"
-                                                                            >
-                                                                                <rect
-                                                                                    x="3.5"
-                                                                                    y="4.5"
-                                                                                    width="17"
-                                                                                    height="16"
-                                                                                    rx="2"
-                                                                                />
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    d="M8 2.5v4M16 2.5v4M3.5 9h17"
-                                                                                />
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"
-                                                                                />
-                                                                            </svg>
-                                                                        )}
-
+                                                                        <Icon
+                                                                            type={terlambat ? 'alert' : 'schedule'}
+                                                                            className="h-5 w-5"
+                                                                        />
                                                                     </div>
 
-
-                                                                    {/* CONTENT */}
                                                                     <div className="min-w-0 flex-1">
-
                                                                         <div className="flex items-start justify-between gap-2">
-
                                                                             <div className="min-w-0">
-
                                                                                 <span
-                                                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                                                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                                                                                         terlambat
                                                                                             ? 'bg-amber-100 text-amber-700'
                                                                                             : 'bg-blue-100 text-blue-700'
@@ -874,12 +747,10 @@ export default function Index({
                                                                                         ? 'Pengecekan Belum Dilakukan'
                                                                                         : 'Pengecekan Besok'}
                                                                                 </p>
-
                                                                             </div>
 
-                                                                            {/* DIVISI */}
                                                                             <span
-                                                                                className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-bold ${
+                                                                                className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${
                                                                                     terlambat
                                                                                         ? 'bg-amber-100/80 text-amber-700'
                                                                                         : 'bg-blue-100/80 text-blue-700'
@@ -887,83 +758,37 @@ export default function Index({
                                                                             >
                                                                                 {notif.divisi}
                                                                             </span>
-
                                                                         </div>
 
-
-                                                                        {/* PESAN */}
                                                                         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
                                                                             {notif.pesan}
                                                                         </p>
 
-
-                                                                        {/* NO ITEM */}
                                                                         <div className="mt-2.5 flex items-center gap-2">
-
                                                                             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-slate-400">
-                                                                                <svg
-                                                                                    viewBox="0 0 24 24"
-                                                                                    fill="none"
-                                                                                    stroke="currentColor"
-                                                                                    strokeWidth="1.8"
-                                                                                    className="h-3 w-3"
-                                                                                >
-                                                                                    <path
-                                                                                        strokeLinecap="round"
-                                                                                        strokeLinejoin="round"
-                                                                                        d="M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10"
-                                                                                    />
-                                                                                </svg>
+                                                                                <Icon type="list" className="h-3 w-3" />
                                                                             </span>
 
-                                                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                                            <span className="text-[11px] font-semibold text-slate-400">
                                                                                 No. {notif.no_item}
                                                                             </span>
-
                                                                         </div>
-
                                                                     </div>
-
                                                                 </div>
                                                             </div>
                                                         );
                                                     })}
 
-
-                                                {/* =========================
-                                                    EMPTY STATE
-                                                ========================== */}
+                                                {/* EMPTY STATE */}
                                                 {notifikasi.length === 0 &&
                                                     jumlahPengirimanDitolak === 0 && (
                                                         <div className="flex flex-col items-center px-6 py-12 text-center">
-
                                                             <div className="relative mb-4">
-
                                                                 <div className="absolute inset-0 rounded-3xl bg-blue-100 blur-xl" />
 
                                                                 <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-500 shadow-sm ring-1 ring-blue-100">
-
-                                                                    <svg
-                                                                        viewBox="0 0 24 24"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        strokeWidth="1.6"
-                                                                        className="h-7 w-7"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5"
-                                                                        />
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            d="M10 20h4"
-                                                                        />
-                                                                    </svg>
-
+                                                                    <Icon type="bell" className="h-7 w-7" />
                                                                 </div>
-
                                                             </div>
 
                                                             <p className="text-sm font-bold text-slate-700">
@@ -973,27 +798,21 @@ export default function Index({
                                                             <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-slate-400">
                                                                 Belum ada jadwal atau aktivitas yang perlu diperhatikan.
                                                             </p>
-
                                                         </div>
                                                     )}
-
                                             </div>
 
-                                            {/* =========================
-                                                FOOTER DROPDOWN
-                                            ========================== */}
-                                            {(notifikasi.length + jumlahPengirimanDitolak) > 0 && (
+                                            {/* FOOTER DROPDOWN */}
+                                            {totalNotif > 0 && (
                                                 <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3">
-
-                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                    <span className="text-[11px] font-medium text-slate-400">
                                                         Sistem Schedule Preventif
                                                     </span>
 
-                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
                                                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                                                         Sistem aktif
                                                     </span>
-
                                                 </div>
                                             )}
                                         </div>
@@ -1004,12 +823,14 @@ export default function Index({
                     </div>
                 </header>
 
-                {/* GREETING */}
+                {/* =====================================================
+                    GREETING
+                ====================================================== */}
                 <div className="mx-auto max-w-[1800px] px-4 pt-6 sm:px-6">
-                    <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 px-6 py-5 shadow-lg shadow-blue-100">
-                        
-                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-                        <div className="absolute -bottom-12 right-24 h-28 w-28 rounded-full bg-indigo-300/20 blur-2xl" />
+                    <div className="idx-rise relative overflow-hidden rounded-3xl border border-white/25 bg-gradient-to-r from-white/20 via-white/10 to-white/5 px-6 py-5 shadow-[0_20px_50px_rgba(2,6,23,0.30)] backdrop-blur-xl">
+
+                        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-300/20 blur-3xl" />
+                        <div className="absolute -bottom-14 right-24 h-32 w-32 rounded-full bg-indigo-300/20 blur-3xl" />
 
                         <div className="relative flex items-center justify-between gap-4">
                             <div>
@@ -1021,32 +842,34 @@ export default function Index({
                                     {greeting}, Admin! 👋
                                 </h2>
 
-                                <p className="mt-1 text-xs text-blue-100 sm:text-sm">
+                                <p className="mt-1 text-xs text-blue-100/90 sm:text-sm">
                                     Kelola jadwal dan pantau aktivitas preventif mesin dengan mudah.
                                 </p>
                             </div>
 
-                            <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl backdrop-blur-sm sm:flex">
+                            <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 text-2xl backdrop-blur-sm sm:flex">
                                 ⚙️
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* MAIN */}
-                <main className="mx-auto max-w-[1800px] px-6 py-7">
+                {/* =====================================================
+                    MAIN
+                ====================================================== */}
+                <main className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6">
 
                     {/* TOOLBAR */}
-                    <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/60">
-
+                    <div
+                        style={{ animationDelay: '100ms' }}
+                        className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
+                    >
                         <div className="flex flex-col gap-6 p-5 lg:p-6 xl:flex-row xl:items-center xl:justify-between">
 
-                            {/* =========================
-                                LEFT - INFO DATA
-                            ========================= */}
+                            {/* LEFT - INFO DATA */}
                             <div className="flex min-w-0 items-center gap-4">
 
-                                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200">
+                                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-lg shadow-blue-300/50">
                                     <div className="absolute inset-0 rounded-2xl bg-white/10" />
 
                                     <Icon
@@ -1056,7 +879,6 @@ export default function Index({
                                 </div>
 
                                 <div className="min-w-0">
-
                                     <div className="flex flex-wrap items-center gap-2">
                                         <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
                                             Data Preventif Mesin
@@ -1075,22 +897,15 @@ export default function Index({
                                             {months[selectedMonth]} {selectedYear}
                                         </span>
                                     </p>
-
                                 </div>
                             </div>
 
-
-                            {/* =========================
-                                RIGHT - CONTROLS
-                            ========================= */}
+                            {/* RIGHT - CONTROLS */}
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
 
-                                {/* =========================
-                                    STATUS FILTER
-                                ========================= */}
+                                {/* STATUS FILTER */}
                                 <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
 
-                                    {/* LABEL */}
                                     <div className="flex items-center gap-2 px-2.5">
                                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm">
                                             <Icon
@@ -1099,114 +914,34 @@ export default function Index({
                                             />
                                         </div>
 
-                                        <span className="hidden text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:block">
+                                        <span className="hidden text-xs font-bold text-slate-500 sm:block">
                                             Status
                                         </span>
                                     </div>
 
-                                    {/* SEGMENTED CONTROL */}
                                     <div className="flex items-center gap-0.5 rounded-xl bg-white p-0.5 shadow-sm">
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const status = 'all';
-
-                                                setStatusFilter(status);
-
-                                                router.get(
-                                                    '/preventif-mesin',
-                                                    {
-                                                        bulan: selectedMonth + 1,
-                                                        tahun: selectedYear,
-                                                        status: status,
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                        replace: true,
-                                                    }
-                                                );
-                                            }}
-                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
-                                                statusFilter === 'all'
-                                                    ? 'bg-slate-800 text-white shadow-sm'
-                                                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                                            }`}
-                                        >
-                                            Semua
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const status = 'ACT';
-
-                                                setStatusFilter(status);
-
-                                                router.get(
-                                                    '/preventif-mesin',
-                                                    {
-                                                        bulan: selectedMonth + 1,
-                                                        tahun: selectedYear,
-                                                        status: status,
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                        replace: true,
-                                                    }
-                                                );
-                                            }}
-                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
-                                                statusFilter === 'ACT'
-                                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
-                                                    : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
-                                            }`}
-                                        >
-                                            ACT
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const status = 'Plan';
-
-                                                setStatusFilter(status);
-
-                                                router.get(
-                                                    '/preventif-mesin',
-                                                    {
-                                                        bulan: selectedMonth + 1,
-                                                        tahun: selectedYear,
-                                                        status: status,
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                        replace: true,
-                                                    }
-                                                );
-                                            }}
-                                            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
-                                                statusFilter === 'Plan'
-                                                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
-                                                    : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600'
-                                            }`}
-                                        >
-                                            Plan
-                                        </button>
-
+                                        {statusOptions.map((option) => (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                onClick={() =>
+                                                    applyStatusFilter(option.value)
+                                                }
+                                                className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                                                    statusFilter === option.value
+                                                        ? option.active
+                                                        : option.idle
+                                                }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
-
-                                {/* =========================
-                                    PERIODE
-                                ========================= */}
+                                {/* PERIODE */}
                                 <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
 
-                                    {/* ICON */}
                                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-blue-500 shadow-sm">
                                         <Icon
                                             type="calendar"
@@ -1249,19 +984,10 @@ export default function Index({
                                             ))}
                                         </select>
 
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
+                                        <Icon
+                                            type="chevron"
                                             className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="m6 9 6 6 6-6"
-                                            />
-                                        </svg>
+                                        />
                                     </div>
 
                                     <div className="h-6 w-px bg-slate-200" />
@@ -1304,63 +1030,33 @@ export default function Index({
                                             ))}
                                         </select>
 
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
+                                        <Icon
+                                            type="chevron"
                                             className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="m6 9 6 6 6-6"
-                                            />
-                                        </svg>
+                                        />
                                     </div>
-
                                 </div>
 
-
-                                {/* =========================
-                                    ACTIONS
-                                ========================= */}
+                                {/* ACTIONS */}
                                 <div className="flex items-center gap-2">
 
-                                    {/* DOWNLOAD */}
                                     <a
                                         href={`/preventif-mesin/export?bulan=${selectedMonth + 1}&tahun=${selectedYear}`}
                                         className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
                                     >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
+                                        <Icon
+                                            type="download"
                                             className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M12 3v12m0 0 4-4m-4 4-4-4"
-                                            />
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M5 21h14"
-                                            />
-                                        </svg>
+                                        />
 
                                         <span className="hidden sm:inline">
                                             Excel
                                         </span>
                                     </a>
 
-
-                                    {/* TAMBAH */}
                                     <Link
                                         href="/preventif-mesin/create"
-                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-300"
+                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
                                     >
                                         <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/15">
                                             <Icon
@@ -1373,28 +1069,25 @@ export default function Index({
                                             Tambah Data
                                         </span>
                                     </Link>
-
                                 </div>
-
                             </div>
                         </div>
 
                         {/* ACCENT LINE */}
                         <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
-
                     </div>
 
                     {/* TABLE */}
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/50">
-
-                        <div className="overflow-x-auto">
+                    <div
+                        style={{ animationDelay: '200ms' }}
+                        className={`idx-rise overflow-hidden rounded-3xl ${glassCard}`}
+                    >
+                        <div className="idx-scroll overflow-x-auto">
                             <table className="w-full border-separate border-spacing-0 text-sm">
 
                                 <thead className="text-white">
-                                    {/* =========================
-                                        HEADER UTAMA
-                                    ========================== */}
-                                    <tr className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800">
+                                    {/* HEADER UTAMA */}
+                                    <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
 
                                         {[
                                             'Divisi',
@@ -1422,7 +1115,6 @@ export default function Index({
                                                             : 'justify-center'
                                                     }`}
                                                 >
-                                                    {/* titik indikator */}
                                                     <span className="h-1.5 w-1.5 rounded-full bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]" />
 
                                                     {header}
@@ -1441,9 +1133,7 @@ export default function Index({
                                             </div>
                                         </th>
 
-                                        {/* =========================
-                                            BULAN
-                                        ========================== */}
+                                        {/* BULAN */}
                                         <th
                                             colSpan={jumlahHari}
                                             className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-3 text-center"
@@ -1466,7 +1156,6 @@ export default function Index({
                                                         {months[selectedMonth].toUpperCase()} {selectedYear}
                                                     </span>
                                                 </div>
-
                                             </div>
                                         </th>
 
@@ -1482,10 +1171,8 @@ export default function Index({
                                         </th>
                                     </tr>
 
-                                    {/* =========================
-                                        HEADER TANGGAL
-                                    ========================== */}
-                                    <tr className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-800">
+                                    {/* HEADER TANGGAL */}
+                                    <tr className="bg-gradient-to-r from-blue-800 via-blue-900 to-indigo-900">
                                         {tanggal.map((day) => (
                                             <th
                                                 key={day}
@@ -1515,7 +1202,7 @@ export default function Index({
                                                     return (
                                                         <tr
                                                             key={preventif.no}
-                                                            className="group transition-colors hover:bg-blue-50/30"
+                                                            className="group transition-colors hover:bg-blue-50/50"
                                                         >
                                                             {/* DIVISI */}
                                                             {rowSpan > 0 && (
@@ -1620,7 +1307,7 @@ export default function Index({
                                                                             checked
                                                                                 ? 'bg-emerald-50'
                                                                                 : plan
-                                                                                ? 'bg-blue-50/30'
+                                                                                ? 'bg-blue-50/40'
                                                                                 : 'bg-white'
                                                                         }`}
                                                                     >
@@ -1738,7 +1425,7 @@ export default function Index({
                                             )}
 
                                             {/* TOTAL */}
-                                            <tr className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800">
+                                            <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
 
                                                 {/* TOTAL PREVENTIF */}
                                                 <td
@@ -1768,7 +1455,7 @@ export default function Index({
                                                 {/* TOTAL DOT */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
-                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-200">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
                                                             DOT
                                                         </span>
 
@@ -1781,7 +1468,7 @@ export default function Index({
                                                 {/* TOTAL HOT */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
-                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-200">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
                                                             HOT
                                                         </span>
 
@@ -1803,14 +1490,14 @@ export default function Index({
                                                 {tanggal.map((day) => {
                                                     const tanggalKirim = getTanggalChecklist(day);
 
-                                                    const notifPengiriman =
-                                                        getNotifikasiPengiriman(tanggalKirim);
+                                                    const notifPengiriman = getNotifikasiPengiriman(tanggalKirim);
 
-                                                    const ditolak =
-                                                        notifPengiriman?.status === 'ditolak';
+                                                    const ditolak = notifPengiriman?.status === 'ditolak';
 
-                                                    const diperiksa =
-                                                        notifPengiriman?.status === 'diperiksa';
+                                                    // sudah diperiksa / di-acc pimpinan
+                                                    const disetujui = ['diperiksa', 'disetujui', 'approved'].includes(
+                                                        notifPengiriman?.status
+                                                    );
 
                                                     return (
                                                         <td
@@ -1818,87 +1505,52 @@ export default function Index({
                                                             className="border-r border-white/10 px-1 py-3 text-center"
                                                         >
                                                             <div className="relative inline-flex">
-
                                                                 <button
                                                                     type="button"
+                                                                    disabled={disetujui}
                                                                     onClick={() => {
+                                                                        if (disetujui) return;
+
                                                                         router.post(
                                                                             '/preventif-pengiriman',
-                                                                            {
-                                                                                tanggal: tanggalKirim,
-                                                                            },
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            }
+                                                                            { tanggal: tanggalKirim },
+                                                                            { preserveScroll: true }
                                                                         );
                                                                     }}
                                                                     title={
                                                                         ditolak
                                                                             ? `Ditolak: ${notifPengiriman.alasan_penolakan || 'Tidak ada alasan'}`
-                                                                            : diperiksa
-                                                                            ? `Sudah diperiksa ${tanggalKirim}`
+                                                                            : disetujui
+                                                                            ? `Disetujui pimpinan (${tanggalKirim})`
                                                                             : `Kirim data ${tanggalKirim}`
                                                                     }
-                                                                    className={`
-                                                                        group inline-flex h-8 w-8
-                                                                        items-center justify-center
-                                                                        rounded-xl
-                                                                        border
-                                                                        text-white
-                                                                        shadow-sm
-                                                                        transition-all duration-200
-                                                                        hover:-translate-y-0.5
-                                                                        active:translate-y-0
-                                                                        ${
-                                                                            ditolak
-                                                                                ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:bg-red-400'
-                                                                                : diperiksa
-                                                                                ? 'border-emerald-400/30 bg-emerald-500 shadow-emerald-900/20 hover:bg-emerald-400'
-                                                                                : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:bg-blue-400'
-                                                                        }
-                                                                    `}
+                                                                    className={`group inline-flex h-8 w-8 items-center justify-center rounded-xl border text-white shadow-sm transition-all duration-200 ${
+                                                                        ditolak
+                                                                            ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:-translate-y-0.5 hover:bg-red-400'
+                                                                            : disetujui
+                                                                            ? 'cursor-default border-emerald-300/40 bg-gradient-to-br from-emerald-400 to-green-600 shadow-emerald-900/30 ring-2 ring-emerald-300/30'
+                                                                            : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:-translate-y-0.5 hover:bg-blue-400 active:translate-y-0'
+                                                                    }`}
                                                                 >
-                                                                    <svg
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                        viewBox="0 0 24 24"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        strokeWidth="2"
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        className="
-                                                                            h-4 w-4
-                                                                            transition-transform duration-200
-                                                                            group-hover:translate-x-0.5
-                                                                            group-hover:-translate-y-0.5
-                                                                        "
-                                                                    >
-                                                                        <path d="M22 2 11 13" />
-                                                                        <path d="m22 2-7 20-4-9-9-4Z" />
-                                                                    </svg>
+                                                                    {disetujui ? (
+                                                                        <Icon
+                                                                            type="approve"
+                                                                            className="h-[18px] w-[18px]"
+                                                                        />
+                                                                    ) : (
+                                                                        <Icon
+                                                                            type="send"
+                                                                            className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                                                                        />
+                                                                    )}
                                                                 </button>
 
                                                                 {/* BADGE DITOLAK */}
                                                                 {ditolak && (
-                                                                    <span
-                                                                        className="
-                                                                            absolute -right-1.5 -top-1.5
-                                                                            flex h-4 min-w-4
-                                                                            items-center justify-center
-                                                                            rounded-full
-                                                                            border-2 border-slate-800
-                                                                            bg-red-500
-                                                                            px-1
-                                                                            text-[8px]
-                                                                            font-bold
-                                                                            text-white
-                                                                            shadow-sm
-                                                                        "
-                                                                    >
+                                                                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-[#0a1a4d] bg-red-500 px-1 text-[8px] font-bold text-white shadow-sm">
                                                                         !
                                                                     </span>
                                                                 )}
-
                                                             </div>
                                                         </td>
                                                     );
@@ -1942,7 +1594,7 @@ export default function Index({
                         {filteredPreventifMesins.length > 0 &&
                             preventifMesins.links &&
                             preventifMesins.links.length > 3 && (
-                                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-5 py-4">
+                                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-4">
                                     <p className="text-sm text-slate-500">
                                         Menampilkan{' '}
                                         <span className="font-semibold text-slate-700">
@@ -1969,10 +1621,10 @@ export default function Index({
                                                 dangerouslySetInnerHTML={{
                                                     __html: link.label,
                                                 }}
-                                                className={`min-w-9 rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
+                                                className={`min-w-[36px] rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
                                                     link.active
                                                         ? 'bg-blue-600 text-white shadow-sm'
-                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                        : 'bg-white text-slate-600 shadow-sm hover:bg-blue-50 hover:text-blue-600'
                                                 } ${
                                                     !link.url
                                                         ? 'pointer-events-none opacity-40'
@@ -1985,11 +1637,24 @@ export default function Index({
                             )}
                     </div>
                 </main>
+
+                {/* =====================================================
+                    FOOTER (TRANSPARAN)
+                ====================================================== */}
+                <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                    <div className="mx-auto flex min-h-[60px] max-w-[1800px] items-center justify-center px-6 py-4 text-center">
+                        <p className="text-xs font-medium text-white/70">
+                            © {new Date().getFullYear()} Emma Sarkilla · Schedule Preventif Mesin
+                        </p>
+                    </div>
+                </footer>
             </div>
 
-            {/* SUCCESS TOAST */}
+            {/* =====================================================
+                SUCCESS TOAST
+            ====================================================== */}
             {showSuccess && (
-                <div className="fixed right-5 top-5 z-[100] flex w-[360px] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-emerald-100/50">
+                <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
 
                     <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
 
@@ -2019,11 +1684,13 @@ export default function Index({
                 </div>
             )}
 
-            {/* MODAL CATATAN */}
+            {/* =====================================================
+                MODAL CATATAN
+            ====================================================== */}
             {showCatatan && selectedChecklist && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-md">
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
 
-                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-900/20">
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
 
                         <div className="border-b border-slate-100 px-6 py-5">
                             <div className="flex items-start justify-between">
@@ -2096,7 +1763,7 @@ export default function Index({
                             <button
                                 type="button"
                                 onClick={saveCatatan}
-                                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg"
+                                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
                             >
                                 Simpan Catatan
                             </button>
@@ -2105,11 +1772,13 @@ export default function Index({
                 </div>
             )}
 
-            {/* MODAL HAPUS */}
+            {/* =====================================================
+                MODAL HAPUS
+            ====================================================== */}
             {showDeleteModal && selectedPreventif && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-md">
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
 
-                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-900/20">
+                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
 
                         <div className="px-6 pb-4 pt-6">
                             <div className="flex items-start justify-between">
@@ -2192,15 +1861,6 @@ export default function Index({
                     </div>
                 </div>
             )}
-
-            {/* FOOTER */}
-            <footer className="mt-10 border-t border-slate-200 bg-white">
-                <div className="mx-auto max-w-[1800px] px-6 py-5 text-center">
-                    <p className="text-xs text-slate-400">
-                        © {new Date().getFullYear()} Sistem Schedule Preventif
-                    </p>
-                </div>
-            </footer>
         </>
     );
 }

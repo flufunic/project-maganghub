@@ -10,9 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [
+    PreventifMesinController::class,
+    'welcome'
+])->name('welcome');
 
 Route::get('/login', [
     AuthController::class,

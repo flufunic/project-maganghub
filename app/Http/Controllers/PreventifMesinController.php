@@ -15,6 +15,314 @@ use Maatwebsite\Excel\Facades\Excel;
 class PreventifMesinController extends Controller
 {
 
+    public function welcome(Request $request)
+    {
+        $bulan = (int) $request->input('bulan', now()->month);
+        $tahun = (int) $request->input('tahun', now()->year);
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER PERIOD REPORT
+        |--------------------------------------------------------------------------
+        | Default: Januari - Desember
+        */
+        $bulanMulai = (int) $request->input('bulan_mulai', 1);
+        $bulanSelesai = (int) $request->input('bulan_selesai', 12);
+
+        // Pastikan bulan tetap berada di 1-12
+        $bulanMulai = max(1, min(12, $bulanMulai));
+        $bulanSelesai = max(1, min(12, $bulanSelesai));
+
+        // Kalau terbalik, otomatis dibalik
+        if ($bulanMulai > $bulanSelesai) {
+            [$bulanMulai, $bulanSelesai] = [
+                $bulanSelesai,
+                $bulanMulai
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DATA PREVENTIF
+        |--------------------------------------------------------------------------
+        | Untuk Monthly Report dan Period Report.
+        |
+        | Checklist diambil untuk SATU TAHUN penuh supaya setiap bulan
+        | pada Period Report bisa dicek status ACT/Plan masing-masing.
+        |--------------------------------------------------------------------------
+        */
+        $preventifMesins = PreventifMesin::with([
+            'checklists' => function ($query) use ($tahun) {
+                $query->whereYear('tanggal', $tahun);
+            }
+        ])
+            ->orderBy('divisi')
+            ->orderBy('no_item')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | MONTHLY REPORT
+        |--------------------------------------------------------------------------
+        */
+        $detail = [];
+
+        $totalItem = 0;
+        $totalJadwal = 0;
+        $totalAct = 0;
+        $totalPlan = 0;
+
+        $divisiReport = [];
+
+        foreach ($preventifMesins as $preventif) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Ambil tanggal jadwal preventif pada bulan yang dipilih
+            |--------------------------------------------------------------------------
+            */
+            $tanggalPlan = $this->generateTanggalPlan(
+                $preventif,
+                $tahun,
+                $bulan
+            );
+
+            $totalJadwalItem = count($tanggalPlan);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Kalau item tidak punya jadwal pada bulan ini,
+            | tidak ditampilkan di report bulan tersebut.
+            |--------------------------------------------------------------------------
+            */
+            if ($totalJadwalItem === 0) {
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mapping checklist berdasarkan tanggal
+            |--------------------------------------------------------------------------
+            */
+            $checklistByDate = $preventif->checklists->keyBy(function ($checklist) {
+                return Carbon::parse($checklist->tanggal)->format('Y-m-d');
+            });
+
+            $actItem = 0;
+
+            foreach ($tanggalPlan as $tanggal) {
+
+                $checklist = $checklistByDate->get($tanggal);
+
+                if ($checklist && (bool) $checklist->status === true) {
+                    $actItem++;
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Jadwal yang belum dikerjakan = Plan
+            |--------------------------------------------------------------------------
+            */
+            $planItem = $totalJadwalItem - $actItem;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Total keseluruhan
+            |--------------------------------------------------------------------------
+            */
+            $totalItem++;
+            $totalJadwal += $totalJadwalItem;
+            $totalAct += $actItem;
+            $totalPlan += $planItem;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Report per divisi
+            |--------------------------------------------------------------------------
+            */
+            $divisi = $preventif->divisi ?: 'Lainnya';
+
+            if (!isset($divisiReport[$divisi])) {
+                $divisiReport[$divisi] = [
+                    'divisi' => $divisi,
+                    'act' => 0,
+                    'plan' => 0,
+                    'total' => 0,
+                ];
+            }
+
+            $divisiReport[$divisi]['act'] += $actItem;
+            $divisiReport[$divisi]['plan'] += $planItem;
+            $divisiReport[$divisi]['total'] += $totalJadwalItem;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Detail tabel
+            |--------------------------------------------------------------------------
+            */
+            $detail[] = [
+                'divisi' => $preventif->divisi,
+                'no_item' => $preventif->no_item,
+                'item_preventif' => $preventif->item_preventif,
+
+                'total_jadwal' => $totalJadwalItem,
+
+                'act' => $actItem,
+
+                'plan' => $planItem,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Persentase ACT
+        |--------------------------------------------------------------------------
+        */
+        $persentaseAct = $totalJadwal > 0
+            ? round(($totalAct / $totalJadwal) * 100, 1)
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Nama bulan
+        |--------------------------------------------------------------------------
+        */
+        $namaBulan = [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember',
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERIOD REPORT
+        |--------------------------------------------------------------------------
+        |
+        | Contoh:
+        | Januari - Juni
+        | => hanya 6 bulan yang ditampilkan.
+        |
+        | ACT  = BAR
+        | Plan = LINE
+        |
+        */
+        $annualReport = [];
+
+        for (
+            $bulanTahunan = $bulanMulai;
+            $bulanTahunan <= $bulanSelesai;
+            $bulanTahunan++
+        ) {
+
+            $totalActTahunan = 0;
+            $totalPlanTahunan = 0;
+
+            foreach ($preventifMesins as $preventif) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Generate jadwal untuk bulan tersebut
+                |--------------------------------------------------------------------------
+                */
+                $tanggalPlanTahunan = $this->generateTanggalPlan(
+                    $preventif,
+                    $tahun,
+                    $bulanTahunan
+                );
+
+                if (count($tanggalPlanTahunan) === 0) {
+                    continue;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Checklist tahun tersebut sudah tersedia dari query di atas.
+                |--------------------------------------------------------------------------
+                */
+                $checklistByDate = $preventif->checklists
+                    ->keyBy(function ($checklist) {
+                        return Carbon::parse($checklist->tanggal)
+                            ->format('Y-m-d');
+                    });
+
+                /*
+                |--------------------------------------------------------------------------
+                | Hitung ACT dan PLAN khusus bulan tersebut
+                |--------------------------------------------------------------------------
+                */
+                foreach ($tanggalPlanTahunan as $tanggal) {
+
+                    $checklist = $checklistByDate->get($tanggal);
+
+                    if (
+                        $checklist &&
+                        (bool) $checklist->status === true
+                    ) {
+                        $totalActTahunan++;
+                    } else {
+                        $totalPlanTahunan++;
+                    }
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Simpan data per bulan
+            |--------------------------------------------------------------------------
+            */
+            $annualReport[] = [
+                'bulan' => $bulanTahunan,
+                'nama_bulan' => $namaBulan[$bulanTahunan] ?? '',
+                'act' => $totalActTahunan,
+                'plan' => $totalPlanTahunan,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM DATA KE REACT
+        |--------------------------------------------------------------------------
+        */
+        return Inertia::render('Welcome', [
+            'bulan' => $bulan,
+            'tahun' => $tahun,
+
+            /*
+            | Monthly Report
+            */
+            'detail' => $detail,
+
+            'totalItem' => $totalItem,
+            'totalJadwal' => $totalJadwal,
+            'totalAct' => $totalAct,
+            'totalPlan' => $totalPlan,
+
+            'persentaseAct' => $persentaseAct,
+
+            'divisiReport' => array_values($divisiReport),
+
+            /*
+            | Period Report
+            */
+            'annualReport' => $annualReport,
+
+            'bulanMulai' => $bulanMulai,
+            'bulanSelesai' => $bulanSelesai,
+
+            'namaBulan' => $namaBulan,
+        ]);
+    }
+
     public function index(Request $request): Response
     {
         $bulan = (int) $request->input('bulan', now()->month);
@@ -642,14 +950,12 @@ class PreventifMesinController extends Controller
             (int) ($preventifMesin->jumlah_dilakukan ?? 1)
         );
 
-        // Tanpa periode: jadwal sekali saja di sekitar tanggal plan awal
+        // Tanpa periode: jadwal sekali saja (hari kerja berurutan)
         if (
             empty($preventifMesin->periode_nilai) ||
             empty($preventifMesin->periode_satuan)
         ) {
-            for ($i = 0; $i < $jumlahDilakukan; $i++) {
-                $tgl = $tanggalAwal->copy()->addDays($i);
-
+            foreach ($this->generateHariKerja($tanggalAwal, $jumlahDilakukan) as $tgl) {
                 if ($tgl->gte($tanggalMulai) && $tgl->lte($tanggalAkhir)) {
                     $tanggalPlan[] = $tgl->format('Y-m-d');
                 }
@@ -662,9 +968,7 @@ class PreventifMesinController extends Controller
 
         while ($tanggal->lte($tanggalAkhir)) {
 
-            for ($i = 0; $i < $jumlahDilakukan; $i++) {
-                $tanggalDilakukan = $tanggal->copy()->addDays($i);
-
+            foreach ($this->generateHariKerja($tanggal, $jumlahDilakukan) as $tanggalDilakukan) {
                 if (
                     $tanggalDilakukan->gte($tanggalMulai)
                     &&
@@ -687,6 +991,10 @@ class PreventifMesinController extends Controller
 
             $tanggal = $tanggalBerikutnya;
         }
+
+        // Hapus tanggal ganda (kalau dua periode saling tumpang tindih) lalu urutkan
+        $tanggalPlan = array_values(array_unique($tanggalPlan));
+        sort($tanggalPlan);
 
         return $tanggalPlan;
     }
@@ -721,6 +1029,27 @@ class PreventifMesinController extends Controller
             default =>
                 $tanggal->copy(),
         };
+    }
+
+    /**
+     * Ambil N hari kerja (Senin-Jumat) berurutan mulai dari tanggal tertentu.
+     * Sabtu & Minggu dilewati. Kalau tanggal mulai jatuh di weekend,
+     * otomatis mulai dari Senin berikutnya.
+     */
+    private function generateHariKerja(Carbon $mulai, int $jumlah): array
+    {
+        $hasil = [];
+        $tanggal = $mulai->copy();
+
+        while (count($hasil) < $jumlah) {
+            if ($tanggal->isWeekday()) {
+                $hasil[] = $tanggal->copy();
+            }
+
+            $tanggal->addDay();
+        }
+
+        return $hasil;
     }
 
     public function exportExcel(Request $request)
