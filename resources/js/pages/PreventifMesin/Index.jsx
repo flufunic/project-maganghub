@@ -64,6 +64,8 @@ const ICONS = {
         ],
     },
     list: { paths: ['M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10'] },
+    // ICON BARU: jam (untuk tombol edit durasi/DOT/HOT per bulan)
+    clock: { paths: ['M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'] },
 };
 
 function Icon({ type, className = 'h-4 w-4' }) {
@@ -196,6 +198,21 @@ export default function Index({
     const [catatan, setCatatan] = useState('');
 
     // =========================
+    // STATE EDIT BULANAN
+    // (durasi, total durasi, DOT, HOT per bulan)
+    // =========================
+    const [showBulanan, setShowBulanan] = useState(false);
+    const [selectedBulanan, setSelectedBulanan] = useState(null);
+    const [savingBulanan, setSavingBulanan] = useState(false);
+    const [formBulanan, setFormBulanan] = useState({
+        item_preventif: '',
+        durasi: '',
+        total_durasi: '',
+        dot: '',
+        hot: '',
+    });
+
+    // =========================
     // NOTIFIKASI PENGIRIMAN
     // =========================
     const getNotifikasiPengiriman = (tanggal) => {
@@ -210,13 +227,16 @@ export default function Index({
 
     // =========================
     // SUCCESS TOAST
+    // (dependensi pakai `flash` supaya pesan yang sama,
+    //  misalnya "Data bulanan berhasil disimpan.", tetap muncul
+    //  setiap kali disimpan)
     // =========================
     useEffect(() => {
         if (flash?.success) {
             setSuccessMessage(flash.success);
             setShowSuccess(true);
         }
-    }, [flash?.success]);
+    }, [flash]);
 
     useEffect(() => {
         if (!showSuccess) {
@@ -388,6 +408,69 @@ export default function Index({
     };
 
     // =========================
+    // MODAL EDIT BULANAN
+    // =========================
+    const openBulanan = (preventif) => {
+        setSelectedBulanan(preventif);
+
+        // nilai yang tampil di tabel = nilai bulan ini
+        // (kosong kalau bulan ini belum diisi)
+        setFormBulanan({
+            item_preventif: preventif.item_preventif ?? '',
+            durasi: preventif.durasi ?? '',
+            total_durasi: preventif.total_durasi ?? '',
+            dot: preventif.dot ?? '',
+            hot: preventif.hot ?? '',
+        });
+
+        setShowBulanan(true);
+    };
+
+    const closeBulanan = () => {
+        setShowBulanan(false);
+        setSelectedBulanan(null);
+        setSavingBulanan(false);
+    };
+
+    const submitBulanan = (payload) => {
+        if (!selectedBulanan) {
+            return;
+        }
+
+        setSavingBulanan(true);
+
+        router.put(
+            `/preventif-mesin/${selectedBulanan.no}/bulanan`,
+            {
+                ...payload,
+                bulan: selectedMonth + 1,
+                tahun: selectedYear,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => closeBulanan(),
+                onFinish: () => setSavingBulanan(false),
+            }
+        );
+    };
+
+    // Simpan nilai yang diisi di form
+    const saveBulanan = () => {
+        submitBulanan(formBulanan);
+    };
+
+    // Kosongkan semua -> data bulan ini dihapus
+    const resetBulanan = () => {
+        submitBulanan({
+            item_preventif: '',
+            durasi: '',
+            total_durasi: '',
+            dot: '',
+            hot: '',
+        });
+    };
+
+    // =========================
     // FILTER STATUS (klik tombol)
     // =========================
     const applyStatusFilter = (nextStatus) => {
@@ -429,6 +512,14 @@ export default function Index({
             active: 'bg-amber-500 text-white shadow-sm shadow-amber-200',
             idle: 'text-slate-500 hover:bg-amber-50 hover:text-amber-600',
         },
+    ];
+
+    // field input untuk modal bulanan
+    const bulananFields = [
+        { name: 'durasi', label: 'Durasi' },
+        { name: 'total_durasi', label: 'Total Durasi' },
+        { name: 'dot', label: 'DOT' },
+        { name: 'hot', label: 'HOT' },
     ];
 
     return (
@@ -1225,6 +1316,14 @@ export default function Index({
                                                                     <span className="font-medium text-slate-700">
                                                                         {preventif.item_preventif}
                                                                     </span>
+
+                                                                    {preventif.item_preventif_master &&
+                                                                        preventif.item_preventif !==
+                                                                            preventif.item_preventif_master && (
+                                                                            <span className="ml-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 align-middle text-[10px] font-bold text-violet-600">
+                                                                                Khusus bulan ini
+                                                                            </span>
+                                                                        )}
                                                                 </div>
                                                             </td>
 
@@ -1282,13 +1381,11 @@ export default function Index({
 
                                                             {/* CHECKLIST */}
                                                             {tanggal.map((day) => {
-                                                                const checked = isChecked(preventif, day);
-
                                                                 const plan = isTanggalPlan(preventif, day);
 
-                                                                // Checklist boleh dilakukan jika tanggal tersebut
-                                                                // memang merupakan tanggal PLAN
-                                                                const canChecklist = plan;
+                                                                // Semua tanggal bisa di-checklist. Tanggal tanpa jadwal Plan
+                                                                // tetap bisa diisi, hanya saja tidak ditandai ○.
+                                                                const checked = isChecked(preventif, day);
 
                                                                 const checklist = getChecklist(preventif, day);
 
@@ -1317,28 +1414,22 @@ export default function Index({
                                                                             <div className="flex items-center justify-center">
                                                                                 <button
                                                                                     type="button"
-                                                                                    disabled={!canChecklist}
-                                                                                    onClick={() => {
-                                                                                        if (canChecklist) {
-                                                                                            toggleChecklist(
-                                                                                                preventif,
-                                                                                                day
-                                                                                            );
-                                                                                        }
-                                                                                    }}
+                                                                                    onClick={() =>
+                                                                                        toggleChecklist(preventif, day)
+                                                                                    }
                                                                                     className={`flex h-8 w-8 items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 ${
-                                                                                        !canChecklist
-                                                                                            ? 'cursor-default border-slate-200 bg-slate-50 text-slate-300'
-                                                                                            : checked
+                                                                                        checked
                                                                                             ? 'cursor-pointer border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-200'
-                                                                                            : 'cursor-pointer border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100'
+                                                                                            : plan
+                                                                                            ? 'cursor-pointer border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100'
+                                                                                            : 'cursor-pointer border-slate-200 bg-white text-slate-300 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
                                                                                     }`}
                                                                                     title={
-                                                                                        !canChecklist
-                                                                                            ? 'Tidak ada jadwal Plan'
-                                                                                            : checked
+                                                                                        checked
                                                                                             ? 'Klik untuk membatalkan ACT'
-                                                                                            : 'Klik untuk ACT / Closed'
+                                                                                            : plan
+                                                                                            ? 'Klik untuk ACT / Closed'
+                                                                                            : 'Tidak ada jadwal Plan, tetap bisa diisi'
                                                                                     }
                                                                                 >
                                                                                     {checked ? (
@@ -1387,6 +1478,26 @@ export default function Index({
                                                             {/* AKSI */}
                                                             <td className="border border-slate-200 px-3 py-3">
                                                                 <div className="flex items-center justify-center gap-1.5">
+
+                                                                    {/* EDIT DURASI / DOT / HOT BULAN INI */}
+                                                                    <button
+                                                                        type="button"
+                                                                        title={`Isi durasi, DOT & HOT ${months[selectedMonth]} ${selectedYear}`}
+                                                                        onClick={() =>
+                                                                            openBulanan(preventif)
+                                                                        }
+                                                                        className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100 hover:shadow-md"
+                                                                    >
+                                                                        <Icon
+                                                                            type="clock"
+                                                                            className="h-4 w-4"
+                                                                        />
+
+                                                                        {/* penanda: bulan ini sudah diisi manual */}
+                                                                        {preventif.punya_data_bulanan && (
+                                                                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500" />
+                                                                        )}
+                                                                    </button>
 
                                                                     <Link
                                                                         href={`/preventif-mesin/${preventif.no}/edit`}
@@ -1442,7 +1553,7 @@ export default function Index({
 
                                                         <div className="flex flex-col items-start leading-none">
                                                             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200">
-                                                                Rekapitulasi
+                                                                Rekapitulasi {months[selectedMonth]} {selectedYear}
                                                             </span>
 
                                                             <span className="mt-1 text-xs font-extrabold text-white">
@@ -1681,6 +1792,161 @@ export default function Index({
                     >
                         ×
                     </button>
+                </div>
+            )}
+
+            {/* =====================================================
+                MODAL EDIT BULANAN (DURASI / TOTAL DURASI / DOT / HOT)
+            ====================================================== */}
+            {showBulanan && selectedBulanan && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
+
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
+
+                        {/* HEADER */}
+                        <div className="border-b border-slate-100 px-6 py-5">
+                            <div className="flex items-start justify-between">
+
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-600 shadow-sm">
+                                        <Icon
+                                            type="clock"
+                                            className="h-5 w-5"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <h2 className="text-base font-bold text-slate-900">
+                                            Item, Durasi, DOT &amp; HOT Bulanan
+                                        </h2>
+
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Periode{' '}
+                                            <span className="font-semibold text-slate-700">
+                                                {months[selectedMonth]} {selectedYear}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={closeBulanan}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                                {selectedBulanan.item_preventif}
+                            </p>
+                        </div>
+
+                        {/* FORM */}
+                        <div className="px-6 py-5">
+                            {/* ITEM PREVENTIF BULAN INI */}
+                            <div className="mb-4">
+                                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                    Item Preventif
+                                </label>
+
+                                <textarea
+                                    rows="3"
+                                    value={formBulanan.item_preventif}
+                                    onChange={(e) =>
+                                        setFormBulanan({
+                                            ...formBulanan,
+                                            item_preventif: e.target.value,
+                                        })
+                                    }
+                                    placeholder="Isi jika pekerjaan bulan ini berbeda"
+                                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
+                                />
+
+                                <p className="mt-1.5 text-xs text-slate-400">
+                                    Nama item master:{' '}
+                                    <span className="font-medium text-slate-500">
+                                        {selectedBulanan.item_preventif_master ??
+                                            selectedBulanan.item_preventif}
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                {bulananFields.map((field) => (
+                                    <div key={field.name}>
+                                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                            {field.label}{' '}
+                                            <span className="text-xs font-medium text-slate-400">
+                                                (jam)
+                                            </span>
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={formBulanan[field.name]}
+                                            onChange={(e) =>
+                                                setFormBulanan({
+                                                    ...formBulanan,
+                                                    [field.name]: e.target.value,
+                                                })
+                                            }
+                                            placeholder="0"
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            <p className="mt-4 text-xs leading-relaxed text-slate-400">
+                                Nilai ini hanya berlaku untuk{' '}
+                                {months[selectedMonth]} {selectedYear}. Bulan
+                                lain tidak ikut berubah. Item Preventif yang
+                                dikosongkan atau sama dengan item master akan
+                                memakai nama master. Klik Kosongkan Bulan Ini
+                                untuk menghapus semua data bulan ini.
+                            </p>
+                        </div>
+
+                        {/* FOOTER */}
+                        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+                            <div>
+                                {selectedBulanan.punya_data_bulanan && (
+                                    <button
+                                        type="button"
+                                        onClick={resetBulanan}
+                                        disabled={savingBulanan}
+                                        className="rounded-xl px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                                    >
+                                        Kosongkan Bulan Ini
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={closeBulanan}
+                                    className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                                >
+                                    Batal
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={saveBulanan}
+                                    disabled={savingBulanan}
+                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:opacity-60"
+                                >
+                                    {savingBulanan ? 'Menyimpan...' : 'Simpan'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

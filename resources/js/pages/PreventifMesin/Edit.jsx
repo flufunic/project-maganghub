@@ -58,7 +58,6 @@ const inputBase =
     'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:ring-4';
 
 const focusBlue = 'focus:border-blue-400 focus:ring-blue-100';
-const focusGreen = 'focus:border-emerald-400 focus:ring-emerald-100';
 
 // =========================================================
 // SMALL COMPONENTS
@@ -112,22 +111,6 @@ const SectionTitle = ({ title, desc, bar }) => (
     </div>
 );
 
-const UnitInput = ({ unit, ...props }) => (
-    <div className="relative">
-        <input
-            type="number"
-            step="0.01"
-            min="0"
-            {...props}
-            className={`${inputBase} ${focusGreen} pr-14`}
-        />
-
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-            {unit}
-        </span>
-    </div>
-);
-
 export default function Edit({ preventifMesin }) {
     const [alert, setAlert] = useState('');
 
@@ -161,32 +144,6 @@ export default function Edit({ preventifMesin }) {
             preventifMesin.jumlah_dilakukan !== ''
                 ? Number(preventifMesin.jumlah_dilakukan)
                 : 1,
-
-        durasi:
-            preventifMesin.durasi !== null &&
-            preventifMesin.durasi !== undefined
-                ? Number(preventifMesin.durasi)
-                : '',
-
-        total_durasi:
-            preventifMesin.total_durasi !== null &&
-            preventifMesin.total_durasi !== undefined
-                ? Number(preventifMesin.total_durasi)
-                : '',
-
-        dot:
-            preventifMesin.dot !== null &&
-            preventifMesin.dot !== undefined
-                ? Number(preventifMesin.dot)
-                : '',
-
-        hot:
-            preventifMesin.hot !== null &&
-            preventifMesin.hot !== undefined
-                ? Number(preventifMesin.hot)
-                : '',
-
-        // status: preventifMesin.status ?? 'Plan',
     });
 
     // =========================
@@ -552,66 +509,6 @@ export default function Edit({ preventifMesin }) {
                                     </div>
                                 </section>
 
-                                {/* DURASI & METRIK */}
-                                <section>
-                                    <SectionTitle
-                                        title="Durasi & Metrik"
-                                        desc="Perbarui durasi pekerjaan dan nilai pengukuran."
-                                        bar="from-emerald-500 to-teal-500"
-                                    />
-
-                                    <div className="grid gap-5 sm:grid-cols-2">
-
-                                        {/* DURASI */}
-                                        <Field label="Durasi" error={errors.durasi}>
-                                            <UnitInput
-                                                unit="JAM"
-                                                value={data.durasi}
-                                                onChange={(e) => setData('durasi', e.target.value)}
-                                                placeholder="Masukkan durasi"
-                                            />
-                                        </Field>
-
-                                        {/* TOTAL DURASI */}
-                                        <Field label="Total Durasi" error={errors.total_durasi}>
-                                            <UnitInput
-                                                unit="JAM"
-                                                value={data.total_durasi}
-                                                onChange={(e) =>
-                                                    setData('total_durasi', e.target.value)
-                                                }
-                                                placeholder="Masukkan total durasi"
-                                            />
-                                        </Field>
-
-                                        {/* DOT */}
-                                        <Field label="DOT" error={errors.dot}>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={data.dot}
-                                                onChange={(e) => setData('dot', e.target.value)}
-                                                placeholder="Masukkan DOT"
-                                                className={`${inputBase} ${focusGreen}`}
-                                            />
-                                        </Field>
-
-                                        {/* HOT */}
-                                        <Field label="HOT" error={errors.hot}>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={data.hot}
-                                                onChange={(e) => setData('hot', e.target.value)}
-                                                placeholder="Masukkan HOT"
-                                                className={`${inputBase} ${focusGreen}`}
-                                            />
-                                        </Field>
-                                    </div>
-                                </section>
-
                                 {/* BUTTON */}
                                 <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
 
@@ -711,6 +608,14 @@ export default function Edit({ preventifMesin }) {
 
                                         <div className="flex items-start gap-3">
                                             <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]" />
+                                            <p className="text-xs leading-relaxed text-blue-100">
+                                                Durasi, Total Durasi, DOT, dan HOT diubah per bulan lewat tombol jam
+                                                (ungu) di halaman data preventif.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300 shadow-[0_0_6px_rgba(125,211,252,0.8)]" />
                                             <p className="text-xs leading-relaxed text-blue-100">
                                                 Data akan disimpan setelah tombol Simpan Perubahan ditekan.
                                             </p>

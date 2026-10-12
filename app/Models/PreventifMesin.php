@@ -47,4 +47,13 @@ class PreventifMesin extends Model
             'no'
         );
     }
+
+    public function bulanans(): HasMany
+    {
+        return $this->hasMany(
+            PreventifMesinBulanan::class,
+            'preventif_mesin_id',
+            'no'
+        );
+    }
 }

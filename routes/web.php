@@ -94,6 +94,11 @@ Route::middleware('auth')->group(function () {
     ])
         ->middleware('role:admin')
         ->name('preventif-pengiriman.store');
+        
+    Route::put(
+        '/preventif-mesin/{preventifMesin}/bulanan',
+        [PreventifMesinController::class, 'updateBulanan']
+    )->name('preventif-mesin.bulanan');
 });
 
 Route::middleware(['auth', 'role:pimpinan'])->group(function () {

@@ -45,11 +45,36 @@ const ICON_CHEVRON = 'M9 5l7 7-7 7';
 const ICON_ARROW = 'M5 12h14m-7-7l7 7-7 7';
 const ICON_MENU = 'M4 7h16M4 12h16M4 17h16';
 const ICON_CLOSE = 'M6 18L18 6M6 6l12 12';
-const ICON_PIE = ['M12 3a9 9 0 109 9h-9V3z', 'M14 3.34A9 9 0 0120.66 10H14V3.34z'];
 const ICON_CALENDAR =
     'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z';
 const ICON_EMPTY =
     'M9 17v-2m3 2v-6m3 6v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14';
+
+/* ------------------------------------------------------------------
+| WARNA PER DIVISI (Period Report)
+| Nama key harus sama persis dengan nama divisi di database.
+| Divisi yang belum terdaftar otomatis pakai warna cadangan.
+------------------------------------------------------------------ */
+// bg = warna batang, text = warna angka di dalam batang
+// (warna muda pakai angka gelap supaya tetap terbaca)
+const WARNA_DIVISI = {
+    Sewing: { bg: '#ea580c', text: '#ffffff' }, // orange
+    Headrest: { bg: '#c084fc', text: '#3b0764' }, // ungu
+    Utility: { bg: '#1e3a8a', text: '#ffffff' }, // biru tua
+    Saidan: { bg: '#86efac', text: '#14532d' }, // hijau muda
+    Lainnya: { bg: '#94a3b8', text: '#ffffff' },
+};
+
+const WARNA_CADANGAN = [
+    { bg: '#fdba74', text: '#7c2d12' },
+    { bg: '#fde047', text: '#713f12' },
+    { bg: '#5eead4', text: '#134e4a' },
+];
+
+const getDivisiWarna = (divisi, index) =>
+    WARNA_DIVISI[divisi] ?? WARNA_CADANGAN[index % WARNA_CADANGAN.length];
+
+const getDivisiColor = (divisi, index) => getDivisiWarna(divisi, index).bg;
 
 /* ------------------------------------------------------------------
 | STYLE TOKENS
@@ -138,16 +163,35 @@ function SectionTitle({ icon, tone, tag, title, description, children }) {
     );
 }
 
+/*
+| Item legend bisa berupa:
+| - { label, line: true, borderClass, dotClass }  -> garis + titik
+| - { label, color: '#hex' }                      -> kotak warna (dipakai per divisi)
+| - { label, className }                          -> pill dengan class Tailwind
+*/
 function Legend({ items }) {
     return (
-        <div className="flex flex-wrap items-center justify-center gap-6 border-t border-slate-200/70 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-slate-200/70 px-4 py-3">
             {items.map((item) => (
                 <div key={item.label} className="flex items-center gap-2">
                     {item.line ? (
                         <span className="relative block h-3 w-6">
-                            <span className="absolute left-0 right-0 top-1.5 border-t-2 border-amber-500" />
-                            <span className="absolute left-2 top-0.5 h-2 w-2 rounded-full bg-amber-500" />
+                            <span
+                                className={`absolute left-0 right-0 top-1.5 border-t-2 ${
+                                    item.borderClass ?? 'border-amber-500'
+                                }`}
+                            />
+                            <span
+                                className={`absolute left-2 top-0.5 h-2 w-2 rounded-full ${
+                                    item.dotClass ?? 'bg-amber-500'
+                                }`}
+                            />
                         </span>
+                    ) : item.color ? (
+                        <span
+                            className="h-3 w-3 rounded-[4px]"
+                            style={{ backgroundColor: item.color }}
+                        />
                     ) : (
                         <span className={`h-2.5 w-5 rounded-full ${item.className}`} />
                     )}
@@ -177,6 +221,13 @@ function EmptyState({ title, text, className = '' }) {
 }
 
 /* ------------------------------------------------------------------
+| HELPER
+| Ubah bulan + tahun jadi satu angka supaya mudah dibandingkan
+| lintas tahun. Contoh: Oktober 2026 > Oktober 2025.
+------------------------------------------------------------------ */
+const monthIndex = (year, month) => Number(year) * 12 + Number(month);
+
+/* ------------------------------------------------------------------
 | PAGE
 ------------------------------------------------------------------ */
 export default function Welcome({
@@ -190,16 +241,25 @@ export default function Welcome({
     persentaseAct = 0,
     divisiReport = [],
     annualReport = [],
+    daftarDivisi = [],
     bulanMulai = 1,
+    tahunMulai,
     bulanSelesai = 12,
+    tahunSelesai,
     namaBulan = {},
 }) {
     const [selectedMonth, setSelectedMonth] = useState(Number(bulan));
     const [selectedYear, setSelectedYear] = useState(Number(tahun));
+
+    // Period report: bulan + tahun awal dan akhir
     const [selectedAnnualStartMonth, setSelectedAnnualStartMonth] =
         useState(Number(bulanMulai));
+    const [selectedAnnualStartYear, setSelectedAnnualStartYear] =
+        useState(Number(tahunMulai ?? tahun));
     const [selectedAnnualEndMonth, setSelectedAnnualEndMonth] =
         useState(Number(bulanSelesai));
+    const [selectedAnnualEndYear, setSelectedAnnualEndYear] =
+        useState(Number(tahunSelesai ?? tahun));
 
     const [pageLoaded, setPageLoaded] = useState(false);
     const [chartAnimated, setChartAnimated] = useState(false);
@@ -226,7 +286,9 @@ export default function Welcome({
                 bulan: selectedMonth,
                 tahun: selectedYear,
                 bulan_mulai: selectedAnnualStartMonth,
+                tahun_mulai: selectedAnnualStartYear,
                 bulan_selesai: selectedAnnualEndMonth,
+                tahun_selesai: selectedAnnualEndYear,
             },
             {
                 preserveScroll: true,
@@ -243,8 +305,40 @@ export default function Welcome({
         sendFilter();
     };
 
+    // Ubah awal periode. Kalau jadi lebih besar dari akhir, akhir ikut maju.
+    const handleAnnualStartChange = (month, year) => {
+        setSelectedAnnualStartMonth(month);
+        setSelectedAnnualStartYear(year);
+
+        if (
+            monthIndex(year, month) >
+            monthIndex(selectedAnnualEndYear, selectedAnnualEndMonth)
+        ) {
+            setSelectedAnnualEndMonth(month);
+            setSelectedAnnualEndYear(year);
+        }
+    };
+
+    // Ubah akhir periode. Tidak boleh lebih kecil dari awal.
+    const handleAnnualEndChange = (month, year) => {
+        let nextMonth = month;
+
+        if (
+            monthIndex(year, nextMonth) <
+            monthIndex(selectedAnnualStartYear, selectedAnnualStartMonth)
+        ) {
+            nextMonth = selectedAnnualStartMonth;
+        }
+
+        setSelectedAnnualEndMonth(nextMonth);
+        setSelectedAnnualEndYear(year);
+    };
+
     const currentMonthName = namaBulan[selectedMonth] || 'Bulan';
     const years = Array.from({ length: 2040 - 2020 + 1 }, (_, i) => 2020 + i);
+
+    // Tahun akhir hanya boleh >= tahun awal
+    const endYears = years.filter((year) => year >= selectedAnnualStartYear);
 
     /* ---------------- DATA ---------------- */
 
@@ -268,6 +362,7 @@ export default function Welcome({
         transform: chartAnimated ? 'rotate(0deg)' : 'rotate(-90deg)',
     };
 
+    // Skala Y period report (Plan selalu >= ACT, tapi tetap dihitung dua-duanya)
     const maxAnnualChartValue = Math.max(
         1,
         ...annualReport.flatMap((item) => [
@@ -276,26 +371,39 @@ export default function Welcome({
         ])
     );
 
-    const annualChartPoints = annualReport.map((item, index) => {
+    // Kalau periode melewati lebih dari satu tahun, tahun ikut ditampilkan di label
+    const periodSpansYears = annualReport.some(
+        (item) => item.tahun !== annualReport[0].tahun
+    );
+
+    // Titik garis Plan (posisi x sejajar dengan tengah tiap batang)
+    const annualPlanPoints = annualReport.map((item, index) => {
         const total = annualReport.length;
         const x = total === 1 ? 50 : ((index + 0.5) / total) * 100;
-        const plan = Number(item.plan || 0);
-        const planHeight =
-            maxAnnualChartValue > 0 ? (plan / maxAnnualChartValue) * 100 : 0;
+        const value = Number(item.plan || 0);
+        const height = (value / maxAnnualChartValue) * 100;
 
-        return { x, y: 100 - planHeight };
+        return { x, y: 100 - height };
     });
 
-    const annualLinePoints = annualChartPoints
+    // Karena kolom batang pakai flex-1 dengan jumlah yang sama, tengah kolom
+    // = (index + 0.5) / total, sama persis dengan x titik di atas.
+    const annualPlanLine = annualPlanPoints
         .map((point) => `${point.x},${point.y}`)
         .join(' ');
 
-    const annualAreaPoints =
-        annualChartPoints.length > 0
-            ? `${annualChartPoints[0].x},100 ${annualLinePoints} ${
-                  annualChartPoints[annualChartPoints.length - 1].x
-              },100`
-            : '';
+    // Divisi yang dipakai di legend & stack. Kalau backend belum mengirim
+    // daftarDivisi, ambil dari data act_per_divisi.
+    const stackDivisi =
+        daftarDivisi.length > 0
+            ? daftarDivisi
+            : Array.from(
+                  new Set(
+                      annualReport.flatMap((item) =>
+                          Object.keys(item.act_per_divisi ?? {})
+                      )
+                  )
+              );
 
     /* ---------------- SIDEBAR ---------------- */
 
@@ -561,21 +669,20 @@ export default function Welcome({
                                     tone="blue"
                                     tag="Period report"
                                     title="ACT & Plan per Periode"
-                                    description="Perbandingan progres preventif berdasarkan periode yang dipilih."
+                                    description="ACT per divisi (batang bertumpuk) dibandingkan dengan Plan (garis) pada periode yang dipilih."
                                 >
                                     <div className="flex flex-wrap items-end gap-2">
+                                        {/* DARI BULAN */}
                                         <Field id="bulan_mulai" label="Dari bulan" width={118}>
                                             <select
                                                 id="bulan_mulai"
                                                 value={selectedAnnualStartMonth}
-                                                onChange={(event) => {
-                                                    const value = Number(event.target.value);
-                                                    setSelectedAnnualStartMonth(value);
-
-                                                    if (value > selectedAnnualEndMonth) {
-                                                        setSelectedAnnualEndMonth(value);
-                                                    }
-                                                }}
+                                                onChange={(event) =>
+                                                    handleAnnualStartChange(
+                                                        Number(event.target.value),
+                                                        selectedAnnualStartYear
+                                                    )
+                                                }
                                                 className={selectBlue}
                                             >
                                                 {Object.entries(namaBulan).map(([value, label]) => (
@@ -586,23 +693,51 @@ export default function Welcome({
                                             </select>
                                         </Field>
 
+                                        {/* DARI TAHUN */}
+                                        <Field id="tahun_mulai" label="Dari tahun" width={92}>
+                                            <select
+                                                id="tahun_mulai"
+                                                value={selectedAnnualStartYear}
+                                                onChange={(event) =>
+                                                    handleAnnualStartChange(
+                                                        selectedAnnualStartMonth,
+                                                        Number(event.target.value)
+                                                    )
+                                                }
+                                                className={selectBlue}
+                                            >
+                                                {years.map((year) => (
+                                                    <option key={year} value={year}>
+                                                        {year}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+
+                                        {/* SAMPAI BULAN */}
                                         <Field id="bulan_selesai" label="Sampai bulan" width={118}>
                                             <select
                                                 id="bulan_selesai"
                                                 value={selectedAnnualEndMonth}
-                                                onChange={(event) => {
-                                                    const value = Number(event.target.value);
-
-                                                    if (value >= selectedAnnualStartMonth) {
-                                                        setSelectedAnnualEndMonth(value);
-                                                    }
-                                                }}
+                                                onChange={(event) =>
+                                                    handleAnnualEndChange(
+                                                        Number(event.target.value),
+                                                        selectedAnnualEndYear
+                                                    )
+                                                }
                                                 className={selectBlue}
                                             >
                                                 {Object.entries(namaBulan)
                                                     .filter(
                                                         ([value]) =>
-                                                            Number(value) >= selectedAnnualStartMonth
+                                                            monthIndex(
+                                                                selectedAnnualEndYear,
+                                                                value
+                                                            ) >=
+                                                            monthIndex(
+                                                                selectedAnnualStartYear,
+                                                                selectedAnnualStartMonth
+                                                            )
                                                     )
                                                     .map(([value, label]) => (
                                                         <option key={value} value={value}>
@@ -612,16 +747,20 @@ export default function Welcome({
                                             </select>
                                         </Field>
 
-                                        <Field id="tahun_period" label="Tahun" width={92}>
+                                        {/* SAMPAI TAHUN */}
+                                        <Field id="tahun_selesai" label="Sampai tahun" width={92}>
                                             <select
-                                                id="tahun_period"
-                                                value={selectedYear}
+                                                id="tahun_selesai"
+                                                value={selectedAnnualEndYear}
                                                 onChange={(event) =>
-                                                    setSelectedYear(Number(event.target.value))
+                                                    handleAnnualEndChange(
+                                                        selectedAnnualEndMonth,
+                                                        Number(event.target.value)
+                                                    )
                                                 }
                                                 className={selectBlue}
                                             >
-                                                {years.map((year) => (
+                                                {endYears.map((year) => (
                                                     <option key={year} value={year}>
                                                         {year}
                                                     </option>
@@ -642,8 +781,10 @@ export default function Welcome({
                                             Periode laporan
                                         </p>
                                         <p className="mt-0.5 text-sm font-extrabold text-slate-800">
-                                            {namaBulan[selectedAnnualStartMonth]} -{' '}
-                                            {namaBulan[selectedAnnualEndMonth]} {selectedYear}
+                                            {namaBulan[selectedAnnualStartMonth]}{' '}
+                                            {selectedAnnualStartYear} -{' '}
+                                            {namaBulan[selectedAnnualEndMonth]}{' '}
+                                            {selectedAnnualEndYear}
                                         </p>
                                     </div>
 
@@ -663,7 +804,7 @@ export default function Welcome({
                                 <div className="p-4 sm:p-5">
                                     <div className="dashboard-scrollbar overflow-x-auto pb-1">
                                         <div
-                                            className="relative h-[270px]"
+                                            className="relative h-[320px]"
                                             style={{
                                                 minWidth: `${Math.max(800, annualReport.length * 90)}px`,
                                             }}
@@ -689,152 +830,195 @@ export default function Welcome({
                                                         ))}
                                                     </div>
 
-                                                    <div className="absolute inset-x-0 bottom-14 top-10">
-                                                        {/* ACT BARS */}
-                                                        <div className="absolute inset-0 flex items-end px-5">
-                                                            {annualReport.map((item, index) => {
-                                                                const act = Number(item.act || 0);
-                                                                const actHeight =
-                                                                    maxAnnualChartValue > 0
-                                                                        ? (act / maxAnnualChartValue) * 100
-                                                                        : 0;
-                                                                const visualActHeight =
-                                                                    act > 0 ? Math.max(actHeight, 3) : 0;
+                                                    {/* =======================================
+                                                        BATANG ACT BERTUMPUK PER DIVISI
+                                                    ======================================== */}
+                                                    <div className="absolute inset-x-0 bottom-14 top-10 z-0 flex px-5">
+                                                        {annualReport.map((item, index) => {
+                                                            const act = Number(item.act || 0);
+                                                            const plan = Number(item.plan || 0);
 
-                                                                return (
-                                                                    <div
-                                                                        key={item.bulan}
-                                                                        className="relative flex h-full flex-1 items-end justify-center"
-                                                                    >
-                                                                        <span
-                                                                            className="absolute z-20 whitespace-nowrap text-[11px] font-extrabold text-blue-700 transition-all duration-700"
+                                                            const actHeight =
+                                                                (act / maxAnnualChartValue) * 100;
+
+                                                            // Segmen per divisi (urutan = urutan tumpukan dari bawah)
+                                                            const segments = stackDivisi
+                                                                .map((divisi, divisiIndex) => ({
+                                                                    divisi,
+                                                                    value: Number(
+                                                                        item.act_per_divisi?.[divisi] || 0
+                                                                    ),
+                                                                    color: getDivisiColor(
+                                                                        divisi,
+                                                                        divisiIndex
+                                                                    ),
+                                                                    textColor: getDivisiWarna(
+                                                                        divisi,
+                                                                        divisiIndex
+                                                                    ).text,
+                                                                }))
+                                                                .filter((segment) => segment.value > 0);
+
+                                                            // Label total ACT di atas batang hanya kalau
+                                                            // jaraknya ke titik Plan cukup lega.
+                                                            const showTotalLabel =
+                                                                act > 0 &&
+                                                                ((plan - act) / maxAnnualChartValue) * 100 >= 20;
+
+                                                            return (
+                                                                <div
+                                                                    key={`bar-${item.tahun}-${item.bulan}`}
+                                                                    className="relative flex h-full flex-1 items-end justify-center"
+                                                                >
+                                                                    {act > 0 && (
+                                                                        <div
+                                                                            className="relative flex w-[46px] flex-col-reverse transition-all duration-700 ease-out"
                                                                             style={{
-                                                                                bottom:
-                                                                                    chartAnimated && act > 0
-                                                                                        ? `min(calc(${visualActHeight}% + 7px), calc(100% - 16px))`
-                                                                                        : '0px',
-                                                                                opacity:
-                                                                                    chartAnimated && act > 0 ? 1 : 0,
-                                                                                transform: chartAnimated
-                                                                                    ? 'translateY(0)'
-                                                                                    : 'translateY(7px)',
+                                                                                height: chartAnimated
+                                                                                    ? `${Math.max(actHeight, 3)}%`
+                                                                                    : '0%',
                                                                                 transitionDelay: `${index * 60}ms`,
                                                                             }}
                                                                         >
-                                                                            {act > 0 ? act : ''}
-                                                                        </span>
+                                                                            {segments.map((segment, segIndex) => {
+                                                                                const isTop =
+                                                                                    segIndex === segments.length - 1;
 
-                                                                        <div
-                                                                            className="w-9 rounded-t-xl bg-gradient-to-t from-blue-700 to-sky-400 shadow-[0_8px_18px_rgba(37,99,235,0.25)] transition-all duration-700 ease-out hover:from-blue-600 hover:to-cyan-300"
-                                                                            style={{
-                                                                                height: chartAnimated
-                                                                                    ? `${visualActHeight}%`
-                                                                                    : '0%',
-                                                                                transitionDelay: `${index * 70}ms`,
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
+                                                                                return (
+                                                                                    <div
+                                                                                        key={segment.divisi}
+                                                                                        title={`${segment.divisi}: ${segment.value}`}
+                                                                                        className={`relative flex min-h-0 items-center justify-center border-t border-white/40 first:border-t-0 ${
+                                                                                            isTop ? 'rounded-t-lg' : ''
+                                                                                        }`}
+                                                                                        style={{
+                                                                                            flexGrow: segment.value,
+                                                                                            flexBasis: 0,
+                                                                                            backgroundColor: segment.color,
+                                                                                        }}
+                                                                                    >
+                                                                                        <span
+                                                                                            className="text-[10px] font-extrabold leading-none transition-opacity duration-500"
+                                                                                            style={{
+                                                                                                color: segment.textColor,
+                                                                                                opacity: chartAnimated ? 1 : 0,
+                                                                                                transitionDelay: `${500 + index * 60}ms`,
+                                                                                            }}
+                                                                                        >
+                                                                                            {segment.value}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
 
-                                                        {/* PLAN LINE + DOTS (sejajar dengan bar ACT) */}
-                                                        <div className="pointer-events-none absolute inset-0 z-10 px-5">
-                                                            <div className="relative h-full w-full">
-                                                                <svg
-                                                                    className="absolute inset-0 h-full w-full overflow-visible"
-                                                                    viewBox="0 0 100 100"
-                                                                    preserveAspectRatio="none"
-                                                                >
-                                                                    <defs>
-                                                                        <linearGradient
-                                                                            id="planArea"
-                                                                            x1="0"
-                                                                            y1="0"
-                                                                            x2="0"
-                                                                            y2="1"
-                                                                        >
-                                                                            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.22" />
-                                                                            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-                                                                        </linearGradient>
-                                                                    </defs>
+                                                                            {/* TOTAL ACT */}
+                                                                            {showTotalLabel && (
+                                                                                <span
+                                                                                    className="absolute left-1/2 whitespace-nowrap text-[11px] font-extrabold text-slate-700 transition-opacity duration-500"
+                                                                                    style={{
+                                                                                        bottom: 'calc(100% + 4px)',
+                                                                                        transform: 'translateX(-50%)',
+                                                                                        opacity: chartAnimated ? 1 : 0,
+                                                                                        transitionDelay: `${600 + index * 60}ms`,
+                                                                                    }}
+                                                                                >
+                                                                                    {act}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
 
-                                                                    <polygon
-                                                                        points={annualAreaPoints}
-                                                                        fill="url(#planArea)"
-                                                                        className="transition-opacity duration-700"
-                                                                        style={{ opacity: chartAnimated ? 1 : 0 }}
-                                                                    />
+                                                    {/* =======================================
+                                                        GARIS PLAN (KUNING) DI ATAS BATANG
+                                                    ======================================== */}
+                                                    <div className="pointer-events-none absolute inset-x-0 bottom-14 top-10 z-10 px-5">
+                                                        <div className="relative h-full w-full">
+                                                            <svg
+                                                                className="absolute inset-0 h-full w-full overflow-visible"
+                                                                viewBox="0 0 100 100"
+                                                                preserveAspectRatio="none"
+                                                            >
+                                                                <polyline
+                                                                    points={annualPlanLine}
+                                                                    fill="none"
+                                                                    stroke="#f59e0b"
+                                                                    strokeWidth="2.5"
+                                                                    vectorEffect="non-scaling-stroke"
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    className="transition-opacity duration-500"
+                                                                    style={{ opacity: chartAnimated ? 1 : 0 }}
+                                                                />
+                                                            </svg>
 
-                                                                    <polyline
-                                                                        points={annualLinePoints}
-                                                                        fill="none"
-                                                                        stroke="#f59e0b"
-                                                                        strokeWidth="2.5"
-                                                                        vectorEffect="non-scaling-stroke"
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        className="transition-opacity duration-500"
-                                                                        style={{ opacity: chartAnimated ? 1 : 0 }}
-                                                                    />
-                                                                </svg>
+                                                            {/* DOTS PLAN (HTML, supaya tetap bulat) */}
+                                                            {annualPlanPoints.map((point, index) => (
+                                                                <span
+                                                                    key={`plan-dot-${index}`}
+                                                                    className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-amber-500 bg-white shadow-[0_2px_8px_rgba(245,158,11,0.5)] transition-all duration-500"
+                                                                    style={{
+                                                                        left: `${point.x}%`,
+                                                                        top: `${point.y}%`,
+                                                                        opacity: chartAnimated ? 1 : 0,
+                                                                        transform: chartAnimated
+                                                                            ? 'translate(-50%, -50%) scale(1)'
+                                                                            : 'translate(-50%, -50%) scale(0)',
+                                                                        transitionDelay: `${600 + index * 70}ms`,
+                                                                    }}
+                                                                />
+                                                            ))}
 
-                                                                {/* DOTS (HTML, supaya tetap bulat) */}
-                                                                {annualChartPoints.map((point, index) => (
+                                                            {/* NILAI PLAN */}
+                                                            {annualPlanPoints.map((point, index) => {
+                                                                const item = annualReport[index];
+                                                                const plan = Number(item.plan || 0);
+
+                                                                if (plan <= 0) return null;
+
+                                                                return (
                                                                     <span
-                                                                        key={`dot-${index}`}
-                                                                        className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-amber-500 bg-white shadow-[0_2px_8px_rgba(245,158,11,0.5)] transition-all duration-500"
+                                                                        key={`plan-label-${item.tahun}-${item.bulan}`}
+                                                                        className="absolute whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-600 shadow-sm transition-all duration-500"
                                                                         style={{
                                                                             left: `${point.x}%`,
-                                                                            top: `${point.y}%`,
+                                                                            top: `calc(${point.y}% - 32px)`,
                                                                             opacity: chartAnimated ? 1 : 0,
                                                                             transform: chartAnimated
-                                                                                ? 'translate(-50%, -50%) scale(1)'
-                                                                                : 'translate(-50%, -50%) scale(0)',
-                                                                            transitionDelay: `${600 + index * 70}ms`,
+                                                                                ? 'translate(-50%, 0)'
+                                                                                : 'translate(-50%, 6px)',
+                                                                            transitionDelay: `${760 + index * 70}ms`,
                                                                         }}
-                                                                    />
-                                                                ))}
-
-                                                                {/* PLAN VALUE */}
-                                                                {annualChartPoints.map((point, index) => {
-                                                                    const item = annualReport[index];
-                                                                    const plan = Number(item.plan || 0);
-
-                                                                    if (plan <= 0) return null;
-
-                                                                    return (
-                                                                        <span
-                                                                            key={`plan-label-${item.bulan}`}
-                                                                            className="absolute whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-600 shadow-sm transition-all duration-500"
-                                                                            style={{
-                                                                                left: `${point.x}%`,
-                                                                                top: `calc(${point.y}% - 32px)`,
-                                                                                opacity: chartAnimated ? 1 : 0,
-                                                                                transform: chartAnimated
-                                                                                    ? 'translate(-50%, 0)'
-                                                                                    : 'translate(-50%, 6px)',
-                                                                                transitionDelay: `${700 + index * 70}ms`,
-                                                                            }}
-                                                                        >
-                                                                            {plan}
-                                                                        </span>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                                    >
+                                                                        {plan}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
 
                                                     {/* BASELINE */}
-                                                    <div className="absolute inset-x-0 bottom-14 border-b border-slate-300" />
+                                                    <div className="absolute inset-x-0 bottom-14 z-10 border-b border-slate-300" />
 
                                                     {/* MONTH LABEL */}
                                                     <div className="absolute inset-x-0 bottom-0 flex h-11 items-start px-5">
                                                         {annualReport.map((item) => (
-                                                            <div key={item.bulan} className="flex-1 text-center">
+                                                            <div
+                                                                key={`${item.tahun}-${item.bulan}`}
+                                                                className="flex-1 text-center"
+                                                            >
                                                                 <span className="text-[11px] font-bold text-slate-600">
                                                                     {item.nama_bulan}
                                                                 </span>
+
+                                                                {periodSpansYears && (
+                                                                    <span className="block text-[10px] font-semibold text-slate-400">
+                                                                        {item.tahun}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -845,10 +1029,10 @@ export default function Welcome({
 
                                     <Legend
                                         items={[
-                                            {
-                                                label: 'ACT',
-                                                className: 'bg-gradient-to-r from-blue-700 to-sky-400',
-                                            },
+                                            ...stackDivisi.map((divisi, index) => ({
+                                                label: `ACT ${divisi}`,
+                                                color: getDivisiColor(divisi, index),
+                                            })),
                                             { label: 'Plan', line: true },
                                         ]}
                                     />

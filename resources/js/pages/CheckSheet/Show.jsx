@@ -74,8 +74,14 @@ const inputClass =
 
 const selectClass = inputClass;
 
-const tableHead =
-    'border-r border-white/10 px-4 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
+// tableHeadBase = tanpa padding horizontal (supaya bisa di-override tanpa konflik px-*)
+const tableHeadBase =
+    'border-r border-white/10 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
+
+const tableHead = `${tableHeadBase} px-4`;
+
+// Lebar kolom sticky "No" (HARUS sama dengan offset left kolom Inspection Point)
+// w-16 = 64px  ->  left-[64px]
 
 // =========================================================
 // SMALL COMPONENTS
@@ -1060,30 +1066,45 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                         />
 
                         <div className="idx-scroll overflow-x-auto">
-                            <table className="w-full min-w-[1200px] border-collapse">
+                            {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
+                            <table className="w-full min-w-[1200px] border-separate border-spacing-0">
                                 <thead>
-                                    <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900 text-white">
-                                        <th className={`sticky left-0 z-20 w-16 bg-[#0a1a4d] text-center ${tableHead}`}>
+                                    <tr className="text-white">
+                                        {/* No (sticky, lebar dikunci 64px) */}
+                                        <th
+                                            className={`sticky left-0 z-20 w-16 min-w-[64px] max-w-[64px] bg-[#0a1a4d] px-0 text-center ${tableHeadBase}`}
+                                        >
                                             No
                                         </th>
 
-                                        <th className={`sticky left-16 z-20 min-w-[230px] bg-[#0b1f5c] text-left ${tableHead}`}>
+                                        {/* Inspection Point (sticky, offset 64px = lebar kolom No) */}
+                                        <th
+                                            className={`sticky left-[64px] z-20 min-w-[230px] bg-[#0a1a4d] text-left shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)] ${tableHead}`}
+                                        >
                                             Inspection Point
                                         </th>
 
-                                        <th className={`min-w-[170px] text-left ${tableHead}`}>
+                                        <th
+                                            className={`min-w-[170px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                        >
                                             Condition
                                         </th>
 
-                                        <th className={`min-w-[180px] text-left ${tableHead}`}>
+                                        <th
+                                            className={`min-w-[180px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                        >
                                             Method
                                         </th>
 
-                                        <th className={`w-28 text-center ${tableHead}`}>
+                                        <th
+                                            className={`w-28 bg-[#0a1a4d] text-center ${tableHead}`}
+                                        >
                                             Shift
                                         </th>
 
-                                        <th className={`w-24 text-center ${tableHead}`}>
+                                        <th
+                                            className={`w-24 bg-[#0a1a4d] text-center ${tableHead}`}
+                                        >
                                             Aksi
                                         </th>
 
@@ -1100,7 +1121,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                             return (
                                                 <th
                                                     key={tanggalLengkap || index}
-                                                    className="w-12 min-w-12 border-r border-white/10 px-1 py-4 text-center text-[11px] font-bold"
+                                                    className="w-12 min-w-12 border-r border-white/10 bg-[#0a1a4d] px-1 py-4 text-center text-[11px] font-bold"
                                                 >
                                                     <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
                                                         {tanggalValue}
@@ -1139,33 +1160,35 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                         filteredItems.map((item, index) => (
                                             <tr
                                                 key={item.id}
-                                                className="group border-b border-slate-100 transition-colors last:border-b-0 hover:bg-blue-50/50"
+                                                className="group transition-colors hover:bg-blue-50/50"
                                             >
-                                                <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-3 py-3 text-center text-sm font-bold text-slate-500 group-hover:bg-blue-50">
+                                                {/* No (sticky) */}
+                                                <td className="sticky left-0 z-10 w-16 min-w-[64px] max-w-[64px] border-b border-r border-slate-100 bg-white px-0 py-3 text-center text-sm font-bold text-slate-500 group-hover:bg-blue-50">
                                                     {item.no ?? index + 1}
                                                 </td>
 
-                                                <td className="sticky left-16 z-10 border-r border-slate-100 bg-white px-4 py-3 group-hover:bg-blue-50">
+                                                {/* Inspection Point (sticky) */}
+                                                <td className="sticky left-[64px] z-10 border-b border-r border-slate-100 bg-white px-4 py-3 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
                                                     <div className="font-semibold text-slate-800">
                                                         {item.inspection_point}
                                                     </div>
                                                 </td>
 
-                                                <td className="border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
                                                     {item.condition || '-'}
                                                 </td>
 
-                                                <td className="border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
                                                     {item.method || '-'}
                                                 </td>
 
-                                                <td className="border-r border-slate-100 px-4 py-3 text-center">
+                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-center">
                                                     <span className="inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600">
                                                         {item.shift || '-'}
                                                     </span>
                                                 </td>
 
-                                                <td className="border-r border-slate-100 px-2 py-3">
+                                                <td className="border-b border-r border-slate-100 px-2 py-3">
                                                     <div className="flex justify-center gap-1.5">
                                                         <IconButton
                                                             title="Edit"
@@ -1185,7 +1208,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                                     </div>
                                                 </td>
 
-                                                {tanggal.map((itemTanggal, index) => {
+                                                {tanggal.map((itemTanggal, idx) => {
                                                     const tanggalLengkap =
                                                         getTanggalLengkap(
                                                             itemTanggal,
@@ -1204,8 +1227,8 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
                                                     return (
                                                         <td
-                                                            key={tanggalLengkap || index}
-                                                            className={`border-r border-slate-100 px-1 py-2 text-center ${
+                                                            key={tanggalLengkap || idx}
+                                                            className={`border-b border-r border-slate-100 px-1 py-2 text-center ${
                                                                 checked ? 'bg-emerald-50/70' : ''
                                                             }`}
                                                         >
@@ -1246,7 +1269,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             tone="amber"
                             title="Abnormality"
                             desc="Catat abnormality, countermeasure, status, dan PIC."
-                            badge={`${checkSheet.abnormalities?.length} Data`}
+                            badge={`${checkSheet.abnormalities?.length ?? 0} Data`}
                             badgeTone="amber"
                             action={
                                 <button
