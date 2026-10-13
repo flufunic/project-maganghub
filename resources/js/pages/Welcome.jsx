@@ -49,19 +49,23 @@ const ICON_CALENDAR =
     'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z';
 const ICON_EMPTY =
     'M9 17v-2m3 2v-6m3 6v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14';
+const ICON_PLAY = 'M8 5.5v13l11-6.5z';
+const ICON_PAUSE = 'M9 5.5v13M15 5.5v13';
+
+/* ------------------------------------------------------------------
+| TINGGI ISI SLIDE (tahunan & bulanan dibuat sama)
+| Ubah angka ini kalau mau card lebih tinggi / pendek.
+------------------------------------------------------------------ */
+const SLIDE_BODY_H = 'xl:h-[400px]';
 
 /* ------------------------------------------------------------------
 | WARNA PER DIVISI (Period Report)
-| Nama key harus sama persis dengan nama divisi di database.
-| Divisi yang belum terdaftar otomatis pakai warna cadangan.
 ------------------------------------------------------------------ */
-// bg = warna batang, text = warna angka di dalam batang
-// (warna muda pakai angka gelap supaya tetap terbaca)
 const WARNA_DIVISI = {
-    Sewing: { bg: '#ea580c', text: '#ffffff' }, // orange
-    Headrest: { bg: '#c084fc', text: '#3b0764' }, // ungu
-    Utility: { bg: '#1e3a8a', text: '#ffffff' }, // biru tua
-    Saidan: { bg: '#86efac', text: '#14532d' }, // hijau muda
+    Sewing: { bg: '#ea580c', text: '#ffffff' },
+    Headrest: { bg: '#c084fc', text: '#3b0764' },
+    Utility: { bg: '#1e3a8a', text: '#ffffff' },
+    Saidan: { bg: '#86efac', text: '#14532d' },
     Lainnya: { bg: '#94a3b8', text: '#ffffff' },
 };
 
@@ -78,7 +82,6 @@ const getDivisiColor = (divisi, index) => getDivisiWarna(divisi, index).bg;
 
 /* ------------------------------------------------------------------
 | STYLE TOKENS
-| (opacity memakai nilai yang aman untuk Tailwind v3 & v4)
 ------------------------------------------------------------------ */
 const glassCard =
     'border border-white/60 bg-white/[0.88] shadow-[0_24px_70px_rgba(7,26,77,0.28)] backdrop-blur-2xl';
@@ -87,7 +90,7 @@ const glassInner =
     'border border-white/70 bg-white/[0.72] shadow-[0_10px_30px_rgba(7,26,77,0.10)] backdrop-blur-xl';
 
 const selectBase =
-    'h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm outline-none transition-all focus:ring-4';
+    'h-8 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm outline-none transition-all focus:ring-2';
 
 const selectBlue = `${selectBase} hover:border-blue-300 focus:border-blue-500 focus:ring-blue-500/15`;
 const selectIndigo = `${selectBase} hover:border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500/15`;
@@ -100,7 +103,7 @@ function Field({ id, label, width, children }) {
         <div style={{ width }}>
             <label
                 htmlFor={id}
-                className="mb-1 block text-[10px] font-semibold text-slate-500"
+                className="mb-0.5 block text-[9px] font-semibold text-slate-500"
             >
                 {label}
             </label>
@@ -119,7 +122,7 @@ function ActionButton({ tone = 'blue', type = 'button', onClick }) {
         <button
             type={type}
             onClick={onClick}
-            className={`group relative flex h-9 items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r px-4 text-xs font-bold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 ${gradient}`}
+            className={`group relative flex h-8 cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-lg bg-gradient-to-r px-3 text-[11px] font-bold text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 ${gradient}`}
         >
             <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             <span className="relative">Tampilkan</span>
@@ -163,15 +166,9 @@ function SectionTitle({ icon, tone, tag, title, description, children }) {
     );
 }
 
-/*
-| Item legend bisa berupa:
-| - { label, line: true, borderClass, dotClass }  -> garis + titik
-| - { label, color: '#hex' }                      -> kotak warna (dipakai per divisi)
-| - { label, className }                          -> pill dengan class Tailwind
-*/
 function Legend({ items }) {
     return (
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-slate-200/70 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 border-t border-slate-200/70 px-3 py-2">
             {items.map((item) => (
                 <div key={item.label} className="flex items-center gap-2">
                     {item.line ? (
@@ -222,10 +219,12 @@ function EmptyState({ title, text, className = '' }) {
 
 /* ------------------------------------------------------------------
 | HELPER
-| Ubah bulan + tahun jadi satu angka supaya mudah dibandingkan
-| lintas tahun. Contoh: Oktober 2026 > Oktober 2025.
 ------------------------------------------------------------------ */
 const monthIndex = (year, month) => Number(year) * 12 + Number(month);
+
+const YEARS = Array.from({ length: 2040 - 2020 + 1 }, (_, i) => 2020 + i);
+
+const DURATION_OPTIONS = [6, 10, 15, 20, 30, 60, 120];
 
 /* ------------------------------------------------------------------
 | PAGE
@@ -264,6 +263,29 @@ export default function Welcome({
     const [pageLoaded, setPageLoaded] = useState(false);
     const [chartAnimated, setChartAnimated] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [activeSlide, setActiveSlide] = useState('annual');
+    const [slideDuration, setSlideDuration] = useState(10);
+
+    // Putar / jeda otomatis (diatur lewat tombol Jeda / Putar)
+    const [isPlaying, setIsPlaying] = useState(true);
+
+    const autoRunning = isPlaying;
+
+    // Ganti slide otomatis. Timer dibuat ulang setiap slide berganti
+    // (termasuk saat tab diklik manual), jadi hitungan mulai dari awal.
+    useEffect(() => {
+        if (!autoRunning) {
+            return undefined;
+        }
+
+        const timer = setTimeout(() => {
+            setActiveSlide((current) =>
+                current === 'annual' ? 'monthly' : 'annual'
+            );
+        }, Number(slideDuration) * 1000);
+
+        return () => clearTimeout(timer);
+    }, [autoRunning, activeSlide, slideDuration]);
 
     useEffect(() => {
         const timer = setTimeout(() => setPageLoaded(true), 100);
@@ -321,24 +343,25 @@ export default function Welcome({
 
     // Ubah akhir periode. Tidak boleh lebih kecil dari awal.
     const handleAnnualEndChange = (month, year) => {
-        let nextMonth = month;
-
         if (
-            monthIndex(year, nextMonth) <
+            monthIndex(year, month) <
             monthIndex(selectedAnnualStartYear, selectedAnnualStartMonth)
         ) {
-            nextMonth = selectedAnnualStartMonth;
+            setSelectedAnnualEndMonth(selectedAnnualStartMonth);
+            setSelectedAnnualEndYear(selectedAnnualStartYear);
+
+            return;
         }
 
-        setSelectedAnnualEndMonth(nextMonth);
+        setSelectedAnnualEndMonth(month);
         setSelectedAnnualEndYear(year);
     };
 
     const currentMonthName = namaBulan[selectedMonth] || 'Bulan';
-    const years = Array.from({ length: 2040 - 2020 + 1 }, (_, i) => 2020 + i);
-
-    // Tahun akhir hanya boleh >= tahun awal
-    const endYears = years.filter((year) => year >= selectedAnnualStartYear);
+    const monthOptions = Object.entries(namaBulan).map(([value, label]) => ({
+        value: Number(value),
+        label,
+    }));
 
     /* ---------------- DATA ---------------- */
 
@@ -362,7 +385,6 @@ export default function Welcome({
         transform: chartAnimated ? 'rotate(0deg)' : 'rotate(-90deg)',
     };
 
-    // Skala Y period report (Plan selalu >= ACT, tapi tetap dihitung dua-duanya)
     const maxAnnualChartValue = Math.max(
         1,
         ...annualReport.flatMap((item) => [
@@ -371,12 +393,10 @@ export default function Welcome({
         ])
     );
 
-    // Kalau periode melewati lebih dari satu tahun, tahun ikut ditampilkan di label
     const periodSpansYears = annualReport.some(
         (item) => item.tahun !== annualReport[0].tahun
     );
 
-    // Titik garis Plan (posisi x sejajar dengan tengah tiap batang)
     const annualPlanPoints = annualReport.map((item, index) => {
         const total = annualReport.length;
         const x = total === 1 ? 50 : ((index + 0.5) / total) * 100;
@@ -386,14 +406,10 @@ export default function Welcome({
         return { x, y: 100 - height };
     });
 
-    // Karena kolom batang pakai flex-1 dengan jumlah yang sama, tengah kolom
-    // = (index + 0.5) / total, sama persis dengan x titik di atas.
     const annualPlanLine = annualPlanPoints
         .map((point) => `${point.x},${point.y}`)
         .join(' ');
 
-    // Divisi yang dipakai di legend & stack. Kalau backend belum mengirim
-    // daftarDivisi, ambil dari data act_per_divisi.
     const stackDivisi =
         daftarDivisi.length > 0
             ? daftarDivisi
@@ -485,6 +501,10 @@ export default function Welcome({
                     0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
                     50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
                 }
+                @keyframes slideProgress {
+                    from { transform: scaleX(0); }
+                    to { transform: scaleX(1); }
+                }
 
                 .dashboard-gradient {
                     background-size: 250% 250%;
@@ -505,12 +525,31 @@ export default function Welcome({
                     .dashboard-float,
                     .dashboard-float-reverse { animation: none !important; }
                 }
+                    
+                /* Memunculkan kursor tangan pada pilihan bulan dan tahun */
+                select#mulai_bulan,
+                select#mulai_tahun,
+                select#selesai_bulan,
+                select#selesai_tahun,
+                select#bulanan_bulan,
+                select#bulanan_tahun {
+                    cursor: pointer !important;
+                }
+
+                /* Kursor tangan saat pilihan dropdown dibuka */
+                select#mulai_bulan option,
+                select#mulai_tahun option,
+                select#selesai_bulan option,
+                select#selesai_tahun option,
+                select#bulanan_bulan option,
+                select#bulanan_tahun option {
+                    cursor: pointer;
+                }
+
             `}</style>
 
             <div className="relative min-h-screen overflow-x-hidden text-slate-900">
-                {/* =====================================================
-                    BACKGROUND
-                ====================================================== */}
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="dashboard-gradient absolute inset-0 bg-gradient-to-br from-[#061540] via-[#1447b8] to-[#3bb4f2]" />
 
@@ -519,16 +558,14 @@ export default function Welcome({
                     <div className="dashboard-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-300/20 blur-[100px]" />
                 </div>
 
-                {/* =====================================================
-                    HEADER
-                ====================================================== */}
+                {/* HEADER */}
                 <header className="sticky top-0 z-50 border-b border-white/20 bg-[#061540]/50 shadow-[0_8px_30px_rgba(2,6,23,0.20)] backdrop-blur-2xl">
                     <div className="mx-auto flex h-[68px] max-w-[1600px] items-center px-4 sm:px-6 lg:px-8">
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(true)}
                             aria-label="Buka menu"
-                            className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15 text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/25 hover:shadow-lg"
+                            className="group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-white/15 text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/25 hover:shadow-lg"
                         >
                             <Icon
                                 d={ICON_MENU}
@@ -565,9 +602,7 @@ export default function Welcome({
                     </div>
                 </header>
 
-                {/* =====================================================
-                    SIDEBAR
-                ====================================================== */}
+                {/* SIDEBAR */}
                 <div
                     className={`fixed inset-0 z-[60] bg-slate-950/50 backdrop-blur-[3px] transition-all duration-300 ${
                         sidebarOpen
@@ -582,7 +617,6 @@ export default function Welcome({
                         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
                 >
-                    {/* HEADER */}
                     <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 text-white shadow-lg">
                             <Icon d={ICON_BRAND} className="h-5 w-5" />
@@ -599,13 +633,12 @@ export default function Welcome({
                             type="button"
                             onClick={() => setSidebarOpen(false)}
                             aria-label="Tutup menu"
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white"
+                            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white"
                         >
                             <Icon d={ICON_CLOSE} className="h-4 w-4" strokeWidth={2} />
                         </button>
                     </div>
 
-                    {/* MENU */}
                     <div className="dashboard-scrollbar flex-1 overflow-y-auto px-3 py-5">
                         <p className="mb-2 px-3 text-[11px] font-semibold text-white/45">
                             Dashboard
@@ -642,7 +675,6 @@ export default function Welcome({
                         </Link>
                     </div>
 
-                    {/* FOOTER */}
                     <div className="border-t border-white/10 bg-black/10 px-4 py-4">
                         <p className="text-center text-[11px] font-medium text-white/50">
                             © {new Date().getFullYear()} Emma Sarkilla
@@ -650,9 +682,7 @@ export default function Welcome({
                     </div>
                 </aside>
 
-                {/* =====================================================
-                    MAIN
-                ====================================================== */}
+                {/* MAIN */}
                 <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-5 lg:px-6">
                     {/* ---------------- MAIN CARD ---------------- */}
                     <div
@@ -661,612 +691,425 @@ export default function Welcome({
                             pageLoaded
                         )}`}
                     >
-                        {/* ========== PERIOD REPORT ========== */}
-                        <section className="min-w-0 overflow-hidden border-b border-slate-200/70">
-                            <div className="border-b border-slate-200/70 bg-gradient-to-r from-blue-50/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
-                                <SectionTitle
-                                    icon={ICON_CHART}
-                                    tone="blue"
-                                    tag="Period report"
-                                    title="ACT & Plan per Periode"
-                                    description="ACT per divisi (batang bertumpuk) dibandingkan dengan Plan (garis) pada periode yang dipilih."
+                        {/* ========== KONTROL GRAFIK ========== */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 bg-white/70 px-3 py-2.5 sm:px-4">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                                    Dashboard Analytics
+                                </p>
+                                <h2 className="text-sm font-extrabold text-slate-900">
+                                    Laporan ACT &amp; Plan per Periode
+                                </h2>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* TAB */}
+                                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSlide('annual')}
+                                        className={`cursor-pointer rounded-md px-3 py-1.5 text-[11px] font-bold transition ${
+                                            activeSlide === 'annual'
+                                                ? 'bg-white text-blue-700 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        Tahunan
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveSlide('monthly')}
+                                        className={`cursor-pointer rounded-md px-3 py-1.5 text-[11px] font-bold transition ${
+                                            activeSlide === 'monthly'
+                                                ? 'bg-white text-blue-700 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        Bulanan
+                                    </button>
+                                </div>
+
+                                {/* PUTAR / JEDA */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPlaying((current) => !current)}
+                                    title={
+                                        isPlaying
+                                            ? 'Jeda pergantian otomatis'
+                                            : 'Putar pergantian otomatis'
+                                    }
+                                    className={`flex h-[34px] cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-[11px] font-bold transition ${
+                                        isPlaying
+                                            ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                            : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                    }`}
                                 >
-                                    <div className="flex flex-wrap items-end gap-2">
-                                        {/* DARI BULAN */}
-                                        <Field id="bulan_mulai" label="Dari bulan" width={118}>
-                                            <select
-                                                id="bulan_mulai"
-                                                value={selectedAnnualStartMonth}
-                                                onChange={(event) =>
-                                                    handleAnnualStartChange(
-                                                        Number(event.target.value),
-                                                        selectedAnnualStartYear
-                                                    )
-                                                }
-                                                className={selectBlue}
-                                            >
-                                                {Object.entries(namaBulan).map(([value, label]) => (
-                                                    <option key={value} value={value}>
-                                                        {label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-
-                                        {/* DARI TAHUN */}
-                                        <Field id="tahun_mulai" label="Dari tahun" width={92}>
-                                            <select
-                                                id="tahun_mulai"
-                                                value={selectedAnnualStartYear}
-                                                onChange={(event) =>
-                                                    handleAnnualStartChange(
-                                                        selectedAnnualStartMonth,
-                                                        Number(event.target.value)
-                                                    )
-                                                }
-                                                className={selectBlue}
-                                            >
-                                                {years.map((year) => (
-                                                    <option key={year} value={year}>
-                                                        {year}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-
-                                        {/* SAMPAI BULAN */}
-                                        <Field id="bulan_selesai" label="Sampai bulan" width={118}>
-                                            <select
-                                                id="bulan_selesai"
-                                                value={selectedAnnualEndMonth}
-                                                onChange={(event) =>
-                                                    handleAnnualEndChange(
-                                                        Number(event.target.value),
-                                                        selectedAnnualEndYear
-                                                    )
-                                                }
-                                                className={selectBlue}
-                                            >
-                                                {Object.entries(namaBulan)
-                                                    .filter(
-                                                        ([value]) =>
-                                                            monthIndex(
-                                                                selectedAnnualEndYear,
-                                                                value
-                                                            ) >=
-                                                            monthIndex(
-                                                                selectedAnnualStartYear,
-                                                                selectedAnnualStartMonth
-                                                            )
-                                                    )
-                                                    .map(([value, label]) => (
-                                                        <option key={value} value={value}>
-                                                            {label}
-                                                        </option>
-                                                    ))}
-                                            </select>
-                                        </Field>
-
-                                        {/* SAMPAI TAHUN */}
-                                        <Field id="tahun_selesai" label="Sampai tahun" width={92}>
-                                            <select
-                                                id="tahun_selesai"
-                                                value={selectedAnnualEndYear}
-                                                onChange={(event) =>
-                                                    handleAnnualEndChange(
-                                                        selectedAnnualEndMonth,
-                                                        Number(event.target.value)
-                                                    )
-                                                }
-                                                className={selectBlue}
-                                            >
-                                                {endYears.map((year) => (
-                                                    <option key={year} value={year}>
-                                                        {year}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-
-                                        <ActionButton onClick={sendFilter} />
-                                    </div>
-                                </SectionTitle>
-                            </div>
-
-                            {/* RANGE INFO */}
-                            <div className="px-5 pt-4 sm:px-6">
-                                <div className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3">
-                                    <div>
-                                        <p className="text-[11px] font-semibold text-blue-600">
-                                            Periode laporan
-                                        </p>
-                                        <p className="mt-0.5 text-sm font-extrabold text-slate-800">
-                                            {namaBulan[selectedAnnualStartMonth]}{' '}
-                                            {selectedAnnualStartYear} -{' '}
-                                            {namaBulan[selectedAnnualEndMonth]}{' '}
-                                            {selectedAnnualEndYear}
-                                        </p>
-                                    </div>
-
-                                    <div className="rounded-xl bg-white px-3.5 py-1.5 text-center shadow-sm">
-                                        <p className="text-base font-extrabold text-blue-700">
-                                            {annualReport.length}
-                                        </p>
-                                        <p className="text-[10px] font-semibold text-slate-500">
-                                            Bulan
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PERIOD GRAPH */}
-                            {annualReport.length > 0 ? (
-                                <div className="p-4 sm:p-5">
-                                    <div className="dashboard-scrollbar overflow-x-auto pb-1">
-                                        <div
-                                            className="relative h-[320px]"
-                                            style={{
-                                                minWidth: `${Math.max(800, annualReport.length * 90)}px`,
-                                            }}
-                                        >
-                                            <div className="absolute inset-0 flex">
-                                                {/* Y AXIS */}
-                                                <div className="flex w-11 shrink-0 flex-col justify-between pt-8 pb-[49px] pr-2 text-right text-[10px] font-medium text-slate-500">
-                                                    {[4, 3, 2, 1, 0].map((value) => (
-                                                        <span key={value}>
-                                                            {Math.round((maxAnnualChartValue * value) / 4)}
-                                                        </span>
-                                                    ))}
-                                                </div>
-
-                                                <div className="relative flex-1">
-                                                    {/* GRID */}
-                                                    <div className="absolute inset-x-0 bottom-14 top-10 flex flex-col justify-between">
-                                                        {[0, 1, 2, 3, 4].map((line) => (
-                                                            <div
-                                                                key={line}
-                                                                className="border-t border-dashed border-slate-300/80"
-                                                            />
-                                                        ))}
-                                                    </div>
-
-                                                    {/* =======================================
-                                                        BATANG ACT BERTUMPUK PER DIVISI
-                                                    ======================================== */}
-                                                    <div className="absolute inset-x-0 bottom-14 top-10 z-0 flex px-5">
-                                                        {annualReport.map((item, index) => {
-                                                            const act = Number(item.act || 0);
-                                                            const plan = Number(item.plan || 0);
-
-                                                            const actHeight =
-                                                                (act / maxAnnualChartValue) * 100;
-
-                                                            // Segmen per divisi (urutan = urutan tumpukan dari bawah)
-                                                            const segments = stackDivisi
-                                                                .map((divisi, divisiIndex) => ({
-                                                                    divisi,
-                                                                    value: Number(
-                                                                        item.act_per_divisi?.[divisi] || 0
-                                                                    ),
-                                                                    color: getDivisiColor(
-                                                                        divisi,
-                                                                        divisiIndex
-                                                                    ),
-                                                                    textColor: getDivisiWarna(
-                                                                        divisi,
-                                                                        divisiIndex
-                                                                    ).text,
-                                                                }))
-                                                                .filter((segment) => segment.value > 0);
-
-                                                            // Label total ACT di atas batang hanya kalau
-                                                            // jaraknya ke titik Plan cukup lega.
-                                                            const showTotalLabel =
-                                                                act > 0 &&
-                                                                ((plan - act) / maxAnnualChartValue) * 100 >= 20;
-
-                                                            return (
-                                                                <div
-                                                                    key={`bar-${item.tahun}-${item.bulan}`}
-                                                                    className="relative flex h-full flex-1 items-end justify-center"
-                                                                >
-                                                                    {act > 0 && (
-                                                                        <div
-                                                                            className="relative flex w-[46px] flex-col-reverse transition-all duration-700 ease-out"
-                                                                            style={{
-                                                                                height: chartAnimated
-                                                                                    ? `${Math.max(actHeight, 3)}%`
-                                                                                    : '0%',
-                                                                                transitionDelay: `${index * 60}ms`,
-                                                                            }}
-                                                                        >
-                                                                            {segments.map((segment, segIndex) => {
-                                                                                const isTop =
-                                                                                    segIndex === segments.length - 1;
-
-                                                                                return (
-                                                                                    <div
-                                                                                        key={segment.divisi}
-                                                                                        title={`${segment.divisi}: ${segment.value}`}
-                                                                                        className={`relative flex min-h-0 items-center justify-center border-t border-white/40 first:border-t-0 ${
-                                                                                            isTop ? 'rounded-t-lg' : ''
-                                                                                        }`}
-                                                                                        style={{
-                                                                                            flexGrow: segment.value,
-                                                                                            flexBasis: 0,
-                                                                                            backgroundColor: segment.color,
-                                                                                        }}
-                                                                                    >
-                                                                                        <span
-                                                                                            className="text-[10px] font-extrabold leading-none transition-opacity duration-500"
-                                                                                            style={{
-                                                                                                color: segment.textColor,
-                                                                                                opacity: chartAnimated ? 1 : 0,
-                                                                                                transitionDelay: `${500 + index * 60}ms`,
-                                                                                            }}
-                                                                                        >
-                                                                                            {segment.value}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-
-                                                                            {/* TOTAL ACT */}
-                                                                            {showTotalLabel && (
-                                                                                <span
-                                                                                    className="absolute left-1/2 whitespace-nowrap text-[11px] font-extrabold text-slate-700 transition-opacity duration-500"
-                                                                                    style={{
-                                                                                        bottom: 'calc(100% + 4px)',
-                                                                                        transform: 'translateX(-50%)',
-                                                                                        opacity: chartAnimated ? 1 : 0,
-                                                                                        transitionDelay: `${600 + index * 60}ms`,
-                                                                                    }}
-                                                                                >
-                                                                                    {act}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* =======================================
-                                                        GARIS PLAN (KUNING) DI ATAS BATANG
-                                                    ======================================== */}
-                                                    <div className="pointer-events-none absolute inset-x-0 bottom-14 top-10 z-10 px-5">
-                                                        <div className="relative h-full w-full">
-                                                            <svg
-                                                                className="absolute inset-0 h-full w-full overflow-visible"
-                                                                viewBox="0 0 100 100"
-                                                                preserveAspectRatio="none"
-                                                            >
-                                                                <polyline
-                                                                    points={annualPlanLine}
-                                                                    fill="none"
-                                                                    stroke="#f59e0b"
-                                                                    strokeWidth="2.5"
-                                                                    vectorEffect="non-scaling-stroke"
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                    className="transition-opacity duration-500"
-                                                                    style={{ opacity: chartAnimated ? 1 : 0 }}
-                                                                />
-                                                            </svg>
-
-                                                            {/* DOTS PLAN (HTML, supaya tetap bulat) */}
-                                                            {annualPlanPoints.map((point, index) => (
-                                                                <span
-                                                                    key={`plan-dot-${index}`}
-                                                                    className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-amber-500 bg-white shadow-[0_2px_8px_rgba(245,158,11,0.5)] transition-all duration-500"
-                                                                    style={{
-                                                                        left: `${point.x}%`,
-                                                                        top: `${point.y}%`,
-                                                                        opacity: chartAnimated ? 1 : 0,
-                                                                        transform: chartAnimated
-                                                                            ? 'translate(-50%, -50%) scale(1)'
-                                                                            : 'translate(-50%, -50%) scale(0)',
-                                                                        transitionDelay: `${600 + index * 70}ms`,
-                                                                    }}
-                                                                />
-                                                            ))}
-
-                                                            {/* NILAI PLAN */}
-                                                            {annualPlanPoints.map((point, index) => {
-                                                                const item = annualReport[index];
-                                                                const plan = Number(item.plan || 0);
-
-                                                                if (plan <= 0) return null;
-
-                                                                return (
-                                                                    <span
-                                                                        key={`plan-label-${item.tahun}-${item.bulan}`}
-                                                                        className="absolute whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-600 shadow-sm transition-all duration-500"
-                                                                        style={{
-                                                                            left: `${point.x}%`,
-                                                                            top: `calc(${point.y}% - 32px)`,
-                                                                            opacity: chartAnimated ? 1 : 0,
-                                                                            transform: chartAnimated
-                                                                                ? 'translate(-50%, 0)'
-                                                                                : 'translate(-50%, 6px)',
-                                                                            transitionDelay: `${760 + index * 70}ms`,
-                                                                        }}
-                                                                    >
-                                                                        {plan}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* BASELINE */}
-                                                    <div className="absolute inset-x-0 bottom-14 z-10 border-b border-slate-300" />
-
-                                                    {/* MONTH LABEL */}
-                                                    <div className="absolute inset-x-0 bottom-0 flex h-11 items-start px-5">
-                                                        {annualReport.map((item) => (
-                                                            <div
-                                                                key={`${item.tahun}-${item.bulan}`}
-                                                                className="flex-1 text-center"
-                                                            >
-                                                                <span className="text-[11px] font-bold text-slate-600">
-                                                                    {item.nama_bulan}
-                                                                </span>
-
-                                                                {periodSpansYears && (
-                                                                    <span className="block text-[10px] font-semibold text-slate-400">
-                                                                        {item.tahun}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Legend
-                                        items={[
-                                            ...stackDivisi.map((divisi, index) => ({
-                                                label: `ACT ${divisi}`,
-                                                color: getDivisiColor(divisi, index),
-                                            })),
-                                            { label: 'Plan', line: true },
-                                        ]}
+                                    <Icon
+                                        d={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                                        strokeWidth={2.2}
+                                        className="h-3.5 w-3.5"
                                     />
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    title="Tidak ada data pada periode ini"
-                                    text="Tidak ditemukan jadwal preventif pada periode yang dipilih."
+                                    {isPlaying ? 'Jeda' : 'Putar'}
+                                </button>
+
+                                {/* DURASI */}
+                                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                                    <span className="whitespace-nowrap text-[10px] font-semibold text-slate-500">
+                                        Durasi
+                                    </span>
+                                    <select
+                                        value={slideDuration}
+                                        onChange={(event) =>
+                                            setSlideDuration(Number(event.target.value))
+                                        }
+                                        className="cursor-pointer border-0 bg-transparent p-0 pr-5 text-[11px] font-bold text-slate-700 outline-none focus:ring-0"
+                                    >
+                                        {DURATION_OPTIONS.map((seconds) => (
+                                            <option key={seconds} value={seconds}>
+                                                {seconds} detik
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* GARIS PROGRES PERGANTIAN SLIDE */}
+                        <div className="h-0.5 overflow-hidden bg-slate-200/60">
+                            {autoRunning && (
+                                <div
+                                    key={`${activeSlide}-${slideDuration}`}
+                                    className="h-full origin-left bg-blue-500"
+                                    style={{
+                                        animation: `slideProgress ${slideDuration}s linear forwards`,
+                                    }}
                                 />
                             )}
-                        </section>
+                        </div>
 
-                        {/* ========== MONTHLY REPORT ========== */}
-                        <section className="min-w-0 overflow-hidden">
-                            <div className="border-b border-slate-200/70 bg-gradient-to-r from-indigo-50/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
-                                <SectionTitle
-                                    icon={ICON_CALENDAR}
-                                    tone="indigo"
-                                    tag="Monthly report"
-                                    title={`Detail Laporan ${currentMonthName} ${selectedYear}`}
-                                    description="Ringkasan kondisi preventive maintenance pada bulan yang dipilih."
-                                >
-                                    <form
-                                        onSubmit={applyFilter}
-                                        className="flex flex-wrap items-end gap-2"
-                                    >
-                                        <Field id="bulan" label="Bulan" width={118}>
-                                            <select
-                                                id="bulan"
-                                                value={selectedMonth}
-                                                onChange={(event) =>
-                                                    setSelectedMonth(Number(event.target.value))
-                                                }
-                                                className={selectIndigo}
+                        <div>
+                            {/* ========== PERIOD REPORT ========== */}
+                            {activeSlide === 'annual' && (
+                                <section className="min-w-0 overflow-hidden">
+                                    <div className="border-b border-slate-200/70 bg-gradient-to-r from-blue-50/80 via-white/40 to-white/40 px-4 py-2.5 sm:px-5">
+                                        <SectionTitle
+                                            icon={ICON_CHART}
+                                            tone="blue"
+                                            tag="Period report"
+                                            title="Rentang Periode"
+                                            description="Pilih awal dan akhir laporan."
+                                        >
+                                            <form
+                                                onSubmit={applyFilter}
+                                                className="flex flex-wrap items-end gap-x-3 gap-y-2"
                                             >
-                                                {Object.entries(namaBulan).map(([value, label]) => (
-                                                    <option key={value} value={value}>
-                                                        {label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
+                                                {/* DARI */}
+                                                <div className="flex items-end gap-1.5">
+                                                    <Field id="mulai_bulan" label="Dari bulan" width={104}>
+                                                        <select
+                                                            id="mulai_bulan"
+                                                            value={selectedAnnualStartMonth}
+                                                            onChange={(event) =>
+                                                                handleAnnualStartChange(
+                                                                    Number(event.target.value),
+                                                                    selectedAnnualStartYear
+                                                                )
+                                                            }
+                                                            className={selectBlue}
+                                                        >
+                                                            {monthOptions.map((month) => (
+                                                                <option key={month.value} value={month.value}>
+                                                                    {month.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </Field>
 
-                                        <Field id="tahun" label="Tahun" width={92}>
-                                            <select
-                                                id="tahun"
-                                                value={selectedYear}
-                                                onChange={(event) =>
-                                                    setSelectedYear(Number(event.target.value))
-                                                }
-                                                className={selectIndigo}
-                                            >
-                                                {years.map((year) => (
-                                                    <option key={year} value={year}>
-                                                        {year}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
+                                                    <Field id="mulai_tahun" label="Tahun" width={74}>
+                                                        <select
+                                                            id="mulai_tahun"
+                                                            value={selectedAnnualStartYear}
+                                                            onChange={(event) =>
+                                                                handleAnnualStartChange(
+                                                                    selectedAnnualStartMonth,
+                                                                    Number(event.target.value)
+                                                                )
+                                                            }
+                                                            className={selectBlue}
+                                                        >
+                                                            {YEARS.map((year) => (
+                                                                <option key={year} value={year}>
+                                                                    {year}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </Field>
+                                                </div>
 
-                                        <ActionButton type="submit" tone="indigo" />
-                                    </form>
-                                </SectionTitle>
-                            </div>
+                                                {/* SAMPAI */}
+                                                <div className="flex items-end gap-1.5">
+                                                    <Field id="selesai_bulan" label="Sampai bulan" width={104}>
+                                                        <select
+                                                            id="selesai_bulan"
+                                                            value={selectedAnnualEndMonth}
+                                                            onChange={(event) =>
+                                                                handleAnnualEndChange(
+                                                                    Number(event.target.value),
+                                                                    selectedAnnualEndYear
+                                                                )
+                                                            }
+                                                            className={selectBlue}
+                                                        >
+                                                            {monthOptions.map((month) => (
+                                                                <option key={month.value} value={month.value}>
+                                                                    {month.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </Field>
 
-                            <div className="grid grid-cols-1 gap-4 p-4 sm:p-5 xl:grid-cols-5">
-                                {/* ---------- BAR CHART ---------- */}
-                                <section
-                                    className={`overflow-hidden rounded-3xl transition-all duration-300 hover:-translate-y-1 xl:col-span-3 ${glassInner}`}
-                                >
-                                    <div className="flex items-start justify-between gap-4 border-b border-slate-200/70 px-5 py-4">
-                                        <div>
-                                            <p className="text-[11px] font-semibold text-blue-600">
-                                                Performance
-                                            </p>
-                                            <h3 className="text-base font-extrabold text-slate-900">
-                                                ACT vs Plan per Divisi
-                                            </h3>
-                                            <p className="mt-0.5 text-xs text-slate-500">
-                                                Perbandingan jadwal yang sudah dan belum dilakukan.
-                                            </p>
-                                        </div>
+                                                    <Field id="selesai_tahun" label="Tahun" width={74}>
+                                                        <select
+                                                            id="selesai_tahun"
+                                                            value={selectedAnnualEndYear}
+                                                            onChange={(event) =>
+                                                                handleAnnualEndChange(
+                                                                    selectedAnnualEndMonth,
+                                                                    Number(event.target.value)
+                                                                )
+                                                            }
+                                                            className={selectBlue}
+                                                        >
+                                                            {YEARS.map((year) => (
+                                                                <option key={year} value={year}>
+                                                                    {year}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </Field>
+                                                </div>
 
-                                        <div className="hidden rounded-xl bg-white px-3 py-1.5 text-right shadow-sm sm:block">
-                                            <p className="text-[10px] font-semibold text-slate-500">
-                                                Periode
-                                            </p>
-                                            <p className="text-xs font-bold text-slate-800">
-                                                {currentMonthName} {selectedYear}
-                                            </p>
-                                        </div>
+                                                <ActionButton type="submit" />
+                                            </form>
+                                        </SectionTitle>
                                     </div>
 
-                                    {divisiReport.length > 0 ? (
-                                        <>
-                                            <div className="px-4 pb-1 pt-3">
-                                                <div className="dashboard-scrollbar overflow-x-auto">
-                                                    <div
-                                                        className="relative h-[240px]"
-                                                        style={{
-                                                            minWidth: `${Math.max(
-                                                                600,
-                                                                divisiReport.length * 110
-                                                            )}px`,
-                                                        }}
-                                                    >
-                                                        <div className="absolute inset-0 flex">
-                                                            {/* Y AXIS */}
-                                                            <div className="flex w-11 shrink-0 flex-col justify-between pb-[52px] pr-2 text-right text-[10px] font-medium text-slate-500">
-                                                                {[4, 3, 2, 1, 0].map((value) => (
-                                                                    <span key={value}>
-                                                                        {Math.round((maxChartValue * value) / 4)}
-                                                                    </span>
+                                    {/* PERIOD GRAPH */}
+                                    {annualReport.length > 0 ? (
+                                        <div className={`px-3 pb-2 pt-3 sm:px-4 ${SLIDE_BODY_H}`}>
+                                            <div className="dashboard-scrollbar overflow-x-auto pb-1">
+                                                <div
+                                                    className="relative h-[320px] sm:h-[340px]"
+                                                    style={{
+                                                        minWidth: `${Math.max(600, annualReport.length * 65)}px`,
+                                                    }}
+                                                >
+                                                    <div className="absolute inset-0 flex">
+                                                        {/* Y AXIS */}
+                                                        <div className="flex w-9 shrink-0 flex-col justify-between pb-[40px] pr-1.5 pt-6 text-right text-[9px] font-medium text-slate-500">
+                                                            {[4, 3, 2, 1, 0].map((value) => (
+                                                                <span key={value}>
+                                                                    {Math.round((maxAnnualChartValue * value) / 4)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+
+                                                        <div className="relative flex-1">
+                                                            {/* GRID */}
+                                                            <div className="absolute inset-x-0 bottom-11 top-7 flex flex-col justify-between">
+                                                                {[0, 1, 2, 3, 4].map((line) => (
+                                                                    <div
+                                                                        key={line}
+                                                                        className="border-t border-dashed border-slate-300/80"
+                                                                    />
                                                                 ))}
                                                             </div>
 
-                                                            <div className="relative flex-1">
-                                                                {/* GRID */}
-                                                                <div className="absolute inset-x-0 bottom-[52px] top-2 flex flex-col justify-between">
-                                                                    {[0, 1, 2, 3, 4].map((line) => (
+                                                            {/* BATANG ACT BERTUMPUK PER DIVISI */}
+                                                            <div className="absolute inset-x-0 bottom-11 top-7 z-0 flex px-3">
+                                                                {annualReport.map((item, index) => {
+                                                                    const act = Number(item.act || 0);
+                                                                    const plan = Number(item.plan || 0);
+
+                                                                    const actHeight =
+                                                                        (act / maxAnnualChartValue) * 100;
+
+                                                                    const segments = stackDivisi
+                                                                        .map((divisi, divisiIndex) => ({
+                                                                            divisi,
+                                                                            value: Number(
+                                                                                item.act_per_divisi?.[divisi] || 0
+                                                                            ),
+                                                                            color: getDivisiColor(
+                                                                                divisi,
+                                                                                divisiIndex
+                                                                            ),
+                                                                            textColor: getDivisiWarna(
+                                                                                divisi,
+                                                                                divisiIndex
+                                                                            ).text,
+                                                                        }))
+                                                                        .filter((segment) => segment.value > 0);
+
+                                                                    // Total ACT di atas batang hanya kalau batang
+                                                                    // terdiri dari 2+ divisi. Kalau cuma satu divisi,
+                                                                    // angkanya sudah ada di dalam batang (tidak dobel).
+                                                                    const showTotalLabel =
+                                                                        segments.length > 1 &&
+                                                                        act > 0 &&
+                                                                        ((plan - act) / maxAnnualChartValue) * 100 >= 20;
+
+                                                                    return (
                                                                         <div
-                                                                            key={line}
-                                                                            className="border-t border-dashed border-slate-300/80"
+                                                                            key={`bar-${item.tahun}-${item.bulan}`}
+                                                                            className="relative flex h-full flex-1 items-end justify-center"
+                                                                        >
+                                                                            {act > 0 && (
+                                                                                <div
+                                                                                    className="relative flex w-[34px] flex-col-reverse transition-all duration-700 ease-out"
+                                                                                    style={{
+                                                                                        height: chartAnimated
+                                                                                            ? `${Math.max(actHeight, 3)}%`
+                                                                                            : '0%',
+                                                                                        transitionDelay: `${index * 60}ms`,
+                                                                                    }}
+                                                                                >
+                                                                                    {segments.map((segment, segIndex) => {
+                                                                                        const isTop =
+                                                                                            segIndex === segments.length - 1;
+
+                                                                                        return (
+                                                                                            <div
+                                                                                                key={segment.divisi}
+                                                                                                title={`${segment.divisi}: ${segment.value}`}
+                                                                                                className={`relative flex min-h-0 items-center justify-center border-t border-white/40 first:border-t-0 ${
+                                                                                                    isTop ? 'rounded-t-lg' : ''
+                                                                                                }`}
+                                                                                                style={{
+                                                                                                    flexGrow: segment.value,
+                                                                                                    flexBasis: 0,
+                                                                                                    backgroundColor: segment.color,
+                                                                                                }}
+                                                                                            >
+                                                                                                <span
+                                                                                                    className="text-[10px] font-extrabold leading-none transition-opacity duration-500"
+                                                                                                    style={{
+                                                                                                        color: segment.textColor,
+                                                                                                        opacity: chartAnimated ? 1 : 0,
+                                                                                                        transitionDelay: `${500 + index * 60}ms`,
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {segment.value}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+
+                                                                                    {showTotalLabel && (
+                                                                                        <span
+                                                                                            className="absolute left-1/2 whitespace-nowrap text-[11px] font-extrabold text-slate-700 transition-opacity duration-500"
+                                                                                            style={{
+                                                                                                bottom: 'calc(100% + 4px)',
+                                                                                                transform: 'translateX(-50%)',
+                                                                                                opacity: chartAnimated ? 1 : 0,
+                                                                                                transitionDelay: `${600 + index * 60}ms`,
+                                                                                            }}
+                                                                                        >
+                                                                                            {act}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            {/* GARIS PLAN */}
+                                                            <div className="pointer-events-none absolute inset-x-0 bottom-11 top-7 z-10 px-3">
+                                                                <div className="relative h-full w-full">
+                                                                    <svg
+                                                                        className="absolute inset-0 h-full w-full overflow-visible"
+                                                                        viewBox="0 0 100 100"
+                                                                        preserveAspectRatio="none"
+                                                                    >
+                                                                        <polyline
+                                                                            points={annualPlanLine}
+                                                                            fill="none"
+                                                                            stroke="#f59e0b"
+                                                                            strokeWidth="2.5"
+                                                                            vectorEffect="non-scaling-stroke"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            className="transition-opacity duration-500"
+                                                                            style={{ opacity: chartAnimated ? 1 : 0 }}
+                                                                        />
+                                                                    </svg>
+
+                                                                    {annualPlanPoints.map((point, index) => (
+                                                                        <span
+                                                                            key={`plan-dot-${index}`}
+                                                                            className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-amber-500 bg-white shadow-[0_2px_8px_rgba(245,158,11,0.5)] transition-all duration-500"
+                                                                            style={{
+                                                                                left: `${point.x}%`,
+                                                                                top: `${point.y}%`,
+                                                                                opacity: chartAnimated ? 1 : 0,
+                                                                                transform: chartAnimated
+                                                                                    ? 'translate(-50%, -50%) scale(1)'
+                                                                                    : 'translate(-50%, -50%) scale(0)',
+                                                                                transitionDelay: `${600 + index * 70}ms`,
+                                                                            }}
                                                                         />
                                                                     ))}
-                                                                </div>
 
-                                                                {/* BARS */}
-                                                                <div className="absolute inset-x-0 bottom-[52px] top-2 flex items-end justify-around gap-5 px-5">
-                                                                    {divisiReport.map((item, index) => {
-                                                                        const act = Number(item.act || 0);
+                                                                    {annualPlanPoints.map((point, index) => {
+                                                                        const item = annualReport[index];
                                                                         const plan = Number(item.plan || 0);
 
-                                                                        const actHeight =
-                                                                            maxChartValue > 0
-                                                                                ? (act / maxChartValue) * 100
-                                                                                : 0;
-                                                                        const planHeight =
-                                                                            maxChartValue > 0
-                                                                                ? (plan / maxChartValue) * 100
-                                                                                : 0;
-
-                                                                        const visualActHeight =
-                                                                            act > 0 ? Math.max(actHeight, 3) : 0;
-                                                                        const visualPlanHeight =
-                                                                            plan > 0 ? Math.max(planHeight, 3) : 0;
+                                                                        if (plan <= 0) return null;
 
                                                                         return (
-                                                                            <div
-                                                                                key={item.divisi}
-                                                                                className="flex h-full min-w-[75px] flex-1 items-end justify-center gap-1.5"
+                                                                            <span
+                                                                                key={`plan-label-${item.tahun}-${item.bulan}`}
+                                                                                className="absolute whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-600 shadow-sm transition-all duration-500"
+                                                                                style={{
+                                                                                    left: `${point.x}%`,
+                                                                                    top: `calc(${point.y}% - 32px)`,
+                                                                                    opacity: chartAnimated ? 1 : 0,
+                                                                                    transform: chartAnimated
+                                                                                        ? 'translate(-50%, 0)'
+                                                                                        : 'translate(-50%, 6px)',
+                                                                                    transitionDelay: `${760 + index * 70}ms`,
+                                                                                }}
                                                                             >
-                                                                                {/* ACT */}
-                                                                                <div className="relative flex h-full w-8 items-end justify-center">
-                                                                                    <span
-                                                                                        className="absolute z-20 whitespace-nowrap text-[11px] font-extrabold text-blue-700 transition-all duration-500"
-                                                                                        style={{
-                                                                                            bottom:
-                                                                                                chartAnimated && act > 0
-                                                                                                    ? `min(calc(${visualActHeight}% + 6px), calc(100% - 16px))`
-                                                                                                    : '0px',
-                                                                                            opacity:
-                                                                                                chartAnimated && act > 0 ? 1 : 0,
-                                                                                            transform: chartAnimated
-                                                                                                ? 'translateY(0)'
-                                                                                                : 'translateY(7px)',
-                                                                                            transitionDelay: `${index * 70}ms`,
-                                                                                        }}
-                                                                                    >
-                                                                                        {act > 0 ? act : ''}
-                                                                                    </span>
-
-                                                                                    <div
-                                                                                        className="w-full rounded-t-xl bg-gradient-to-t from-blue-700 to-sky-400 shadow-[0_8px_18px_rgba(37,99,235,0.25)] transition-all duration-700 ease-out hover:from-blue-600 hover:to-cyan-300"
-                                                                                        style={{
-                                                                                            height: chartAnimated
-                                                                                                ? `${visualActHeight}%`
-                                                                                                : '0%',
-                                                                                            transitionDelay: `${index * 80}ms`,
-                                                                                        }}
-                                                                                    />
-                                                                                </div>
-
-                                                                                {/* PLAN */}
-                                                                                <div className="relative flex h-full w-8 items-end justify-center">
-                                                                                    <span
-                                                                                        className="absolute z-20 whitespace-nowrap text-[11px] font-extrabold text-amber-600 transition-all duration-500"
-                                                                                        style={{
-                                                                                            bottom:
-                                                                                                chartAnimated && plan > 0
-                                                                                                    ? `min(calc(${visualPlanHeight}% + 6px), calc(100% - 16px))`
-                                                                                                    : '0px',
-                                                                                            opacity:
-                                                                                                chartAnimated && plan > 0 ? 1 : 0,
-                                                                                            transform: chartAnimated
-                                                                                                ? 'translateY(0)'
-                                                                                                : 'translateY(7px)',
-                                                                                            transitionDelay: `${index * 70 + 120}ms`,
-                                                                                        }}
-                                                                                    >
-                                                                                        {plan > 0 ? plan : ''}
-                                                                                    </span>
-
-                                                                                    <div
-                                                                                        className="w-full rounded-t-xl bg-gradient-to-t from-amber-500 to-yellow-300 shadow-[0_8px_18px_rgba(245,158,11,0.25)] transition-all duration-700 ease-out hover:from-amber-400 hover:to-yellow-200"
-                                                                                        style={{
-                                                                                            height: chartAnimated
-                                                                                                ? `${visualPlanHeight}%`
-                                                                                                : '0%',
-                                                                                            transitionDelay: `${index * 80 + 120}ms`,
-                                                                                        }}
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
+                                                                                {plan}
+                                                                            </span>
                                                                         );
                                                                     })}
                                                                 </div>
+                                                            </div>
 
-                                                                {/* BASELINE */}
-                                                                <div className="absolute inset-x-0 bottom-[52px] border-b border-slate-300" />
+                                                            {/* BASELINE */}
+                                                            <div className="absolute inset-x-0 bottom-11 z-10 border-b border-slate-300" />
 
-                                                                {/* DIVISI LABEL */}
-                                                                <div className="absolute inset-x-0 bottom-0 flex h-11 items-start justify-around gap-5 px-5">
-                                                                    {divisiReport.map((item) => (
-                                                                        <div
-                                                                            key={item.divisi}
-                                                                            className="min-w-[75px] flex-1 text-center"
-                                                                        >
-                                                                            <span className="inline-block max-w-[90px] break-words text-[11px] font-bold leading-4 text-slate-600">
-                                                                                {item.divisi}
+                                                            {/* MONTH LABEL */}
+                                                            <div className="absolute inset-x-0 bottom-0 flex h-9 items-start px-3">
+                                                                {annualReport.map((item) => (
+                                                                    <div
+                                                                        key={`${item.tahun}-${item.bulan}`}
+                                                                        className="flex-1 text-center"
+                                                                    >
+                                                                        <span className="text-[10px] font-bold text-slate-600">
+                                                                            {item.nama_bulan}
+                                                                        </span>
+
+                                                                        {periodSpansYears && (
+                                                                            <span className="block text-[10px] font-semibold text-slate-400">
+                                                                                {item.tahun}
                                                                             </span>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1275,114 +1118,360 @@ export default function Welcome({
 
                                             <Legend
                                                 items={[
-                                                    {
-                                                        label: 'ACT',
-                                                        className: 'bg-gradient-to-r from-blue-700 to-sky-400',
-                                                    },
-                                                    {
-                                                        label: 'Plan',
-                                                        className: 'bg-gradient-to-r from-amber-500 to-yellow-300',
-                                                    },
+                                                    ...stackDivisi.map((divisi, index) => ({
+                                                        label: `ACT ${divisi}`,
+                                                        color: getDivisiColor(divisi, index),
+                                                    })),
+                                                    { label: 'Plan', line: true },
                                                 ]}
                                             />
-                                        </>
+                                        </div>
                                     ) : (
                                         <EmptyState
-                                            title="Tidak ada jadwal preventif"
-                                            text="Tidak ditemukan jadwal pada bulan yang dipilih."
+                                            title="Tidak ada data pada periode ini"
+                                            text="Tidak ditemukan jadwal preventif pada periode yang dipilih."
                                         />
                                     )}
                                 </section>
+                            )}
 
-                                {/* ---------- PIE CHART ---------- */}
-                                <section
-                                    className={`overflow-hidden rounded-3xl transition-all duration-300 hover:-translate-y-1 xl:col-span-2 ${glassInner}`}
-                                >
-                                    <div className="border-b border-slate-200/70 px-5 py-4">
-                                        <p className="text-[11px] font-semibold text-amber-600">
-                                            Overview
-                                        </p>
-                                        <h3 className="text-base font-extrabold text-slate-900">
-                                            Persentase ACT vs Plan
-                                        </h3>
-                                        <p className="mt-0.5 text-xs text-slate-500">
-                                            Persentase seluruh jadwal preventif.
-                                        </p>
+                            {/* ========== MONTHLY REPORT ========== */}
+                            {activeSlide === 'monthly' && (
+                                <section className="min-w-0 overflow-hidden">
+                                    <div className="border-b border-slate-200/70 bg-gradient-to-r from-indigo-50/80 via-white/40 to-white/40 px-4 py-2.5 sm:px-5">
+                                        <SectionTitle
+                                            icon={ICON_CALENDAR}
+                                            tone="indigo"
+                                            tag="Monthly report"
+                                            title={`Detail Laporan ${currentMonthName} ${selectedYear}`}
+                                            description="Ringkasan kondisi preventive maintenance pada bulan yang dipilih."
+                                        >
+                                            <form
+                                                onSubmit={applyFilter}
+                                                className="flex flex-wrap items-end gap-1.5"
+                                            >
+                                                <Field id="bulanan_bulan" label="Bulan" width={104}>
+                                                    <select
+                                                        id="bulanan_bulan"
+                                                        value={selectedMonth}
+                                                        onChange={(event) =>
+                                                            setSelectedMonth(Number(event.target.value))
+                                                        }
+                                                        className={selectIndigo}
+                                                    >
+                                                        {monthOptions.map((month) => (
+                                                            <option key={month.value} value={month.value}>
+                                                                {month.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+
+                                                <Field id="bulanan_tahun" label="Tahun" width={74}>
+                                                    <select
+                                                        id="bulanan_tahun"
+                                                        value={selectedYear}
+                                                        onChange={(event) =>
+                                                            setSelectedYear(Number(event.target.value))
+                                                        }
+                                                        className={selectIndigo}
+                                                    >
+                                                        {YEARS.map((year) => (
+                                                            <option key={year} value={year}>
+                                                                {year}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+
+                                                <ActionButton type="submit" tone="indigo" />
+                                            </form>
+                                        </SectionTitle>
                                     </div>
 
-                                    <div className="flex flex-col items-center justify-center gap-4 p-5">
-                                        <div
-                                            className="h-36 w-36 rounded-full shadow-[0_15px_35px_rgba(15,23,42,0.20)] transition-transform duration-[1000ms] ease-out"
-                                            style={pieStyle}
+                                    <div
+                                        className={`grid grid-cols-1 gap-3 p-3 sm:p-4 xl:grid-cols-5 ${SLIDE_BODY_H}`}
+                                    >
+                                        {/* ---------- BAR CHART ---------- */}
+                                        <section
+                                            className={`flex min-h-0 flex-col overflow-hidden rounded-3xl xl:col-span-3 ${glassInner}`}
                                         >
-                                            <div className="flex h-full w-full items-center justify-center">
-                                                <div className="flex h-[96px] w-[96px] flex-col items-center justify-center rounded-full bg-white shadow-[inset_0_2px_10px_rgba(15,23,42,0.08)]">
-                                                    <span className="text-2xl font-extrabold tracking-tight text-slate-900">
-                                                        {Math.round(actPercentage)}%
-                                                    </span>
-                                                    <span className="text-[10px] font-semibold text-slate-500">
-                                                        ACT
-                                                    </span>
+                                            <div className="flex items-start justify-between gap-4 border-b border-slate-200/70 px-5 py-2.5">
+                                                <div>
+                                                    <p className="text-[11px] font-semibold text-blue-600">
+                                                        Performance
+                                                    </p>
+                                                    <h3 className="text-base font-extrabold text-slate-900">
+                                                        ACT vs Plan per Divisi
+                                                    </h3>
+                                                </div>
+
+                                                <div className="hidden rounded-xl bg-white px-3 py-1 text-right shadow-sm sm:block">
+                                                    <p className="text-[10px] font-semibold text-slate-500">
+                                                        Periode
+                                                    </p>
+                                                    <p className="text-xs font-bold text-slate-800">
+                                                        {currentMonthName} {selectedYear}
+                                                    </p>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div className="w-full max-w-sm space-y-2.5">
-                                            <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="h-3 w-3 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.15)]" />
-                                                    <div>
-                                                        <p className="text-sm font-bold text-slate-800">ACT</p>
-                                                        <p className="text-[11px] text-slate-500">
-                                                            Sudah preventif
-                                                        </p>
+                                            {divisiReport.length > 0 ? (
+                                                <>
+                                                    <div className="min-h-[260px] flex-1 px-4 pb-1 pt-3">
+                                                        <div className="dashboard-scrollbar h-full overflow-x-auto">
+                                                            <div
+                                                                className="relative h-full min-h-[240px]"
+                                                                style={{
+                                                                    minWidth: `${Math.max(
+                                                                        600,
+                                                                        divisiReport.length * 110
+                                                                    )}px`,
+                                                                }}
+                                                            >
+                                                                <div className="absolute inset-0 flex">
+                                                                    {/* Y AXIS */}
+                                                                    <div className="flex w-11 shrink-0 flex-col justify-between pb-[52px] pr-2 text-right text-[10px] font-medium text-slate-500">
+                                                                        {[4, 3, 2, 1, 0].map((value) => (
+                                                                            <span key={value}>
+                                                                                {Math.round((maxChartValue * value) / 4)}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    <div className="relative flex-1">
+                                                                        {/* GRID */}
+                                                                        <div className="absolute inset-x-0 bottom-[52px] top-2 flex flex-col justify-between">
+                                                                            {[0, 1, 2, 3, 4].map((line) => (
+                                                                                <div
+                                                                                    key={line}
+                                                                                    className="border-t border-dashed border-slate-300/80"
+                                                                                />
+                                                                            ))}
+                                                                        </div>
+
+                                                                        {/* BARS */}
+                                                                        <div className="absolute inset-x-0 bottom-[52px] top-2 flex items-end justify-around gap-5 px-5">
+                                                                            {divisiReport.map((item, index) => {
+                                                                                const act = Number(item.act || 0);
+                                                                                const plan = Number(item.plan || 0);
+
+                                                                                const actHeight =
+                                                                                    maxChartValue > 0
+                                                                                        ? (act / maxChartValue) * 100
+                                                                                        : 0;
+                                                                                const planHeight =
+                                                                                    maxChartValue > 0
+                                                                                        ? (plan / maxChartValue) * 100
+                                                                                        : 0;
+
+                                                                                const visualActHeight =
+                                                                                    act > 0 ? Math.max(actHeight, 3) : 0;
+                                                                                const visualPlanHeight =
+                                                                                    plan > 0 ? Math.max(planHeight, 3) : 0;
+
+                                                                                return (
+                                                                                    <div
+                                                                                        key={item.divisi}
+                                                                                        className="flex h-full min-w-[75px] flex-1 items-end justify-center gap-1.5"
+                                                                                    >
+                                                                                        {/* ACT */}
+                                                                                        <div className="relative flex h-full w-8 items-end justify-center">
+                                                                                            <span
+                                                                                                className="absolute z-20 whitespace-nowrap text-[11px] font-extrabold text-blue-700 transition-all duration-500"
+                                                                                                style={{
+                                                                                                    bottom:
+                                                                                                        chartAnimated && act > 0
+                                                                                                            ? `min(calc(${visualActHeight}% + 6px), calc(100% - 16px))`
+                                                                                                            : '0px',
+                                                                                                    opacity:
+                                                                                                        chartAnimated && act > 0 ? 1 : 0,
+                                                                                                    transform: chartAnimated
+                                                                                                        ? 'translateY(0)'
+                                                                                                        : 'translateY(7px)',
+                                                                                                    transitionDelay: `${index * 70}ms`,
+                                                                                                }}
+                                                                                            >
+                                                                                                {act > 0 ? act : ''}
+                                                                                            </span>
+
+                                                                                            <div
+                                                                                                className="w-full rounded-t-xl bg-gradient-to-t from-blue-700 to-sky-400 shadow-[0_8px_18px_rgba(37,99,235,0.25)] transition-all duration-700 ease-out hover:from-blue-600 hover:to-cyan-300"
+                                                                                                style={{
+                                                                                                    height: chartAnimated
+                                                                                                        ? `${visualActHeight}%`
+                                                                                                        : '0%',
+                                                                                                    transitionDelay: `${index * 80}ms`,
+                                                                                                }}
+                                                                                            />
+                                                                                        </div>
+
+                                                                                        {/* PLAN */}
+                                                                                        <div className="relative flex h-full w-8 items-end justify-center">
+                                                                                            <span
+                                                                                                className="absolute z-20 whitespace-nowrap text-[11px] font-extrabold text-amber-600 transition-all duration-500"
+                                                                                                style={{
+                                                                                                    bottom:
+                                                                                                        chartAnimated && plan > 0
+                                                                                                            ? `min(calc(${visualPlanHeight}% + 6px), calc(100% - 16px))`
+                                                                                                            : '0px',
+                                                                                                    opacity:
+                                                                                                        chartAnimated && plan > 0 ? 1 : 0,
+                                                                                                    transform: chartAnimated
+                                                                                                        ? 'translateY(0)'
+                                                                                                        : 'translateY(7px)',
+                                                                                                    transitionDelay: `${index * 70 + 120}ms`,
+                                                                                                }}
+                                                                                            >
+                                                                                                {plan > 0 ? plan : ''}
+                                                                                            </span>
+
+                                                                                            <div
+                                                                                                className="w-full rounded-t-xl bg-gradient-to-t from-amber-500 to-yellow-300 shadow-[0_8px_18px_rgba(245,158,11,0.25)] transition-all duration-700 ease-out hover:from-amber-400 hover:to-yellow-200"
+                                                                                                style={{
+                                                                                                    height: chartAnimated
+                                                                                                        ? `${visualPlanHeight}%`
+                                                                                                        : '0%',
+                                                                                                    transitionDelay: `${index * 80 + 120}ms`,
+                                                                                                }}
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+
+                                                                        {/* BASELINE */}
+                                                                        <div className="absolute inset-x-0 bottom-[52px] border-b border-slate-300" />
+
+                                                                        {/* DIVISI LABEL */}
+                                                                        <div className="absolute inset-x-0 bottom-0 flex h-11 items-start justify-around gap-5 px-5">
+                                                                            {divisiReport.map((item) => (
+                                                                                <div
+                                                                                    key={item.divisi}
+                                                                                    className="min-w-[75px] flex-1 text-center"
+                                                                                >
+                                                                                    <span className="inline-block max-w-[90px] break-words text-[11px] font-bold leading-4 text-slate-600">
+                                                                                        {item.divisi}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <Legend
+                                                        items={[
+                                                            {
+                                                                label: 'ACT',
+                                                                className: 'bg-gradient-to-r from-blue-700 to-sky-400',
+                                                            },
+                                                            {
+                                                                label: 'Plan',
+                                                                className: 'bg-gradient-to-r from-amber-500 to-yellow-300',
+                                                            },
+                                                        ]}
+                                                    />
+                                                </>
+                                            ) : (
+                                                <EmptyState
+                                                    title="Tidak ada jadwal preventif"
+                                                    text="Tidak ditemukan jadwal pada bulan yang dipilih."
+                                                />
+                                            )}
+                                        </section>
+
+                                        {/* ---------- PIE CHART ---------- */}
+                                        <section
+                                            className={`flex min-h-0 flex-col overflow-hidden rounded-3xl xl:col-span-2 ${glassInner}`}
+                                        >
+                                            <div className="border-b border-slate-200/70 px-5 py-2.5">
+                                                <p className="text-[11px] font-semibold text-amber-600">
+                                                    Overview
+                                                </p>
+                                                <h3 className="text-base font-extrabold text-slate-900">
+                                                    Persentase ACT vs Plan
+                                                </h3>
+                                            </div>
+
+                                            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4">
+                                                <div
+                                                    className="h-28 w-28 shrink-0 rounded-full shadow-[0_15px_35px_rgba(15,23,42,0.20)] transition-transform duration-[1000ms] ease-out"
+                                                    style={pieStyle}
+                                                >
+                                                    <div className="flex h-full w-full items-center justify-center">
+                                                        <div className="flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-white shadow-[inset_0_2px_10px_rgba(15,23,42,0.08)]">
+                                                            <span className="text-xl font-extrabold tracking-tight text-slate-900">
+                                                                {Math.round(actPercentage)}%
+                                                            </span>
+                                                            <span className="text-[10px] font-semibold text-slate-500">
+                                                                ACT
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="text-right">
-                                                    <p className="text-lg font-extrabold text-blue-600">
-                                                        {totalAct}
-                                                    </p>
-                                                    <p className="text-[11px] font-semibold text-slate-500">
-                                                        {actPercentage.toFixed(1)}%
-                                                    </p>
-                                                </div>
-                                            </div>
+                                                <div className="w-full max-w-sm space-y-2">
+                                                    <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="h-3 w-3 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.15)]" />
+                                                            <div>
+                                                                <p className="text-sm font-bold text-slate-800">ACT</p>
+                                                                <p className="text-[11px] text-slate-500">
+                                                                    Sudah preventif
+                                                                </p>
+                                                            </div>
+                                                        </div>
 
-                                            <div className="flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_0_4px_rgba(245,158,11,0.15)]" />
-                                                    <div>
-                                                        <p className="text-sm font-bold text-slate-800">Plan</p>
-                                                        <p className="text-[11px] text-slate-500">
-                                                            Belum preventif
-                                                        </p>
+                                                        <div className="text-right">
+                                                            <p className="text-lg font-extrabold leading-tight text-blue-600">
+                                                                {totalAct}
+                                                            </p>
+                                                            <p className="text-[11px] font-semibold text-slate-500">
+                                                                {actPercentage.toFixed(1)}%
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_0_4px_rgba(245,158,11,0.15)]" />
+                                                            <div>
+                                                                <p className="text-sm font-bold text-slate-800">Plan</p>
+                                                                <p className="text-[11px] text-slate-500">
+                                                                    Belum preventif
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-right">
+                                                            <p className="text-lg font-extrabold leading-tight text-amber-600">
+                                                                {totalPlan}
+                                                            </p>
+                                                            <p className="text-[11px] font-semibold text-slate-500">
+                                                                {planPercentage.toFixed(1)}%
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between border-t border-slate-200/70 pt-2 text-sm">
+                                                        <span className="font-medium text-slate-500">
+                                                            Total jadwal
+                                                        </span>
+                                                        <span className="font-extrabold text-slate-800">
+                                                            {totalJadwal}
+                                                        </span>
                                                     </div>
                                                 </div>
-
-                                                <div className="text-right">
-                                                    <p className="text-lg font-extrabold text-amber-600">
-                                                        {totalPlan}
-                                                    </p>
-                                                    <p className="text-[11px] font-semibold text-slate-500">
-                                                        {planPercentage.toFixed(1)}%
-                                                    </p>
-                                                </div>
                                             </div>
-
-                                            <div className="flex items-center justify-between border-t border-slate-200/70 pt-3 text-sm">
-                                                <span className="font-medium text-slate-500">
-                                                    Total jadwal
-                                                </span>
-                                                <span className="font-extrabold text-slate-800">
-                                                    {totalJadwal}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        </section>
                                     </div>
                                 </section>
-                            </div>
-                        </section>
+                            )}
+                        </div>
                     </div>
 
                     {/* ---------------- DETAIL TABLE ---------------- */}
@@ -1401,17 +1490,17 @@ export default function Welcome({
                                 description={`Detail jadwal, ACT, dan Plan untuk ${currentMonthName} ${selectedYear}.`}
                             >
                                 {detail.length > 0 && (
-                                    <div className="w-fit rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+                                    <p className="text-xs font-medium text-slate-500">
                                         {detail.length} item preventif
-                                    </div>
+                                    </p>
                                 )}
                             </SectionTitle>
                         </div>
 
-                        <div className="dashboard-scrollbar overflow-x-auto">
+                        <div className="dashboard-scrollbar max-h-[420px] overflow-auto">
                             <table className="w-full min-w-[900px]">
-                                <thead>
-                                    <tr className="border-b border-slate-200/70 bg-slate-50/80">
+                                <thead className="sticky top-0 z-10 bg-slate-50">
+                                    <tr className="border-b border-slate-200/70 bg-slate-50">
                                         <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
                                             No
                                         </th>
@@ -1435,54 +1524,51 @@ export default function Welcome({
 
                                 <tbody className="divide-y divide-slate-200/60">
                                     {detail.length > 0 ? (
-                                        detail.map((item, index) => {
-                                            return (
-                                                <tr
-                                                    key={`${item.divisi}-${item.no_item}-${index}`}
-                                                    style={{
-                                                        transitionDelay: `${Math.min(index * 40, 600)}ms`,
-                                                    }}
-                                                    className={`group transition-all duration-500 hover:bg-blue-50/70 ${
-                                                        pageLoaded
-                                                            ? 'translate-x-0 opacity-100'
-                                                            : '-translate-x-4 opacity-0'
-                                                    }`}
-                                                >
-                                                    <td className="px-5 py-3.5 text-center text-sm font-semibold text-slate-400">
-                                                        {index + 1}
-                                                    </td>
+                                        detail.map((item, index) => (
+                                            <tr
+                                                key={`${item.divisi}-${item.no_item}-${index}`}
+                                                style={{
+                                                    transitionDelay: `${Math.min(index * 40, 600)}ms`,
+                                                }}
+                                                className={`group transition-all duration-500 hover:bg-blue-50/70 ${
+                                                    pageLoaded
+                                                        ? 'translate-x-0 opacity-100'
+                                                        : '-translate-x-4 opacity-0'
+                                                }`}
+                                            >
+                                                <td className="px-5 py-3.5 text-center text-sm font-semibold text-slate-400">
+                                                    {index + 1}
+                                                </td>
 
-                                                    <td className="px-5 py-3.5">
-                                                        <span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 transition-all group-hover:bg-white group-hover:shadow-sm">
-                                                            {item.divisi || '-'}
-                                                        </span>
-                                                    </td>
+                                                <td className="px-5 py-3.5">
+                                                    <span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 transition-all group-hover:bg-white group-hover:shadow-sm">
+                                                        {item.divisi || '-'}
+                                                    </span>
+                                                </td>
 
-                                                    <td className="px-5 py-3.5 text-sm font-medium text-slate-700">
-                                                        {item.item_preventif || '-'}
-                                                    </td>
+                                                <td className="px-5 py-3.5 text-sm font-medium text-slate-700">
+                                                    {item.item_preventif || '-'}
+                                                </td>
 
-                                                    <td className="px-5 py-3.5 text-center">
-                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">
-                                                            {item.total_jadwal}
-                                                        </span>
-                                                    </td>
+                                                <td className="px-5 py-3.5 text-center">
+                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">
+                                                        {item.total_jadwal}
+                                                    </span>
+                                                </td>
 
-                                                    <td className="px-5 py-3.5 text-center">
-                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-600">
-                                                            {item.act}
-                                                        </span>
-                                                    </td>
+                                                <td className="px-5 py-3.5 text-center">
+                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-600">
+                                                        {item.act}
+                                                    </span>
+                                                </td>
 
-                                                    <td className="px-5 py-3.5 text-center">
-                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-600">
-                                                            {item.plan}
-                                                        </span>
-                                                    </td>
-
-                                                </tr>
-                                            );
-                                        })
+                                                <td className="px-5 py-3.5 text-center">
+                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-600">
+                                                        {item.plan}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
                                     ) : (
                                         <tr>
                                             <td colSpan="6" className="px-5 py-14 text-center">
@@ -1529,9 +1615,7 @@ export default function Welcome({
                     </section>
                 </main>
 
-                {/* =====================================================
-                    FOOTER
-                ====================================================== */}
+                {/* FOOTER */}
                 <footer className="mt-6 border-t border-white/20 bg-[#061540]/50 backdrop-blur-2xl">
                     <div className="mx-auto flex min-h-[60px] max-w-[1600px] items-center justify-center px-5 text-center text-xs font-medium text-white/75 sm:px-6 lg:px-8">
                         © {new Date().getFullYear()} Emma Sarkilla · Maintenance Monitoring System

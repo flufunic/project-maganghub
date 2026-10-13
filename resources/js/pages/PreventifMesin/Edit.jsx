@@ -1,3 +1,4 @@
+import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 
@@ -113,6 +114,7 @@ const SectionTitle = ({ title, desc, bar }) => (
 
 export default function Edit({ preventifMesin }) {
     const [alert, setAlert] = useState('');
+    const [confirmSave, setConfirmSave] = useState(false);
 
     const { data, setData, put, processing, errors } = useForm({
         divisi: preventifMesin.divisi ?? '',
@@ -147,7 +149,7 @@ export default function Edit({ preventifMesin }) {
     });
 
     // =========================
-    // SUBMIT
+    // SUBMIT -> validasi, lalu tampilkan konfirmasi
     // =========================
     const submit = (e) => {
         e.preventDefault();
@@ -173,9 +175,16 @@ export default function Edit({ preventifMesin }) {
         }
 
         setAlert('');
+        setConfirmSave(true);
+    };
 
+    // =========================
+    // SIMPAN (setelah user klik "Ya, Simpan")
+    // =========================
+    const doSave = () => {
         put(`/preventif-mesin/${preventifMesin.no}`, {
             preserveScroll: true,
+            onFinish: () => setConfirmSave(false),
         });
     };
 
@@ -219,9 +228,7 @@ export default function Edit({ preventifMesin }) {
 
             <div className="relative flex min-h-screen flex-col overflow-x-hidden">
 
-                {/* =====================================================
-                    BACKGROUND
-                ====================================================== */}
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
@@ -230,9 +237,7 @@ export default function Edit({ preventifMesin }) {
                     <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
                 </div>
 
-                {/* =====================================================
-                    HEADER (TRANSPARAN)
-                ====================================================== */}
+                {/* HEADER */}
                 <header className="border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
 
                     <div className="mx-auto max-w-6xl px-5 py-6 sm:px-6">
@@ -296,16 +301,12 @@ export default function Edit({ preventifMesin }) {
                     </div>
                 </header>
 
-                {/* =====================================================
-                    MAIN
-                ====================================================== */}
+                {/* MAIN */}
                 <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 sm:px-6 lg:py-10">
 
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
 
-                        {/* =================================================
-                            FORM CARD
-                        ================================================== */}
+                        {/* FORM CARD */}
                         <div className={`idx-rise overflow-hidden rounded-3xl ${glassCard}`}>
 
                             {/* CARD HEADER */}
@@ -524,50 +525,18 @@ export default function Edit({ preventifMesin }) {
                                         disabled={processing}
                                         className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-7 text-sm font-semibold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                                     >
-                                        {processing ? (
-                                            <>
-                                                <svg
-                                                    className="h-4 w-4 animate-spin"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle
-                                                        className="opacity-25"
-                                                        cx="12"
-                                                        cy="12"
-                                                        r="10"
-                                                        stroke="currentColor"
-                                                        strokeWidth="4"
-                                                    />
+                                        <Icon
+                                            type="edit"
+                                            className="h-4 w-4 transition-transform duration-200 group-hover:scale-110"
+                                        />
 
-                                                    <path
-                                                        className="opacity-75"
-                                                        fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                                    />
-                                                </svg>
-
-                                                Menyimpan...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Icon
-                                                    type="edit"
-                                                    className="h-4 w-4 transition-transform duration-200 group-hover:scale-110"
-                                                />
-
-                                                Simpan Perubahan
-                                            </>
-                                        )}
+                                        Simpan Perubahan
                                     </button>
                                 </div>
                             </form>
                         </div>
 
-                        {/* =================================================
-                            SIDE INFO
-                        ================================================== */}
+                        {/* SIDE INFO */}
                         <aside
                             style={{ animationDelay: '150ms' }}
                             className="idx-rise space-y-4"
@@ -617,7 +586,7 @@ export default function Edit({ preventifMesin }) {
                                         <div className="flex items-start gap-3">
                                             <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300 shadow-[0_0_6px_rgba(125,211,252,0.8)]" />
                                             <p className="text-xs leading-relaxed text-blue-100">
-                                                Data akan disimpan setelah tombol Simpan Perubahan ditekan.
+                                                Akan muncul konfirmasi sebelum perubahan benar-benar disimpan.
                                             </p>
                                         </div>
                                     </div>
@@ -658,10 +627,8 @@ export default function Edit({ preventifMesin }) {
                     </div>
                 </main>
 
-                {/* =====================================================
-                    FOOTER (TRANSPARAN)
-                ====================================================== */}
-                <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                {/* FOOTER */}
+                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
                     <div className="mx-auto flex min-h-[60px] max-w-6xl items-center justify-center px-5 py-4 text-center sm:px-6">
                         <p className="text-xs font-medium text-white/70">
                             © {new Date().getFullYear()} Emma Sarkilla · Schedule Preventif Mesin
@@ -669,6 +636,18 @@ export default function Edit({ preventifMesin }) {
                     </div>
                 </footer>
             </div>
+
+            {/* KONFIRMASI SIMPAN PERUBAHAN */}
+            <ConfirmModal
+                open={confirmSave}
+                title="Simpan perubahan?"
+                message="Apakah kamu yakin ingin menyimpan perubahan data ini?"
+                confirmLabel="Ya, Simpan"
+                tone="amber"
+                loading={processing}
+                onConfirm={doSave}
+                onCancel={() => setConfirmSave(false)}
+            />
         </>
     );
 }

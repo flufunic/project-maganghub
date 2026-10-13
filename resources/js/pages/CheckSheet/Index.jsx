@@ -1,9 +1,10 @@
+
 import Sidebar from '@/Components/Sidebar';
-import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import React, { useEffect, useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 /* ------------------------------------------------------------------
-| ICON  (UI saja, tidak ada logic)
+| ICON
 ------------------------------------------------------------------ */
 const ICONS = {
     plus: { sw: 2, paths: ['M12 5v14M5 12h14'] },
@@ -37,14 +38,14 @@ const ICONS = {
             'M8 8h8M8 12h8M8 16h5',
         ],
     },
+    check: { sw: 2.5, paths: ['M5 12.5l4.5 4.5L19 7'] },
+    close: { sw: 2.5, paths: ['M6 6l12 12M18 6L6 18'] },
 };
 
 function Icon({ type, className = 'h-4 w-4' }) {
     const icon = ICONS[type];
 
-    if (!icon) {
-        return null;
-    }
+    if (!icon) return null;
 
     return (
         <svg
@@ -66,14 +67,29 @@ function Icon({ type, className = 'h-4 w-4' }) {
 }
 
 /* ------------------------------------------------------------------
-| STYLE TOKENS
+| STYLE
 ------------------------------------------------------------------ */
 const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
-export default function Index({ checkSheets }) {
+const getNamaDivisi = (checkSheet) =>
+    checkSheet.divisi?.nama_divisi || '-';
 
+export default function Index({ checkSheets = [] }) {
     const [showSidebar, setShowSidebar] = useState(false);
+    const [selectedCheckSheet, setSelectedCheckSheet] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+    const [successAlert, setSuccessAlert] = useState('');
+
+    const { props } = usePage();
+    const flashSuccess = props.flash?.success;
+
+    /* ALERT DARI FLASH SESSION LARAVEL */
+    useEffect(() => {
+        if (flashSuccess) {
+            setSuccessAlert(flashSuccess);
+        }
+    }, [flashSuccess]);
 
     const jam = new Date().getHours();
 
@@ -81,10 +97,65 @@ export default function Index({ checkSheets }) {
         jam >= 5 && jam < 11
             ? 'Selamat Pagi'
             : jam >= 11 && jam < 15
-            ? 'Selamat Siang'
-            : jam >= 15 && jam < 18
-            ? 'Selamat Sore'
-            : 'Selamat Malam';
+              ? 'Selamat Siang'
+              : jam >= 15 && jam < 18
+                ? 'Selamat Sore'
+                : 'Selamat Malam';
+
+    /* URUTKAN DIVISI A-Z, DATA LAMA KE BARU */
+    const sortedCheckSheets = [...checkSheets].sort(
+        (a, b) =>
+            getNamaDivisi(a).localeCompare(getNamaDivisi(b)) ||
+            a.id - b.id
+    );
+
+    /* HITUNG ROWSPAN DIVISI */
+    const getRowSpan = (data, index) => {
+        const currentDivisi = getNamaDivisi(data[index]);
+
+        if (
+            index > 0 &&
+            getNamaDivisi(data[index - 1]) === currentDivisi
+        ) {
+            return 0;
+        }
+
+        let count = 1;
+
+        for (let i = index + 1; i < data.length; i++) {
+            if (getNamaDivisi(data[i]) === currentDivisi) {
+                count++;
+            } else {
+                break;
+            }
+        }
+
+        return count;
+    };
+
+    /* HAPUS CHECK SHEET */
+    const handleDelete = () => {
+        if (!selectedCheckSheet || deleting) return;
+
+        setDeleting(true);
+
+        router.delete(
+            `/check-sheets/${selectedCheckSheet.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedCheckSheet(null);
+                    setSuccessAlert('Check Sheet berhasil dihapus.');
+                },
+                onError: () => {
+                    setSuccessAlert('');
+                },
+                onFinish: () => {
+                    setDeleting(false);
+                },
+            }
+        );
+    };
 
     return (
         <>
@@ -100,29 +171,62 @@ export default function Index({ checkSheets }) {
                     0%, 100% { background-position: 0% 50%; }
                     50% { background-position: 100% 50%; }
                 }
+
                 @keyframes idxFloat {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(30px, -30px, 0) scale(1.08); }
+                    0%, 100% {
+                        transform: translate3d(0, 0, 0) scale(1);
+                    }
+                    50% {
+                        transform: translate3d(30px, -30px, 0) scale(1.08);
+                    }
                 }
+
                 @keyframes idxFloatReverse {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
+                    0%, 100% {
+                        transform: translate3d(0, 0, 0) scale(1);
+                    }
+                    50% {
+                        transform: translate3d(-35px, 25px, 0) scale(1.1);
+                    }
                 }
+
                 @keyframes idxRise {
-                    from { opacity: 0; transform: translateY(18px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from {
+                        opacity: 0;
+                        transform: translateY(18px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
                 }
 
                 .idx-gradient {
                     background-size: 250% 250%;
                     animation: idxGradient 20s ease infinite;
                 }
-                .idx-float { animation: idxFloat 14s ease-in-out infinite; }
-                .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
-                .idx-rise { animation: idxRise 0.7s ease-out both; }
 
-                .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-                .idx-scroll::-webkit-scrollbar-track { background: transparent; }
+                .idx-float {
+                    animation: idxFloat 14s ease-in-out infinite;
+                }
+
+                .idx-float-reverse {
+                    animation: idxFloatReverse 17s ease-in-out infinite;
+                }
+
+                .idx-rise {
+                    animation: idxRise 0.7s ease-out both;
+                }
+
+                .idx-scroll::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+
+                .idx-scroll::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+
                 .idx-scroll::-webkit-scrollbar-thumb {
                     background: rgba(100, 116, 139, 0.4);
                     border-radius: 999px;
@@ -132,33 +236,29 @@ export default function Index({ checkSheets }) {
                     .idx-gradient,
                     .idx-float,
                     .idx-float-reverse,
-                    .idx-rise { animation: none !important; }
+                    .idx-rise {
+                        animation: none !important;
+                    }
                 }
             `}</style>
 
             <div className="relative flex min-h-screen flex-col overflow-x-hidden">
-
-                {/* =====================================================
-                    BACKGROUND
-                ====================================================== */}
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
                     <div className="idx-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
+
                     <div className="idx-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
+
                     <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
                 </div>
 
-                {/* =====================================================
-                    HEADER (TRANSPARAN)
-                ====================================================== */}
+                {/* HEADER */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
                     <div className="mx-auto w-full max-w-[1800px] px-4 py-3.5 sm:px-6">
                         <div className="flex items-center justify-between gap-4">
-
                             <div className="flex min-w-0 items-center gap-3">
-
-                                {/* HAMBURGER */}
                                 <button
                                     type="button"
                                     onClick={() => setShowSidebar(true)}
@@ -171,7 +271,6 @@ export default function Index({ checkSheets }) {
                                     />
                                 </button>
 
-                                {/* ICON */}
                                 <div className="relative hidden shrink-0 sm:block">
                                     <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
                                     <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 shadow-lg">
@@ -182,7 +281,6 @@ export default function Index({ checkSheets }) {
                                     </div>
                                 </div>
 
-                                {/* TITLE */}
                                 <div className="min-w-0">
                                     <h1 className="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
                                         Check Sheet Prediktif
@@ -197,12 +295,9 @@ export default function Index({ checkSheets }) {
                     </div>
                 </header>
 
-                {/* =====================================================
-                    GREETING
-                ====================================================== */}
+                {/* GREETING */}
                 <div className="mx-auto w-full max-w-[1800px] px-4 pt-6 sm:px-6">
                     <div className="idx-rise relative overflow-hidden rounded-3xl border border-white/25 bg-gradient-to-r from-white/20 via-white/10 to-white/5 px-6 py-5 shadow-[0_20px_50px_rgba(2,6,23,0.30)] backdrop-blur-xl">
-
                         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-300/20 blur-3xl" />
                         <div className="absolute -bottom-14 right-24 h-32 w-32 rounded-full bg-indigo-300/20 blur-3xl" />
 
@@ -228,10 +323,38 @@ export default function Index({ checkSheets }) {
                     </div>
                 </div>
 
-                {/* =====================================================
-                    MAIN
-                ====================================================== */}
+                {/* MAIN */}
                 <main className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-6 sm:px-6">
+                    {/* ALERT BERHASIL */}
+                    {successAlert && (
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            className="idx-rise mb-5 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm"
+                        >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                                <Icon type="check" className="h-5 w-5" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-emerald-800">
+                                    Berhasil!
+                                </p>
+                                <p className="mt-0.5 break-words text-sm text-emerald-700">
+                                    {successAlert}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setSuccessAlert('')}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-100"
+                                aria-label="Tutup notifikasi"
+                            >
+                                <Icon type="close" className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
 
                     {/* TOOLBAR */}
                     <div
@@ -239,17 +362,10 @@ export default function Index({ checkSheets }) {
                         className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
                     >
                         <div className="flex flex-col gap-6 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
-
-                            {/* LEFT - INFO DATA */}
                             <div className="flex min-w-0 items-center gap-4">
-
                                 <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-lg shadow-blue-300/50">
                                     <div className="absolute inset-0 rounded-2xl bg-white/10" />
-
-                                    <Icon
-                                        type="clipboard"
-                                        className="relative h-6 w-6"
-                                    />
+                                    <Icon type="clipboard" className="relative h-6 w-6" />
                                 </div>
 
                                 <div className="min-w-0">
@@ -270,7 +386,6 @@ export default function Index({ checkSheets }) {
                                 </div>
                             </div>
 
-                            {/* RIGHT - ADD BUTTON */}
                             <Link
                                 href="/check-sheets/create"
                                 className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
@@ -281,12 +396,10 @@ export default function Index({ checkSheets }) {
                                         className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-90"
                                     />
                                 </span>
-
                                 Tambah Check Sheet
                             </Link>
                         </div>
 
-                        {/* ACCENT LINE */}
                         <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </div>
 
@@ -297,20 +410,38 @@ export default function Index({ checkSheets }) {
                     >
                         <div className="idx-scroll overflow-x-auto">
                             <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
-
                                 <thead className="text-white">
                                     <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
-
                                         {[
-                                            { label: 'No', cls: 'w-16 text-center', dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]' },
-                                            { label: 'Divisi', cls: 'text-left', dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]' },
-                                            { label: 'Nomor Dokumen', cls: 'text-left', dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]' },
-                                            { label: 'Nama Check Sheet', cls: 'text-left', dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]' },
-                                            { label: 'Aksi', cls: 'w-40 text-center', dot: 'bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]' },
+                                            {
+                                                label: 'No',
+                                                cls: 'w-16 text-center',
+                                                dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]',
+                                            },
+                                            {
+                                                label: 'Divisi',
+                                                cls: 'text-left',
+                                                dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]',
+                                            },
+                                            {
+                                                label: 'Nomor Dokumen',
+                                                cls: 'text-left',
+                                                dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]',
+                                            },
+                                            {
+                                                label: 'Nama Check Sheet',
+                                                cls: 'text-left',
+                                                dot: 'bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]',
+                                            },
+                                            {
+                                                label: 'Aksi',
+                                                cls: 'w-40 text-center',
+                                                dot: 'bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]',
+                                            },
                                         ].map((header) => (
                                             <th
                                                 key={header.label}
-                                                className={`border-b border-white/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap ${header.cls}`}
+                                                className={`whitespace-nowrap border-b border-white/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wider ${header.cls}`}
                                             >
                                                 <div
                                                     className={`flex items-center gap-2 ${
@@ -324,120 +455,101 @@ export default function Index({ checkSheets }) {
                                                 </div>
                                             </th>
                                         ))}
-
                                     </tr>
                                 </thead>
 
                                 <tbody>
+                                    {sortedCheckSheets.length > 0 ? (
+                                        sortedCheckSheets.map((checkSheet, index) => {
+                                            const rowSpan = getRowSpan(
+                                                sortedCheckSheets,
+                                                index
+                                            );
 
-                                    {checkSheets.length > 0 ? (
+                                            return (
+                                                <tr
+                                                    key={checkSheet.id}
+                                                    className="group transition-colors hover:bg-blue-50/50"
+                                                >
+                                                    <td className="border-b border-slate-200 px-5 py-3.5 text-center">
+                                                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500 transition-colors duration-200 group-hover:bg-blue-100 group-hover:text-blue-600">
+                                                            {index + 1}
+                                                        </span>
+                                                    </td>
 
-                                        checkSheets.map((checkSheet, index) => (
-
-                                            <tr
-                                                key={checkSheet.id}
-                                                className="group transition-colors hover:bg-blue-50/50"
-                                            >
-
-                                                {/* NO */}
-                                                <td className="border-b border-slate-200 px-5 py-3.5 text-center">
-                                                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500 transition-colors duration-200 group-hover:bg-blue-100 group-hover:text-blue-600">
-                                                        {index + 1}
-                                                    </span>
-                                                </td>
-
-                                                {/* DIVISI */}
-                                                <td className="border-b border-slate-200 px-5 py-3.5">
-                                                    <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors duration-200 group-hover:border-blue-100 group-hover:bg-blue-50 group-hover:text-blue-700">
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                                        {checkSheet.divisi?.nama_divisi || '-'}
-                                                    </span>
-                                                </td>
-
-                                                {/* NOMOR DOKUMEN */}
-                                                <td className="border-b border-slate-200 px-5 py-3.5">
-                                                    <span className="inline-flex items-center rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-700 shadow-sm">
-                                                        {checkSheet.nomor_dokumen}
-                                                    </span>
-                                                </td>
-
-                                                {/* NAMA */}
-                                                <td className="border-b border-slate-200 px-5 py-3.5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 to-indigo-100 text-indigo-500 shadow-sm">
-                                                            <Icon type="sheet" className="h-4 w-4" />
-                                                        </div>
-
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-semibold text-slate-700">
-                                                                {checkSheet.nama_checksheet}
-                                                            </p>
-
-                                                            <p className="mt-0.5 text-[11px] text-slate-400">
-                                                                Dokumen pemeriksaan
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* AKSI */}
-                                                <td className="border-b border-slate-200 px-3 py-3.5">
-                                                    <div className="flex items-center justify-center gap-1.5">
-
-                                                        {/* BUKA */}
-                                                        <Link
-                                                            href={`/check-sheets/${checkSheet.id}`}
-                                                            title="Buka Check Sheet"
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 hover:shadow-md"
+                                                    {rowSpan > 0 && (
+                                                        <td
+                                                            rowSpan={rowSpan}
+                                                            className="align-middle border-b border-r border-slate-200 bg-slate-50/60 px-5 py-3.5"
                                                         >
-                                                            <Icon type="eye" className="h-4 w-4" />
-                                                        </Link>
+                                                            <span className="inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                                                {getNamaDivisi(checkSheet)}
+                                                            </span>
+                                                        </td>
+                                                    )}
 
-                                                        {/* EDIT */}
-                                                        <Link
-                                                            href={`/check-sheets/${checkSheet.id}/edit`}
-                                                            title="Edit Check Sheet"
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
-                                                        >
-                                                            <Icon type="edit" className="h-4 w-4" />
-                                                        </Link>
+                                                    <td className="border-b border-slate-200 px-5 py-3.5">
+                                                        <span className="inline-flex items-center rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-700 shadow-sm">
+                                                            {checkSheet.nomor_dokumen}
+                                                        </span>
+                                                    </td>
 
-                                                        {/* HAPUS */}
-                                                        <button
-                                                            type="button"
-                                                            title="Hapus Check Sheet"
-                                                            onClick={() => {
-                                                                if (
-                                                                    window.confirm(
-                                                                        'Apakah kamu yakin ingin menghapus Check Sheet ini?'
-                                                                    )
-                                                                ) {
-                                                                    router.delete(
-                                                                        `/check-sheets/${checkSheet.id}`
-                                                                    );
+                                                    <td className="border-b border-slate-200 px-5 py-3.5">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 to-indigo-100 text-indigo-500 shadow-sm">
+                                                                <Icon type="sheet" className="h-4 w-4" />
+                                                            </div>
+
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-semibold text-slate-700">
+                                                                    {checkSheet.nama_checksheet}
+                                                                </p>
+                                                                <p className="mt-0.5 text-[11px] text-slate-400">
+                                                                    Dokumen pemeriksaan
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* AKSI */}
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <Link
+                                                                href={`/check-sheets/${checkSheet.id}`}
+                                                                title="Buka Check Sheet"
+                                                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 hover:shadow-md"
+                                                            >
+                                                                <Icon type="eye" className="h-4 w-4" />
+                                                            </Link>
+
+                                                            <Link
+                                                                href={`/check-sheets/${checkSheet.id}/edit`}
+                                                                title="Edit Check Sheet"
+                                                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
+                                                            >
+                                                                <Icon type="edit" className="h-4 w-4" />
+                                                            </Link>
+
+                                                            <button
+                                                                type="button"
+                                                                title="Hapus Check Sheet"
+                                                                onClick={() =>
+                                                                    setSelectedCheckSheet(checkSheet)
                                                                 }
-                                                            }}
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
-                                                        >
-                                                            <Icon type="trash" className="h-4 w-4" />
-                                                        </button>
-
-                                                    </div>
-                                                </td>
-
-                                            </tr>
-                                        ))
-
+                                                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
+                                                            >
+                                                                <Icon type="trash" className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     ) : (
-
-                                        /* EMPTY STATE */
                                         <tr>
-                                            <td
-                                                colSpan="5"
-                                                className="px-6 py-16 text-center"
-                                            >
+                                            <td colSpan="5" className="px-6 py-16 text-center">
                                                 <div className="flex flex-col items-center">
-
                                                     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
                                                         <Icon
                                                             type="clipboard"
@@ -450,9 +562,9 @@ export default function Index({ checkSheets }) {
                                                     </p>
 
                                                     <p className="mt-1 max-w-sm text-sm leading-relaxed text-slate-400">
-                                                        Belum ada dokumen check sheet yang
-                                                        tersedia. Tambahkan check sheet baru
-                                                        untuk mulai melakukan pemeriksaan mesin.
+                                                        Belum ada dokumen check sheet yang tersedia.
+                                                        Tambahkan check sheet baru untuk mulai melakukan
+                                                        pemeriksaan mesin.
                                                     </p>
 
                                                     <Link
@@ -466,7 +578,6 @@ export default function Index({ checkSheets }) {
                                             </td>
                                         </tr>
                                     )}
-
                                 </tbody>
                             </table>
                         </div>
@@ -486,9 +597,111 @@ export default function Index({ checkSheets }) {
                     </div>
                 </main>
 
-                {/* =====================================================
-                    FOOTER (TRANSPARAN)
-                ====================================================== */}
+                {/* MODAL KONFIRMASI HAPUS */}
+                {selectedCheckSheet && (
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                        onMouseDown={(e) => {
+                            if (
+                                e.target === e.currentTarget &&
+                                !deleting
+                            ) {
+                                setSelectedCheckSheet(null);
+                            }
+                        }}
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="delete-modal-title"
+                            className="w-full max-w-md overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/30"
+                        >
+                            <div className="relative border-b border-red-100 bg-gradient-to-r from-red-50 via-white to-orange-50 px-6 pb-5 pt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCheckSheet(null)}
+                                    disabled={deleting}
+                                    className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700 disabled:opacity-50"
+                                    aria-label="Tutup modal"
+                                >
+                                    <Icon type="close" className="h-4 w-4" />
+                                </button>
+
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-100 bg-gradient-to-br from-red-100 to-orange-100 text-red-600 shadow-sm">
+                                        <Icon type="trash" className="h-7 w-7" />
+                                    </div>
+
+                                    <h2
+                                        id="delete-modal-title"
+                                        className="text-xl font-bold tracking-tight text-slate-900"
+                                    >
+                                        Hapus Check Sheet?
+                                    </h2>
+
+                                    <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                                        Apakah kamu yakin ingin menghapus dokumen ini?
+                                        Tindakan ini tidak dapat dibatalkan.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="px-6 py-5">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Dokumen yang akan dihapus
+                                    </p>
+
+                                    <p className="mt-2 break-words text-sm font-bold text-slate-800">
+                                        {selectedCheckSheet.nama_checksheet}
+                                    </p>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <span className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 font-mono text-xs font-semibold text-blue-700">
+                                            {selectedCheckSheet.nomor_dokumen}
+                                        </span>
+
+                                        <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                                            {getNamaDivisi(selectedCheckSheet)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <button
+                                        type="button"
+                                        disabled={deleting}
+                                        onClick={() => setSelectedCheckSheet(null)}
+                                        className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Batal
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={deleting}
+                                        onClick={handleDelete}
+                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-5 text-sm font-bold text-white shadow-md shadow-red-200 transition hover:-translate-y-0.5 hover:from-red-700 hover:to-rose-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {deleting ? (
+                                            <>
+                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                                Menghapus...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icon type="trash" className="h-4 w-4" />
+                                                Ya, Hapus
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* FOOTER */}
                 <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
                     <div className="mx-auto flex min-h-[60px] max-w-[1800px] items-center justify-center px-6 py-4 text-center">
                         <p className="text-xs font-medium text-white/70">

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 
 // =========================================================
 // ICONS  (UI saja, tidak ada logic)
@@ -27,6 +28,10 @@ const ICONS = {
             'M14 2v6h6',
             'M8 13l2 2-2 2M12 13l2 2-2 2',
         ],
+    },
+    // BARU: icon upload untuk tombol Import Excel
+    upload: {
+        paths: ['M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12'],
     },
     check: { sw: 2.5, paths: ['M5 12l4 4L19 6'] },
     calendar: {
@@ -188,7 +193,16 @@ const FormBanner = ({ text, tone = 'blue' }) => {
     );
 };
 
-const FormActions = ({ onCancel, processing, label, tone = 'blue' }) => (
+// PERBAIKAN: tambah prop `disabled` + `processingLabel`
+// supaya tombol bisa nonaktif tanpa menampilkan teks "Menyimpan..."
+const FormActions = ({
+    onCancel,
+    processing,
+    label,
+    tone = 'blue',
+    disabled = false,
+    processingLabel = 'Menyimpan...',
+}) => (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
         <button
             type="button"
@@ -200,30 +214,47 @@ const FormActions = ({ onCancel, processing, label, tone = 'blue' }) => (
 
         <button
             type="submit"
-            disabled={processing}
+            disabled={processing || disabled}
             className={`rounded-xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
                 tone === 'amber'
                     ? 'from-amber-500 to-orange-500 shadow-amber-300/50 hover:from-amber-600 hover:to-orange-600'
                     : 'from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50 hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700'
             }`}
         >
-            {processing ? 'Menyimpan...' : label}
+            {processing ? processingLabel : label}
         </button>
     </div>
 );
 
 // Field form Inspection Point (dipakai add & edit)
-const ItemFields = ({ data, setData, errors, withPlaceholder = false }) => (
+// `nomor` = nomor otomatis (hanya tampilan, tidak dikirim ke server)
+const ItemFields = ({
+    data,
+    setData,
+    errors,
+    withPlaceholder = false,
+    nomor = '',
+}) => (
     <>
         <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="No" required error={errors.no}>
-                <input
-                    type="number"
-                    value={data.no}
-                    onChange={(e) => setData('no', e.target.value)}
-                    className={inputClass}
-                    placeholder={withPlaceholder ? 'Contoh: 1' : undefined}
-                />
+            <Field label="No" error={errors.no}>
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={nomor}
+                        readOnly
+                        placeholder="Pilih shift dulu"
+                        className="w-full cursor-not-allowed rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-2.5 text-sm font-bold text-blue-700 outline-none placeholder:font-medium placeholder:text-blue-300"
+                    />
+
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                        Otomatis
+                    </span>
+                </div>
+
+                <p className="mt-1.5 text-xs text-slate-400">
+                    Mengikuti urutan pada shift yang dipilih.
+                </p>
             </Field>
 
             <Field label="Shift" required error={errors.shift}>
@@ -335,13 +366,21 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
 // MODAL
 // =========================================================
 
-const Modal = ({ title, description, icon = 'default', onClose, children }) => {
+// PERBAIKAN: tambah prop `maxWidth` (default tetap max-w-2xl)
+const Modal = ({
+    title,
+    description,
+    icon = 'default',
+    onClose,
+    children,
+    maxWidth = 'max-w-2xl',
+}) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#030a26]/60 p-4 backdrop-blur-md">
             <div
                 role="dialog"
                 aria-modal="true"
-                className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40"
+                className={`relative w-full ${maxWidth} overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40`}
             >
                 <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
@@ -392,10 +431,288 @@ const Modal = ({ title, description, icon = 'default', onClose, children }) => {
 };
 
 // =========================================================
+// IMPORT EXCEL (BARU)
+// =========================================================
+
+const MAP_FIELDS = [
+    {
+        key: 'inspection_point',
+        label: 'Inspection Point',
+        required: true,
+        hint: 'Boleh pilih lebih dari satu kolom, digabung sesuai urutan klik (contoh: Mesin - Sub Mesin).',
+    },
+    { key: 'condition', label: 'Condition', hint: 'Contoh: STANDART.' },
+    { key: 'method', label: 'Method', hint: 'Contoh: METHOD.' },
+];
+
+const ImportModal = ({ checkSheet, onClose }) => {
+    const [file, setFile] = useState(null);
+    const [headerRow, setHeaderRow] = useState(1);
+    const [preview, setPreview] = useState(null);
+    const [mapping, setMapping] = useState({
+        inspection_point: [],
+        condition: [],
+        method: [],
+    });
+    const [shifts, setShifts] = useState(['A', 'B']);
+    const [loading, setLoading] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState('');
+
+    // Setiap file / baris header berubah -> minta preview ke server
+    
+    useEffect(() => {
+        if (!file) return;
+
+        let cancelled = false;
+        const fd = new FormData();
+        fd.append('file', file);
+
+        setLoading(true);
+        setError('');
+
+        axios
+            .post(`/check-sheets/${checkSheet.id}/import/preview`, fd)
+            .then((res) => {
+                if (cancelled) return;
+
+                setPreview(res.data);
+                setMapping(res.data.mapping);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+
+                setPreview(null);
+                setError(
+                    err.response?.data?.message ||
+                        Object.values(err.response?.data?.errors ?? {})[0]?.[0] ||
+                        'Gagal membaca file.'
+                );
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [file, checkSheet.id]);
+
+
+    const toggleCol = (field, index) =>
+        setMapping((m) => ({
+            ...m,
+            [field]: m[field].includes(index)
+                ? m[field].filter((i) => i !== index)
+                : [...m[field], index],
+        }));
+
+    const toggleShift = (s) =>
+        setShifts((prev) =>
+            prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+        );
+
+    const canSubmit =
+        Boolean(file) &&
+        Boolean(preview) &&
+        mapping.inspection_point.length > 0 &&
+        shifts.length > 0;
+
+    const submit = (e) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+
+       
+    router.post(
+        `/check-sheets/${checkSheet.id}/import`,
+        { file, mapping, shifts },
+        {
+            forceFormData: true,
+            preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => onClose(),
+            onError: (errs) =>
+                setError(Object.values(errs)[0] || 'Import gagal.'),
+        }
+    );
+
+    };
+
+    const headerLabel = (h, i) => (h ? h : `Kolom ${i + 1}`);
+
+    return (
+        <Modal
+            title="Import dari Excel"
+            description="Upload file Excel, lalu cocokkan kolomnya dengan field Inspection Point."
+            onClose={onClose}
+            maxWidth="max-w-4xl"
+        >
+            <form onSubmit={submit} className="space-y-6">
+                <div className="grid gap-5 sm:grid-cols-[1fr_160px]">
+                    <Field label="File Excel" required>
+                        <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(e) => {
+                                setFile(e.target.files[0] ?? null);
+                                setPreview(null);
+                            }}
+                            className={inputClass}
+                        />
+                    </Field>
+
+                    {/* <Field label="Baris Header">
+                        <input
+                            type="number"
+                            min="1"
+                            value={headerRow}
+                            onChange={(e) => setHeaderRow(e.target.value)}
+                            className={inputClass}
+                        />
+                    </Field> */}
+                </div>
+
+                {loading && (
+                    <p className="text-sm text-slate-500">Membaca file...</p>
+                )}
+
+                {error && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                        {error}
+                    </div>
+                )}
+
+                {preview && (
+                    <>
+                        <FormBanner
+                            text="Cocokkan Kolom (terisi otomatis, bisa diubah)"
+                            tone="indigo"
+                        />
+
+                        {MAP_FIELDS.map((f) => (
+                            <div key={f.key}>
+                                <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                                    {f.label}
+                                    {f.required && (
+                                        <span className="ml-1 text-red-500">*</span>
+                                    )}
+                                </p>
+                                <p className="mb-2 text-xs text-slate-400">{f.hint}</p>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {preview.headers.map((h, i) => {
+                                        const order = mapping[f.key].indexOf(i);
+                                        const active = order !== -1;
+
+                                        return (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => toggleCol(f.key, i)}
+                                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                                                    active
+                                                        ? 'border-indigo-300 bg-indigo-600 text-white shadow-sm'
+                                                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                {f.key === 'inspection_point' && active && (
+                                                    <span className="mr-1 opacity-70">
+                                                        {order + 1}.
+                                                    </span>
+                                                )}
+                                                {headerLabel(h, i)}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+
+                        <div>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                                Terapkan ke Shift
+                            </p>
+
+                            <div className="flex gap-4">
+                                {['A', 'B'].map((s) => (
+                                    <label
+                                        key={s}
+                                        className="flex items-center gap-2 text-sm font-semibold text-slate-700"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={shifts.includes(s)}
+                                            onChange={() => toggleShift(s)}
+                                        />
+                                        Shift {s}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                                Contoh data ({preview.total_rows} baris terdeteksi)
+                            </p>
+
+                            <div className="idx-scroll overflow-x-auto rounded-xl border border-slate-200">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-slate-100 text-slate-600">
+                                        <tr>
+                                            {preview.headers.map((h, i) => (
+                                                <th
+                                                    key={i}
+                                                    className="whitespace-nowrap px-3 py-2 text-left font-bold"
+                                                >
+                                                    {headerLabel(h, i)}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {preview.rows.map((row, r) => (
+                                            <tr key={r} className="border-t border-slate-100">
+                                                {preview.headers.map((_, i) => (
+                                                    <td key={i} className="px-3 py-2 text-slate-600">
+                                                        {row[i] || '-'}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+                            Import bersifat menambah data. Jika file yang sama
+                            diimport dua kali, item akan terduplikasi.
+                        </div>
+                    </>
+                )}
+
+                <FormActions
+                    onCancel={onClose}
+                    processing={processing}
+                    disabled={!canSubmit}
+                    processingLabel="Mengimport..."
+                    label="Import Data"
+                />
+            </form>
+        </Modal>
+    );
+};
+
+// =========================================================
 // MAIN
 // =========================================================
 
 export default function Show({ checkSheet, bulan, tahun, tanggal }) {
+    // Flash message (butuh shared prop `flash`, lihat tutorial langkah 6)
+    const { flash } = usePage().props;
+
     // =====================================================
     // STATE
     // =====================================================
@@ -404,6 +721,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     const [editingAbnormality, setEditingAbnormality] = useState(null);
 
     const [showAddItemModal, setShowAddItemModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false); // BARU
 
     const [showAddAbnormalityModal, setShowAddAbnormalityModal] =
         useState(false);
@@ -412,10 +730,10 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
     // =====================================================
     // FORM - ADD ITEM
+    // (nomor tidak diinput, dibuat otomatis oleh server)
     // =====================================================
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        no: '',
         inspection_point: '',
         condition: '',
         method: '',
@@ -434,7 +752,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
         errors: editErrors,
         reset: resetEdit,
     } = useForm({
-        no: '',
         inspection_point: '',
         condition: '',
         method: '',
@@ -604,14 +921,39 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     };
 
     // =====================================================
-    // FILTER
+    // NOMOR OTOMATIS
+    // Nomor berikutnya pada shift tertentu = nomor terakhir + 1.
+    // (Hanya untuk tampilan, nomor sebenarnya ditentukan server.)
     // =====================================================
 
-    const filteredItems = checkSheet.items.filter((item) => {
-        if (shiftFilter === 'all') return true;
+    const nomorBerikutnya = (shift) => {
+        if (!shift) {
+            return '';
+        }
 
-        return item.shift === shiftFilter;
-    });
+        const nomorShift = checkSheet.items
+            .filter((item) => item.shift === shift)
+            .map((item) => Number(item.no) || 0);
+
+        return (nomorShift.length > 0 ? Math.max(...nomorShift) : 0) + 1;
+    };
+
+    // =====================================================
+    // FILTER + URUTKAN
+    // Shift A dulu (berurutan 1, 2, 3, ...), baru Shift B (1, 2, 3, ...)
+    // =====================================================
+
+    const filteredItems = checkSheet.items
+        .filter((item) => {
+            if (shiftFilter === 'all') return true;
+
+            return item.shift === shiftFilter;
+        })
+        .sort(
+            (a, b) =>
+                String(a.shift ?? '').localeCompare(String(b.shift ?? '')) ||
+                (Number(a.no) || 0) - (Number(b.no) || 0)
+        );
 
     // =====================================================
     // EDIT ITEM
@@ -621,7 +963,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
         setEditingItem(item);
 
         setEditData({
-            no: item.no,
             inspection_point: item.inspection_point,
             condition: item.condition ?? '',
             method: item.method ?? '',
@@ -652,7 +993,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     const hapusItem = (item) => {
         if (
             confirm(
-                'Yakin ingin menghapus Inspection Point ini? Checklist yang terkait juga akan terhapus.'
+                'Yakin ingin menghapus Inspection Point ini? Checklist yang terkait juga akan terhapus. Nomor yang tersisa akan disusun ulang.'
             )
         ) {
             router.delete(`/check-sheets/${checkSheet.id}/items/${item.id}`, {
@@ -881,6 +1222,14 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     MAIN
                 ================================================== */}
                 <main className="mx-auto w-full max-w-[1500px] flex-1 px-5 py-8 sm:px-6 lg:px-8">
+                    {/* FLASH MESSAGE (BARU) */}
+                    {flash?.success && (
+                        <div className="idx-rise mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700 shadow-lg">
+                            <Icon type="check" className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>{flash.success}</span>
+                        </div>
+                    )}
+
                     {/* INFO CARD */}
                     <section
                         className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
@@ -1054,14 +1403,25 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             badge={`${filteredItems.length} Item`}
                             badgeTone="blue"
                             action={
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddItemModal(true)}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
-                                >
-                                    <Icon type="plus" />
-                                    Tambah Inspection Point
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowImportModal(true)}
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
+                                    >
+                                        <Icon type="upload" />
+                                        Import Excel
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddItemModal(true)}
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
+                                    >
+                                        <Icon type="plus" />
+                                        Tambah Inspection Point
+                                    </button>
+                                </div>
                             }
                         />
 
@@ -1150,6 +1510,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
                                                     <p className="mt-1 text-sm text-slate-400">
                                                         Tambahkan inspection point
+                                                        atau import dari Excel
                                                         untuk mulai menggunakan
                                                         checklist.
                                                     </p>
@@ -1423,6 +1784,16 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
             </div>
 
             {/* =====================================================
+                MODAL - IMPORT EXCEL (BARU)
+            ====================================================== */}
+            {showImportModal && (
+                <ImportModal
+                    checkSheet={checkSheet}
+                    onClose={() => setShowImportModal(false)}
+                />
+            )}
+
+            {/* =====================================================
                 MODAL - ADD ITEM
             ====================================================== */}
             {showAddItemModal && (
@@ -1439,6 +1810,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             setData={setData}
                             errors={errors}
                             withPlaceholder
+                            nomor={nomorBerikutnya(data.shift)}
                         />
 
                         <FormActions
@@ -1469,6 +1841,11 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             data={editData}
                             setData={setEditData}
                             errors={editErrors}
+                            nomor={
+                                editData.shift === editingItem.shift
+                                    ? editingItem.no
+                                    : nomorBerikutnya(editData.shift)
+                            }
                         />
 
                         <FormActions

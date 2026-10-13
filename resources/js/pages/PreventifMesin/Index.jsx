@@ -1,4 +1,5 @@
 import Sidebar from '@/Components/Sidebar';
+import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -19,18 +20,10 @@ const ICONS = {
             'M10 11v5.5M14 11v5.5',
         ],
     },
-    'arrow-left': { paths: ['M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18'] },
-    logout: {
-        paths: [
-            'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15',
-            'M18 12H9m9 0l-3.75-3.75M18 12l-3.75 3.75',
-        ],
-    },
     calendar: {
         rect: { x: 3.75, y: 4.5, width: 16.5, height: 16, rx: 2 },
         paths: ['M8 2.75v3.5M16 2.75v3.5M3.75 9h16.5'],
     },
-    filter: { paths: ['M4 6h16M7 12h10M10 18h4'] },
     clipboard: {
         rect: { x: 5, y: 4, width: 14, height: 17, rx: 2 },
         paths: ['M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4'],
@@ -40,7 +33,6 @@ const ICONS = {
     },
     menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
     close: { sw: 2, paths: ['M6 6l12 12M18 6L6 18'] },
-    chevron: { sw: 2, paths: ['m6 9 6 6 6-6'] },
     download: { sw: 2, paths: ['M12 3v12m0 0 4-4m-4 4-4-4', 'M5 21h14'] },
     send: { sw: 2, paths: ['M22 2 11 13', 'm22 2-7 20-4-9-9-4Z'] },
     approve: {
@@ -64,7 +56,6 @@ const ICONS = {
         ],
     },
     list: { paths: ['M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10'] },
-    // ICON BARU: jam (untuk tombol edit durasi/DOT/HOT per bulan)
     clock: { paths: ['M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'] },
 };
 
@@ -100,53 +91,61 @@ function Icon({ type, className = 'h-4 w-4' }) {
 const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
+const selectClass =
+    'h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+
+/* Label kecil + kontrol (tanpa ikon dekoratif) */
+function Field({ label, children }) {
+    return (
+        <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {label}
+            </span>
+            {children}
+        </label>
+    );
+}
+
+const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+];
+
 export default function Index({
     preventifMesins,
     flash,
     bulan,
     tahun,
     status,
+    // Total mengikuti filter status. Backend mengirim ketiganya (lihat catatan).
     totalDotAll = 0,
     totalHotAll = 0,
+    totalDotAct = 0,
+    totalHotAct = 0,
+    totalDotPlan = 0,
+    totalHotPlan = 0,
     notifikasi = [],
     notifikasiPengiriman = [],
 }) {
     // =========================
     // BULAN CHECKLIST
     // =========================
-    const [selectedMonth, setSelectedMonth] = useState(
-        Number(bulan) - 1
-    );
+    const [selectedMonth, setSelectedMonth] = useState(Number(bulan) - 1);
+    const [selectedYear, setSelectedYear] = useState(Number(tahun));
 
-    const [selectedYear, setSelectedYear] = useState(
-        Number(tahun)
-    );
+    const jumlahHari = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-    const months = [
-        'Januari',
-        'Februari',
-        'Maret',
-        'April',
-        'Mei',
-        'Juni',
-        'Juli',
-        'Agustus',
-        'September',
-        'Oktober',
-        'November',
-        'Desember',
-    ];
-
-    const jumlahHari = new Date(
-        selectedYear,
-        selectedMonth + 1,
-        0
-    ).getDate();
-
-    const tanggal = Array.from(
-        { length: jumlahHari },
-        (_, index) => index + 1
-    );
+    const tanggal = Array.from({ length: jumlahHari }, (_, index) => index + 1);
 
     const getTanggalChecklist = (day) => {
         return `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -157,17 +156,6 @@ export default function Index({
 
         return preventif.tanggal_plan?.includes(tanggalChecklist);
     };
-
-    const jam = new Date().getHours();
-
-    const greeting =
-        jam >= 5 && jam < 11
-            ? 'Selamat Pagi'
-            : jam >= 11 && jam < 15
-            ? 'Selamat Siang'
-            : jam >= 15 && jam < 18
-            ? 'Selamat Sore'
-            : 'Selamat Malam';
 
     const formatJam = (value) => {
         if (value === null || value === undefined || value === '') {
@@ -189,17 +177,18 @@ export default function Index({
     const [statusFilter, setStatusFilter] = useState(status ?? 'all');
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [selectedPreventif, setSelectedPreventif] = useState(null);
     const [showNotifications, setShowNotifications] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showCatatan, setShowCatatan] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
     const [catatan, setCatatan] = useState('');
 
+    // Dialog konfirmasi umum (edit, hapus, simpan bulanan, dll)
+    // bentuk: { title, message, confirmLabel, tone, onConfirm }
+    const [confirmDialog, setConfirmDialog] = useState(null);
+
     // =========================
     // STATE EDIT BULANAN
-    // (durasi, total durasi, DOT, HOT per bulan)
     // =========================
     const [showBulanan, setShowBulanan] = useState(false);
     const [selectedBulanan, setSelectedBulanan] = useState(null);
@@ -216,9 +205,7 @@ export default function Index({
     // NOTIFIKASI PENGIRIMAN
     // =========================
     const getNotifikasiPengiriman = (tanggal) => {
-        return notifikasiPengiriman.find(
-            (item) => item.tanggal === tanggal
-        );
+        return notifikasiPengiriman.find((item) => item.tanggal === tanggal);
     };
 
     const jumlahPengirimanDitolak = notifikasiPengiriman.filter(
@@ -227,9 +214,6 @@ export default function Index({
 
     // =========================
     // SUCCESS TOAST
-    // (dependensi pakai `flash` supaya pesan yang sama,
-    //  misalnya "Data bulanan berhasil disimpan.", tetap muncul
-    //  setiap kali disimpan)
     // =========================
     useEffect(() => {
         if (flash?.success) {
@@ -261,18 +245,11 @@ export default function Index({
                 const tanggal = String(checklist.tanggal).substring(0, 10);
 
                 return (
-                    tanggal === tanggalChecklist &&
-                    Boolean(checklist.status)
+                    tanggal === tanggalChecklist && Boolean(checklist.status)
                 );
             }) ?? false
         );
     };
-    const isAct = (preventif, day) => {
-        const checklist = getChecklist(preventif, day);
-
-        return checklist && Boolean(checklist.status);
-    };
-
 
     // =========================
     // AMBIL DATA CHECKLIST
@@ -289,27 +266,33 @@ export default function Index({
 
     // =========================
     // STATUS DATA
+    // ACT = ada checklist yang dicentang di bulan yang sedang
+    // ditampilkan, TIDAK harus di tanggal Plan.
     // =========================
     const getStatus = (preventif) => {
-        const tanggalPlan = preventif.tanggal_plan ?? [];
+        const prefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
-        const adaAct = tanggalPlan.some((tanggal) => {
-            const checklist = preventif.checklists?.find((item) => {
-                const checklistTanggal = String(item.tanggal).substring(0, 10);
+        const adaAct = (preventif.checklists ?? []).some((checklist) => {
+            const tgl = String(checklist.tanggal).substring(0, 10);
 
-                return checklistTanggal === tanggal;
-            });
-
-            return checklist && Boolean(checklist.status);
+            return tgl.startsWith(prefix) && Boolean(checklist.status);
         });
 
         return adaAct ? 'ACT' : 'Plan';
     };
 
-    // =========================
-    // FILTER STATUS
-    // =========================
     const filteredPreventifMesins = preventifMesins.data;
+
+    // =========================
+    // TOTAL DOT / HOT MENGIKUTI FILTER STATUS
+    // =========================
+    const totalsByStatus = {
+        all: { dot: totalDotAll, hot: totalHotAll, label: 'Semua' },
+        ACT: { dot: totalDotAct, hot: totalHotAct, label: 'ACT' },
+        Plan: { dot: totalDotPlan, hot: totalHotPlan, label: 'Plan' },
+    };
+
+    const activeTotals = totalsByStatus[statusFilter] ?? totalsByStatus.all;
 
     // =========================
     // ROWSPAN DIVISI
@@ -317,10 +300,7 @@ export default function Index({
     const getRowSpan = (data, index) => {
         const currentDivisi = data[index].divisi;
 
-        if (
-            index > 0 &&
-            data[index - 1].divisi === currentDivisi
-        ) {
+        if (index > 0 && data[index - 1].divisi === currentDivisi) {
             return 0;
         }
 
@@ -373,19 +353,18 @@ export default function Index({
         setShowCatatan(true);
     };
 
-    // =========================
-    // SIMPAN CATATAN
-    // =========================
+    const closeCatatan = () => {
+        setShowCatatan(false);
+        setSelectedChecklist(null);
+        setCatatan('');
+    };
+
     const saveCatatan = () => {
         if (!selectedChecklist) {
             return;
         }
 
-        const {
-            preventif,
-            tanggal,
-            day,
-        } = selectedChecklist;
+        const { preventif, tanggal, day } = selectedChecklist;
 
         const checked = isChecked(preventif, day);
 
@@ -398,11 +377,7 @@ export default function Index({
             },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    setShowCatatan(false);
-                    setSelectedChecklist(null);
-                    setCatatan('');
-                },
+                onSuccess: () => closeCatatan(),
             }
         );
     };
@@ -413,8 +388,6 @@ export default function Index({
     const openBulanan = (preventif) => {
         setSelectedBulanan(preventif);
 
-        // nilai yang tampil di tabel = nilai bulan ini
-        // (kosong kalau bulan ini belum diisi)
         setFormBulanan({
             item_preventif: preventif.item_preventif ?? '',
             durasi: preventif.durasi ?? '',
@@ -454,33 +427,67 @@ export default function Index({
         );
     };
 
-    // Simpan nilai yang diisi di form
+    // Simpan -> konfirmasi dulu
     const saveBulanan = () => {
-        submitBulanan(formBulanan);
+        setConfirmDialog({
+            title: 'Simpan perubahan?',
+            message: `Apakah kamu yakin ingin menyimpan data ${months[selectedMonth]} ${selectedYear}?`,
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            onConfirm: () => {
+                setConfirmDialog(null);
+                submitBulanan(formBulanan);
+            },
+        });
     };
 
-    // Kosongkan semua -> data bulan ini dihapus
+    // Kosongkan -> konfirmasi dulu
     const resetBulanan = () => {
-        submitBulanan({
-            item_preventif: '',
-            durasi: '',
-            total_durasi: '',
-            dot: '',
-            hot: '',
+        setConfirmDialog({
+            title: 'Kosongkan data bulan ini?',
+            message: `Semua data ${months[selectedMonth]} ${selectedYear} untuk item ini akan dihapus.`,
+            confirmLabel: 'Ya, Kosongkan',
+            tone: 'red',
+            onConfirm: () => {
+                setConfirmDialog(null);
+                submitBulanan({
+                    item_preventif: '',
+                    durasi: '',
+                    total_durasi: '',
+                    dot: '',
+                    hot: '',
+                });
+            },
         });
     };
 
     // =========================
-    // FILTER STATUS (klik tombol)
+    // KONFIRMASI HAPUS
     // =========================
-    const applyStatusFilter = (nextStatus) => {
-        setStatusFilter(nextStatus);
+    const confirmDelete = (preventif) => {
+        setConfirmDialog({
+            title: 'Hapus data?',
+            message: `Apakah kamu yakin ingin menghapus "${preventif.item_preventif}"? Data tidak bisa dikembalikan.`,
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            onConfirm: () => {
+                router.delete(`/preventif-mesin/${preventif.no}`, {
+                    preserveScroll: true,
+                    onFinish: () => setConfirmDialog(null),
+                });
+            },
+        });
+    };
 
+    // =========================
+    // FILTER / PERIODE
+    // =========================
+    const visitPeriode = (month, year, nextStatus) => {
         router.get(
             '/preventif-mesin',
             {
-                bulan: selectedMonth + 1,
-                tahun: selectedYear,
+                bulan: month + 1,
+                tahun: year,
                 status: nextStatus,
             },
             {
@@ -493,28 +500,6 @@ export default function Index({
 
     const totalNotif = notifikasi.length + jumlahPengirimanDitolak;
 
-    const statusOptions = [
-        {
-            value: 'all',
-            label: 'Semua',
-            active: 'bg-slate-800 text-white shadow-sm',
-            idle: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-        },
-        {
-            value: 'ACT',
-            label: 'ACT',
-            active: 'bg-emerald-500 text-white shadow-sm shadow-emerald-200',
-            idle: 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600',
-        },
-        {
-            value: 'Plan',
-            label: 'Plan',
-            active: 'bg-amber-500 text-white shadow-sm shadow-amber-200',
-            idle: 'text-slate-500 hover:bg-amber-50 hover:text-amber-600',
-        },
-    ];
-
-    // field input untuk modal bulanan
     const bulananFields = [
         { name: 'durasi', label: 'Durasi' },
         { name: 'total_durasi', label: 'Total Durasi' },
@@ -571,11 +556,8 @@ export default function Index({
                 }
             `}</style>
 
-            <div className="relative min-h-screen overflow-x-hidden">
-
-                {/* =====================================================
-                    BACKGROUND
-                ====================================================== */}
+           <div className="relative flex min-h-screen flex-col overflow-x-hidden">
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
@@ -585,65 +567,41 @@ export default function Index({
                 </div>
 
                 {/* =====================================================
-                    HEADER (TRANSPARAN)
+                    HEADER (RINGKAS)
                 ====================================================== */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
-                    <div className="mx-auto w-full max-w-[1800px] px-4 py-3.5 sm:px-6">
+                    <div className="mx-auto w-full max-w-[1800px] px-4 py-2.5 sm:px-6">
                         <div className="flex items-center justify-between gap-4">
-
                             {/* LEFT */}
                             <div className="flex min-w-0 items-center gap-3">
-
-                                {/* HAMBURGER */}
                                 <button
                                     type="button"
                                     onClick={() => setShowSidebar(true)}
-                                    className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/25 hover:shadow-lg hover:shadow-blue-900/30"
+                                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
                                     title="Menu"
                                 >
-                                    <Icon
-                                        type="menu"
-                                        className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"
-                                    />
+                                    <Icon type="menu" className="h-5 w-5" />
                                 </button>
 
-                                {/* ICON */}
-                                <div className="relative hidden shrink-0 sm:block">
-                                    <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
-                                    <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 shadow-lg">
-                                        <Icon
-                                            type="clipboard"
-                                            className="h-6 w-6 text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* TITLE */}
                                 <div className="min-w-0">
-                                    <h1 className="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
+                                    <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
                                         Schedule Preventif Mesin
                                     </h1>
-
-                                    <p className="mt-0.5 truncate text-xs text-white/65 sm:text-sm">
-                                        Sistem pengelolaan dan monitoring preventif mesin
-                                    </p>
                                 </div>
                             </div>
 
                             {/* RIGHT */}
-                            <div className="relative flex shrink-0 items-center gap-2 rounded-2xl border border-white/20 bg-white/10 p-1.5 backdrop-blur-md">
-
-                                {/* NOTIFIKASI */}
+                            <div className="relative flex shrink-0 items-center">
                                 <div className="relative">
                                     <button
                                         type="button"
                                         onClick={() =>
                                             setShowNotifications(!showNotifications)
                                         }
-                                        className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
+                                        className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/20 transition-all duration-200 ${
                                             totalNotif > 0
-                                                ? 'bg-white/20 text-white shadow-sm hover:bg-white/30'
-                                                : 'text-white/80 hover:bg-white/15 hover:text-white'
+                                                ? 'bg-white/20 text-white hover:bg-white/30'
+                                                : 'bg-white/10 text-white/80 hover:bg-white/15 hover:text-white'
                                         }`}
                                         title="Notifikasi"
                                     >
@@ -666,16 +624,13 @@ export default function Index({
                                     {/* DROPDOWN */}
                                     {showNotifications && (
                                         <div className="absolute right-0 top-12 z-[80] w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-white/40 bg-white/[0.97] shadow-2xl shadow-slate-950/40 backdrop-blur-2xl">
-
                                             {/* HEADER NOTIFIKASI */}
                                             <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 px-5 pb-5 pt-5 text-white">
-
                                                 <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-xl" />
                                                 <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-indigo-400/20 blur-xl" />
 
                                                 <div className="relative">
                                                     <div className="flex items-start justify-between gap-3">
-
                                                         <div className="flex items-center gap-3">
                                                             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
                                                                 <Icon type="bell" className="h-5 w-5" />
@@ -725,7 +680,6 @@ export default function Index({
 
                                             {/* ISI NOTIFIKASI */}
                                             <div className="idx-scroll max-h-[430px] overflow-y-auto bg-slate-50/70">
-
                                                 {/* PENGIRIMAN DITOLAK */}
                                                 {notifikasiPengiriman
                                                     .filter((item) => item.status === 'ditolak')
@@ -735,7 +689,6 @@ export default function Index({
                                                             className="border-b border-red-100 bg-gradient-to-r from-red-50 via-rose-50/60 to-white px-4 py-3.5 transition-all duration-200 hover:from-red-100/80 hover:via-rose-50 hover:to-white"
                                                         >
                                                             <div className="flex items-start gap-3">
-
                                                                 <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200">
                                                                     <Icon type="close" className="h-[18px] w-[18px]" />
 
@@ -804,7 +757,6 @@ export default function Index({
                                                                 }`}
                                                             >
                                                                 <div className="flex items-start gap-3">
-
                                                                     <div
                                                                         className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ${
                                                                             terlambat
@@ -915,271 +867,152 @@ export default function Index({
                 </header>
 
                 {/* =====================================================
-                    GREETING
-                ====================================================== */}
-                <div className="mx-auto max-w-[1800px] px-4 pt-6 sm:px-6">
-                    <div className="idx-rise relative overflow-hidden rounded-3xl border border-white/25 bg-gradient-to-r from-white/20 via-white/10 to-white/5 px-6 py-5 shadow-[0_20px_50px_rgba(2,6,23,0.30)] backdrop-blur-xl">
-
-                        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-300/20 blur-3xl" />
-                        <div className="absolute -bottom-14 right-24 h-32 w-32 rounded-full bg-indigo-300/20 blur-3xl" />
-
-                        <div className="relative flex items-center justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-medium text-blue-100">
-                                    Dashboard Admin
-                                </p>
-
-                                <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">
-                                    {greeting}, Admin! 👋
-                                </h2>
-
-                                <p className="mt-1 text-xs text-blue-100/90 sm:text-sm">
-                                    Kelola jadwal dan pantau aktivitas preventif mesin dengan mudah.
-                                </p>
-                            </div>
-
-                            <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 text-2xl backdrop-blur-sm sm:flex">
-                                ⚙️
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* =====================================================
                     MAIN
                 ====================================================== */}
-                <main className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6">
-
-                    {/* TOOLBAR */}
+                <main className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-4 sm:px-6">
+                    {/* TOOLBAR (RINGKAS) */}
                     <div
-                        style={{ animationDelay: '100ms' }}
-                        className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
+                        className={`idx-rise mb-3 overflow-hidden rounded-2xl ${glassCard}`}
                     >
-                        <div className="flex flex-col gap-6 p-5 lg:p-6 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-end lg:justify-between">
+                            {/* LEFT - INFO */}
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h2 className="text-base font-bold tracking-tight text-slate-900">
+                                        Checklist {months[selectedMonth]} {selectedYear}
+                                    </h2>
 
-                            {/* LEFT - INFO DATA */}
-                            <div className="flex min-w-0 items-center gap-4">
-
-                                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-lg shadow-blue-300/50">
-                                    <div className="absolute inset-0 rounded-2xl bg-white/10" />
-
-                                    <Icon
-                                        type="calendar"
-                                        className="relative h-6 w-6"
-                                    />
+                                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-600">
+                                        {preventifMesins.total} data
+                                    </span>
                                 </div>
 
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
-                                            Data Preventif Mesin
-                                        </h2>
-
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                            {preventifMesins.total} Data
+                                {/* LEGENDA */}
+                                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-md border-2 border-blue-200 text-[10px] font-bold leading-none text-blue-500">
+                                            ○
                                         </span>
-                                    </div>
+                                        Jadwal Plan
+                                    </span>
 
-                                    <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-                                        Jadwal checklist
-                                        <span className="font-semibold text-slate-700">
-                                            {' '}
-                                            {months[selectedMonth]} {selectedYear}
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-md border-2 border-emerald-500 bg-emerald-500 text-[10px] font-bold leading-none text-white">
+                                            ✓
                                         </span>
-                                    </p>
+                                        ACT (sudah dikerjakan)
+                                    </span>
+
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <span>📝</span>
+                                        Catatan
+                                    </span>
                                 </div>
                             </div>
 
-                            {/* RIGHT - CONTROLS */}
-                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                            {/* RIGHT - FILTER SEDERHANA */}
+                            <div className="flex flex-wrap items-end gap-2">
+                                <Field label="Status">
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => {
+                                            const next = e.target.value;
 
-                                {/* STATUS FILTER */}
-                                <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
+                                            setStatusFilter(next);
+                                            visitPeriode(
+                                                selectedMonth,
+                                                selectedYear,
+                                                next
+                                            );
+                                        }}
+                                        className={selectClass}
+                                    >
+                                        <option value="all">Semua status</option>
+                                        <option value="ACT">ACT</option>
+                                        <option value="Plan">Plan</option>
+                                    </select>
+                                </Field>
 
-                                    <div className="flex items-center gap-2 px-2.5">
-                                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm">
-                                            <Icon
-                                                type="filter"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                        </div>
+                                <Field label="Bulan">
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => {
+                                            const month = Number(e.target.value);
 
-                                        <span className="hidden text-xs font-bold text-slate-500 sm:block">
-                                            Status
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-0.5 rounded-xl bg-white p-0.5 shadow-sm">
-                                        {statusOptions.map((option) => (
-                                            <button
-                                                key={option.value}
-                                                type="button"
-                                                onClick={() =>
-                                                    applyStatusFilter(option.value)
-                                                }
-                                                className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
-                                                    statusFilter === option.value
-                                                        ? option.active
-                                                        : option.idle
-                                                }`}
-                                            >
-                                                {option.label}
-                                            </button>
+                                            setSelectedMonth(month);
+                                            visitPeriode(
+                                                month,
+                                                selectedYear,
+                                                statusFilter
+                                            );
+                                        }}
+                                        className={selectClass}
+                                    >
+                                        {months.map((month, index) => (
+                                            <option key={index} value={index}>
+                                                {month}
+                                            </option>
                                         ))}
-                                    </div>
-                                </div>
+                                    </select>
+                                </Field>
 
-                                {/* PERIODE */}
-                                <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-inner">
+                                <Field label="Tahun">
+                                    <select
+                                        value={selectedYear}
+                                        onChange={(e) => {
+                                            const year = Number(e.target.value);
 
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-blue-500 shadow-sm">
-                                        <Icon
-                                            type="calendar"
-                                            className="h-4 w-4"
-                                        />
-                                    </div>
-
-                                    {/* BULAN */}
-                                    <div className="relative">
-                                        <select
-                                            value={selectedMonth}
-                                            onChange={(e) => {
-                                                const month = Number(e.target.value);
-
-                                                setSelectedMonth(month);
-
-                                                router.get(
-                                                    '/preventif-mesin',
-                                                    {
-                                                        bulan: month + 1,
-                                                        tahun: selectedYear,
-                                                        status: statusFilter,
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                        replace: true
-                                                    }
-                                                );
-                                            }}
-                                            className="cursor-pointer appearance-none bg-transparent py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none"
-                                        >
-                                            {months.map((month, index) => (
-                                                <option
-                                                    key={index}
-                                                    value={index}
-                                                >
-                                                    {month}
-                                                </option>
-                                            ))}
-                                        </select>
-
-                                        <Icon
-                                            type="chevron"
-                                            className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                        />
-                                    </div>
-
-                                    <div className="h-6 w-px bg-slate-200" />
-
-                                    {/* TAHUN */}
-                                    <div className="relative">
-                                        <select
-                                            value={selectedYear}
-                                            onChange={(e) => {
-                                                const year = Number(e.target.value);
-
-                                                setSelectedYear(year);
-
-                                                router.get(
-                                                    '/preventif-mesin',
-                                                    {
-                                                        bulan: selectedMonth + 1,
-                                                        tahun: year,
-                                                        status: statusFilter,
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                        replace: true
-                                                    }
-                                                );
-                                            }}
-                                            className="cursor-pointer appearance-none bg-transparent py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none"
-                                        >
-                                            {Array.from(
-                                                { length: 16 },
-                                                (_, index) => 2020 + index
-                                            ).map((year) => (
-                                                <option
-                                                    key={year}
-                                                    value={year}
-                                                >
-                                                    {year}
-                                                </option>
-                                            ))}
-                                        </select>
-
-                                        <Icon
-                                            type="chevron"
-                                            className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* ACTIONS */}
-                                <div className="flex items-center gap-2">
-
-                                    <a
-                                        href={`/preventif-mesin/export?bulan=${selectedMonth + 1}&tahun=${selectedYear}`}
-                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
+                                            setSelectedYear(year);
+                                            visitPeriode(
+                                                selectedMonth,
+                                                year,
+                                                statusFilter
+                                            );
+                                        }}
+                                        className={selectClass}
                                     >
-                                        <Icon
-                                            type="download"
-                                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5"
-                                        />
+                                        {Array.from(
+                                            { length: 16 },
+                                            (_, index) => 2020 + index
+                                        ).map((year) => (
+                                            <option key={year} value={year}>
+                                                {year}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </Field>
 
-                                        <span className="hidden sm:inline">
-                                            Excel
-                                        </span>
-                                    </a>
+                                <a
+                                    href={`/preventif-mesin/export?bulan=${selectedMonth + 1}&tahun=${selectedYear}`}
+                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    <Icon type="download" className="h-4 w-4" />
+                                    Excel
+                                </a>
 
-                                    <Link
-                                        href="/preventif-mesin/create"
-                                        className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
-                                    >
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/15">
-                                            <Icon
-                                                type="plus"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                        </span>
-
-                                        <span className="hidden sm:inline">
-                                            Tambah Data
-                                        </span>
-                                    </Link>
-                                </div>
+                                <Link
+                                    href="/preventif-mesin/create"
+                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition hover:from-blue-700 hover:to-indigo-800"
+                                >
+                                    <Icon type="plus" className="h-4 w-4" />
+                                    Tambah
+                                </Link>
                             </div>
                         </div>
 
-                        {/* ACCENT LINE */}
                         <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </div>
 
                     {/* TABLE */}
                     <div
-                        style={{ animationDelay: '200ms' }}
-                        className={`idx-rise overflow-hidden rounded-3xl ${glassCard}`}
+                        style={{ animationDelay: '100ms' }}
+                        className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
                     >
                         <div className="idx-scroll overflow-x-auto">
                             <table className="w-full border-separate border-spacing-0 text-sm">
-
                                 <thead className="text-white">
                                     {/* HEADER UTAMA */}
                                     <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
-
                                         {[
                                             'Divisi',
                                             'No',
@@ -1193,72 +1026,41 @@ export default function Index({
                                             <th
                                                 key={header}
                                                 rowSpan="2"
-                                                className={`border-b border-r border-white/10 px-4 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap first:border-l ${
+                                                className={`border-b border-r border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap first:border-l ${
                                                     header === 'Item Preventif'
                                                         ? 'min-w-[300px] text-left'
                                                         : 'text-center'
                                                 }`}
                                             >
-                                                <div
-                                                    className={`flex items-center gap-2 ${
-                                                        header === 'Item Preventif'
-                                                            ? 'justify-start'
-                                                            : 'justify-center'
-                                                    }`}
-                                                >
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]" />
-
-                                                    {header}
-                                                </div>
+                                                {header}
                                             </th>
                                         ))}
 
                                         {/* STATUS */}
                                         <th
                                             rowSpan="2"
-                                            className="border-b border-r border-white/10 px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                            className="border-b border-r border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
-                                            <div className="flex items-center justify-center gap-2">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_6px_rgba(110,231,183,0.8)]" />
-                                                Status
-                                            </div>
+                                            Status
                                         </th>
 
                                         {/* BULAN */}
                                         <th
                                             colSpan={jumlahHari}
-                                            className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-3 text-center"
+                                            className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-2 text-center"
                                         >
-                                            <div className="flex items-center justify-center gap-3">
-
-                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
-                                                    <Icon
-                                                        type="calendar"
-                                                        className="h-3.5 w-3.5 text-white"
-                                                    />
-                                                </span>
-
-                                                <div className="flex flex-col items-center leading-none">
-                                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-100">
-                                                        Jadwal Checklist
-                                                    </span>
-
-                                                    <span className="mt-1 text-sm font-extrabold tracking-wide text-white">
-                                                        {months[selectedMonth].toUpperCase()} {selectedYear}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-white">
+                                                Jadwal Checklist ·{' '}
+                                                {months[selectedMonth]} {selectedYear}
+                                            </span>
                                         </th>
 
                                         {/* AKSI */}
                                         <th
                                             rowSpan="2"
-                                            className="border-b border-white/10 px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                            className="border-b border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
-                                            <div className="flex items-center justify-center gap-2">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.8)]" />
-                                                Aksi
-                                            </div>
+                                            Aksi
                                         </th>
                                     </tr>
 
@@ -1267,9 +1069,9 @@ export default function Index({
                                         {tanggal.map((day) => (
                                             <th
                                                 key={day}
-                                                className="min-w-[50px] border-b border-r border-white/10 px-2 py-2.5 text-center"
+                                                className="min-w-[50px] border-b border-r border-white/10 px-2 py-2 text-center"
                                             >
-                                                <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-white ring-1 ring-white/10 transition-all duration-200 hover:bg-white/20">
+                                                <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-white ring-1 ring-white/10">
                                                     {day}
                                                 </div>
                                             </th>
@@ -1287,7 +1089,7 @@ export default function Index({
                                                         index
                                                     );
 
-                                                    const status =
+                                                    const rowStatus =
                                                         getStatus(preventif);
 
                                                     return (
@@ -1338,35 +1140,27 @@ export default function Index({
 
                                                             {/* DURASI */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(
-                                                                    preventif.durasi
-                                                                )}
+                                                                {formatJam(preventif.durasi)}
                                                             </td>
 
                                                             {/* TOTAL DURASI */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(
-                                                                    preventif.total_durasi
-                                                                )}
+                                                                {formatJam(preventif.total_durasi)}
                                                             </td>
 
                                                             {/* DOT */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(
-                                                                    preventif.dot
-                                                                )}
+                                                                {formatJam(preventif.dot)}
                                                             </td>
 
                                                             {/* HOT */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(
-                                                                    preventif.hot
-                                                                )}
+                                                                {formatJam(preventif.hot)}
                                                             </td>
 
                                                             {/* STATUS */}
                                                             <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap">
-                                                                {status === 'ACT' ? (
+                                                                {rowStatus === 'ACT' ? (
                                                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
                                                                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.7)]" />
                                                                         ACT
@@ -1382,20 +1176,13 @@ export default function Index({
                                                             {/* CHECKLIST */}
                                                             {tanggal.map((day) => {
                                                                 const plan = isTanggalPlan(preventif, day);
-
-                                                                // Semua tanggal bisa di-checklist. Tanggal tanpa jadwal Plan
-                                                                // tetap bisa diisi, hanya saja tidak ditandai ○.
                                                                 const checked = isChecked(preventif, day);
-
                                                                 const checklist = getChecklist(preventif, day);
 
-                                                                const hasCatatan =
-                                                                    Boolean(
-                                                                        checklist?.catatan &&
-                                                                        String(
-                                                                            checklist.catatan
-                                                                        ).trim() !== ''
-                                                                    );
+                                                                const hasCatatan = Boolean(
+                                                                    checklist?.catatan &&
+                                                                        String(checklist.catatan).trim() !== ''
+                                                                );
 
                                                                 return (
                                                                     <td
@@ -1409,51 +1196,43 @@ export default function Index({
                                                                         }`}
                                                                     >
                                                                         <div className="flex flex-col items-center gap-1">
-
-                                                                            {/* CHECKBOX */}
-                                                                            <div className="flex items-center justify-center">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        toggleChecklist(preventif, day)
-                                                                                    }
-                                                                                    className={`flex h-8 w-8 items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 ${
-                                                                                        checked
-                                                                                            ? 'cursor-pointer border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-200'
-                                                                                            : plan
-                                                                                            ? 'cursor-pointer border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100'
-                                                                                            : 'cursor-pointer border-slate-200 bg-white text-slate-300 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
-                                                                                    }`}
-                                                                                    title={
-                                                                                        checked
-                                                                                            ? 'Klik untuk membatalkan ACT'
-                                                                                            : plan
-                                                                                            ? 'Klik untuk ACT / Closed'
-                                                                                            : 'Tidak ada jadwal Plan, tetap bisa diisi'
-                                                                                    }
-                                                                                >
-                                                                                    {checked ? (
-                                                                                        <span className="text-base font-bold leading-none">
-                                                                                            ✓
-                                                                                        </span>
-                                                                                    ) : plan ? (
-                                                                                        <span className="text-lg font-bold leading-none">
-                                                                                            ○
-                                                                                        </span>
-                                                                                    ) : null}
-                                                                                </button>
-                                                                            </div>
-
-                                                                            {/* CATATAN */}
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() =>
-                                                                                    openCatatan(
-                                                                                        preventif,
-                                                                                        day
-                                                                                    )
+                                                                                    toggleChecklist(preventif, day)
                                                                                 }
-                                                                                className={`relative text-sm transition hover:scale-110 ${
+                                                                                className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 ${
+                                                                                    checked
+                                                                                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5'
+                                                                                        : plan
+                                                                                        ? 'border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50'
+                                                                                        : 'border-slate-200 bg-white text-slate-300 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
+                                                                                }`}
+                                                                                title={
+                                                                                    checked
+                                                                                        ? 'Klik untuk membatalkan ACT'
+                                                                                        : plan
+                                                                                        ? 'Klik untuk ACT / Closed'
+                                                                                        : 'Tidak ada jadwal Plan, tetap bisa diisi'
+                                                                                }
+                                                                            >
+                                                                                {checked ? (
+                                                                                    <span className="text-base font-bold leading-none">
+                                                                                        ✓
+                                                                                    </span>
+                                                                                ) : plan ? (
+                                                                                    <span className="text-lg font-bold leading-none">
+                                                                                        ○
+                                                                                    </span>
+                                                                                ) : null}
+                                                                            </button>
+
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    openCatatan(preventif, day)
+                                                                                }
+                                                                                className={`relative cursor-pointer text-sm transition hover:scale-110 ${
                                                                                     hasCatatan
                                                                                         ? 'text-blue-600'
                                                                                         : 'text-slate-400 hover:text-slate-600'
@@ -1478,55 +1257,37 @@ export default function Index({
                                                             {/* AKSI */}
                                                             <td className="border border-slate-200 px-3 py-3">
                                                                 <div className="flex items-center justify-center gap-1.5">
-
-                                                                    {/* EDIT DURASI / DOT / HOT BULAN INI */}
+                                                                    {/* EDIT BULANAN */}
                                                                     <button
                                                                         type="button"
                                                                         title={`Isi durasi, DOT & HOT ${months[selectedMonth]} ${selectedYear}`}
-                                                                        onClick={() =>
-                                                                            openBulanan(preventif)
-                                                                        }
-                                                                        className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100 hover:shadow-md"
+                                                                        onClick={() => openBulanan(preventif)}
+                                                                        className="relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100 hover:shadow-md"
                                                                     >
-                                                                        <Icon
-                                                                            type="clock"
-                                                                            className="h-4 w-4"
-                                                                        />
+                                                                        <Icon type="clock" className="h-4 w-4" />
 
-                                                                        {/* penanda: bulan ini sudah diisi manual */}
                                                                         {preventif.punya_data_bulanan && (
                                                                             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500" />
                                                                         )}
                                                                     </button>
 
+                                                                    {/* EDIT */}
                                                                     <Link
                                                                         href={`/preventif-mesin/${preventif.no}/edit`}
                                                                         title="Edit data"
-                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
+                                                                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
                                                                     >
-                                                                        <Icon
-                                                                            type="edit"
-                                                                            className="h-4 w-4"
-                                                                        />
+                                                                        <Icon type="edit" className="h-4 w-4" />
                                                                     </Link>
 
+                                                                    {/* HAPUS */}
                                                                     <button
                                                                         type="button"
                                                                         title="Hapus data"
-                                                                        onClick={() => {
-                                                                            setSelectedPreventif(
-                                                                                preventif
-                                                                            );
-                                                                            setShowDeleteModal(
-                                                                                true
-                                                                            );
-                                                                        }}
-                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
+                                                                        onClick={() => confirmDelete(preventif)}
+                                                                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
                                                                     >
-                                                                        <Icon
-                                                                            type="trash"
-                                                                            className="h-4 w-4"
-                                                                        />
+                                                                        <Icon type="trash" className="h-4 w-4" />
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -1537,33 +1298,23 @@ export default function Index({
 
                                             {/* TOTAL */}
                                             <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
-
-                                                {/* TOTAL PREVENTIF */}
+                                                {/* LABEL */}
                                                 <td
                                                     colSpan={6}
-                                                    className="border-r border-white/10 px-4 py-4 text-center"
+                                                    className="border-r border-white/10 px-4 py-3 text-center"
                                                 >
-                                                    <div className="flex items-center justify-center gap-3">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
-                                                            <Icon
-                                                                type="clipboard"
-                                                                className="h-4 w-4 text-blue-200"
-                                                            />
-                                                        </div>
+                                                    <div className="flex flex-col items-center leading-none">
+                                                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200">
+                                                            Rekapitulasi {months[selectedMonth]} {selectedYear}
+                                                        </span>
 
-                                                        <div className="flex flex-col items-start leading-none">
-                                                            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200">
-                                                                Rekapitulasi {months[selectedMonth]} {selectedYear}
-                                                            </span>
-
-                                                            <span className="mt-1 text-xs font-extrabold text-white">
-                                                                Total Preventif Mesin
-                                                            </span>
-                                                        </div>
+                                                        <span className="mt-1 text-xs font-extrabold text-white">
+                                                            Total Preventif Mesin · {activeTotals.label}
+                                                        </span>
                                                     </div>
                                                 </td>
 
-                                                {/* TOTAL DOT */}
+                                                {/* TOTAL DOT (ikut filter status) */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
                                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
@@ -1571,12 +1322,12 @@ export default function Index({
                                                         </span>
 
                                                         <span className="mt-1 text-xs font-extrabold text-white">
-                                                            {formatJam(totalDotAll)}
+                                                            {formatJam(activeTotals.dot)}
                                                         </span>
                                                     </div>
                                                 </td>
 
-                                                {/* TOTAL HOT */}
+                                                {/* TOTAL HOT (ikut filter status) */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
                                                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
@@ -1584,15 +1335,14 @@ export default function Index({
                                                         </span>
 
                                                         <span className="mt-1 text-xs font-extrabold text-white">
-                                                            {formatJam(totalHotAll)}
+                                                            {formatJam(activeTotals.hot)}
                                                         </span>
                                                     </div>
                                                 </td>
 
-                                                {/* STATUS */}
+                                                {/* LABEL KIRIM */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-100 backdrop-blur-sm">
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_6px_rgba(110,231,183,0.9)]" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-100">
                                                         Kirim
                                                     </span>
                                                 </td>
@@ -1600,12 +1350,8 @@ export default function Index({
                                                 {/* TOMBOL KIRIM PER TANGGAL */}
                                                 {tanggal.map((day) => {
                                                     const tanggalKirim = getTanggalChecklist(day);
-
                                                     const notifPengiriman = getNotifikasiPengiriman(tanggalKirim);
-
                                                     const ditolak = notifPengiriman?.status === 'ditolak';
-
-                                                    // sudah diperiksa / di-acc pimpinan
                                                     const disetujui = ['diperiksa', 'disetujui', 'approved'].includes(
                                                         notifPengiriman?.status
                                                     );
@@ -1635,11 +1381,11 @@ export default function Index({
                                                                             ? `Disetujui pimpinan (${tanggalKirim})`
                                                                             : `Kirim data ${tanggalKirim}`
                                                                     }
-                                                                    className={`group inline-flex h-8 w-8 items-center justify-center rounded-xl border text-white shadow-sm transition-all duration-200 ${
+                                                                    className={`group inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border text-white shadow-sm transition-all duration-200 disabled:cursor-default ${
                                                                         ditolak
                                                                             ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:-translate-y-0.5 hover:bg-red-400'
                                                                             : disetujui
-                                                                            ? 'cursor-default border-emerald-300/40 bg-gradient-to-br from-emerald-400 to-green-600 shadow-emerald-900/30 ring-2 ring-emerald-300/30'
+                                                                            ? 'border-emerald-300/40 bg-gradient-to-br from-emerald-400 to-green-600 shadow-emerald-900/30 ring-2 ring-emerald-300/30'
                                                                             : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:-translate-y-0.5 hover:bg-blue-400 active:translate-y-0'
                                                                     }`}
                                                                 >
@@ -1656,7 +1402,6 @@ export default function Index({
                                                                     )}
                                                                 </button>
 
-                                                                {/* BADGE DITOLAK */}
                                                                 {ditolak && (
                                                                     <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-[#0a1a4d] bg-red-500 px-1 text-[8px] font-bold text-white shadow-sm">
                                                                         !
@@ -1667,7 +1412,6 @@ export default function Index({
                                                     );
                                                 })}
 
-                                                {/* KOLOM AKSI */}
                                                 <td className="border-white/10"></td>
                                             </tr>
                                         </>
@@ -1678,7 +1422,6 @@ export default function Index({
                                                 className="px-6 py-16 text-center"
                                             >
                                                 <div className="flex flex-col items-center">
-
                                                     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
                                                         <Icon
                                                             type="clipboard"
@@ -1705,7 +1448,7 @@ export default function Index({
                         {filteredPreventifMesins.length > 0 &&
                             preventifMesins.links &&
                             preventifMesins.links.length > 3 && (
-                                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-4">
+                                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-3">
                                     <p className="text-sm text-slate-500">
                                         Menampilkan{' '}
                                         <span className="font-semibold text-slate-700">
@@ -1732,7 +1475,7 @@ export default function Index({
                                                 dangerouslySetInnerHTML={{
                                                     __html: link.label,
                                                 }}
-                                                className={`min-w-[36px] rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
+                                                className={`min-w-[36px] cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
                                                     link.active
                                                         ? 'bg-blue-600 text-white shadow-sm'
                                                         : 'bg-white text-slate-600 shadow-sm hover:bg-blue-50 hover:text-blue-600'
@@ -1749,11 +1492,9 @@ export default function Index({
                     </div>
                 </main>
 
-                {/* =====================================================
-                    FOOTER (TRANSPARAN)
-                ====================================================== */}
-                <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
-                    <div className="mx-auto flex min-h-[60px] max-w-[1800px] items-center justify-center px-6 py-4 text-center">
+                {/* FOOTER */}
+                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                    <div className="mx-auto flex max-w-[1800px] items-center justify-center px-6 py-3 text-center">
                         <p className="text-xs font-medium text-white/70">
                             © {new Date().getFullYear()} Emma Sarkilla · Schedule Preventif Mesin
                         </p>
@@ -1766,19 +1507,14 @@ export default function Index({
             ====================================================== */}
             {showSuccess && (
                 <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
-
                     <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
 
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-green-100">
-                        <span className="font-bold text-emerald-600">
-                            ✓
-                        </span>
+                        <span className="font-bold text-emerald-600">✓</span>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800">
-                            Berhasil
-                        </p>
+                        <p className="text-sm font-bold text-slate-800">Berhasil</p>
 
                         <p className="mt-0.5 text-sm leading-relaxed text-slate-500">
                             {successMessage}
@@ -1788,7 +1524,7 @@ export default function Index({
                     <button
                         type="button"
                         onClick={() => setShowSuccess(false)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
                     >
                         ×
                     </button>
@@ -1796,23 +1532,17 @@ export default function Index({
             )}
 
             {/* =====================================================
-                MODAL EDIT BULANAN (DURASI / TOTAL DURASI / DOT / HOT)
+                MODAL EDIT BULANAN
             ====================================================== */}
             {showBulanan && selectedBulanan && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
-
                     <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-
                         {/* HEADER */}
                         <div className="border-b border-slate-100 px-6 py-5">
                             <div className="flex items-start justify-between">
-
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-600 shadow-sm">
-                                        <Icon
-                                            type="clock"
-                                            className="h-5 w-5"
-                                        />
+                                        <Icon type="clock" className="h-5 w-5" />
                                     </div>
 
                                     <div>
@@ -1832,7 +1562,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={closeBulanan}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                                 >
                                     ×
                                 </button>
@@ -1845,7 +1575,6 @@ export default function Index({
 
                         {/* FORM */}
                         <div className="px-6 py-5">
-                            {/* ITEM PREVENTIF BULAN INI */}
                             <div className="mb-4">
                                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                                     Item Preventif
@@ -1902,25 +1631,23 @@ export default function Index({
                             </div>
 
                             <p className="mt-4 text-xs leading-relaxed text-slate-400">
-                                Nilai ini hanya berlaku untuk{' '}
-                                {months[selectedMonth]} {selectedYear}. Bulan
-                                lain tidak ikut berubah. Item Preventif yang
-                                dikosongkan atau sama dengan item master akan
-                                memakai nama master. Klik Kosongkan Bulan Ini
-                                untuk menghapus semua data bulan ini.
+                                Nilai ini hanya berlaku untuk {months[selectedMonth]}{' '}
+                                {selectedYear}. Bulan lain tidak ikut berubah. Item
+                                Preventif yang dikosongkan atau sama dengan item master
+                                akan memakai nama master. Klik Kosongkan Bulan Ini untuk
+                                menghapus semua data bulan ini.
                             </p>
                         </div>
 
                         {/* FOOTER */}
                         <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-
                             <div>
                                 {selectedBulanan.punya_data_bulanan && (
                                     <button
                                         type="button"
                                         onClick={resetBulanan}
                                         disabled={savingBulanan}
-                                        className="rounded-xl px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                                        className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         Kosongkan Bulan Ini
                                     </button>
@@ -1931,7 +1658,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={closeBulanan}
-                                    className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                                    className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
                                 >
                                     Batal
                                 </button>
@@ -1940,7 +1667,7 @@ export default function Index({
                                     type="button"
                                     onClick={saveBulanan}
                                     disabled={savingBulanan}
-                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:opacity-60"
+                                    className="cursor-pointer rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {savingBulanan ? 'Menyimpan...' : 'Simpan'}
                                 </button>
@@ -1955,12 +1682,9 @@ export default function Index({
             ====================================================== */}
             {showCatatan && selectedChecklist && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
-
                     <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-
                         <div className="border-b border-slate-100 px-6 py-5">
                             <div className="flex items-start justify-between">
-
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 shadow-sm">
                                         📝
@@ -1972,20 +1696,16 @@ export default function Index({
                                         </h2>
 
                                         <p className="mt-0.5 text-xs text-slate-500">
-                                            {selectedChecklist.day}{' '}
-                                            {months[selectedMonth]} {selectedYear}
+                                            {selectedChecklist.day} {months[selectedMonth]}{' '}
+                                            {selectedYear}
                                         </p>
                                     </div>
                                 </div>
 
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setShowCatatan(false);
-                                        setSelectedChecklist(null);
-                                        setCatatan('');
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                    onClick={closeCatatan}
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                                 >
                                     ×
                                 </button>
@@ -2003,9 +1723,7 @@ export default function Index({
 
                             <textarea
                                 value={catatan}
-                                onChange={(e) =>
-                                    setCatatan(e.target.value)
-                                }
+                                onChange={(e) => setCatatan(e.target.value)}
                                 rows="5"
                                 placeholder="Tulis catatan untuk checklist ini..."
                                 className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
@@ -2013,15 +1731,10 @@ export default function Index({
                         </div>
 
                         <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setShowCatatan(false);
-                                    setSelectedChecklist(null);
-                                    setCatatan('');
-                                }}
-                                className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                                onClick={closeCatatan}
+                                className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
                             >
                                 Batal
                             </button>
@@ -2029,7 +1742,7 @@ export default function Index({
                             <button
                                 type="button"
                                 onClick={saveCatatan}
-                                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
+                                className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
                             >
                                 Simpan Catatan
                             </button>
@@ -2039,94 +1752,17 @@ export default function Index({
             )}
 
             {/* =====================================================
-                MODAL HAPUS
+                DIALOG KONFIRMASI (hapus, simpan bulanan, dll)
             ====================================================== */}
-            {showDeleteModal && selectedPreventif && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
-
-                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-
-                        <div className="px-6 pb-4 pt-6">
-                            <div className="flex items-start justify-between">
-
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-50 to-rose-100 text-red-600 shadow-sm">
-                                        <Icon
-                                            type="trash"
-                                            className="h-5 w-5"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <h2 className="text-base font-bold text-slate-900">
-                                            Hapus Data
-                                        </h2>
-
-                                        <p className="mt-0.5 text-xs text-slate-500">
-                                            Konfirmasi penghapusan data
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowDeleteModal(false);
-                                        setSelectedPreventif(null);
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="px-6 pb-5">
-                            <p className="text-sm leading-relaxed text-slate-600">
-                                Apakah kamu yakin ingin menghapus data
-                                berikut?
-                            </p>
-                        </div>
-
-                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowDeleteModal(false);
-                                    setSelectedPreventif(null);
-                                }}
-                                className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
-                            >
-                                Batal
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    router.delete(
-                                        `/preventif-mesin/${selectedPreventif.no}`,
-                                        {
-                                            preserveScroll: true,
-                                            onFinish: () => {
-                                                setShowDeleteModal(false);
-                                                setSelectedPreventif(null);
-                                            },
-                                        }
-                                    );
-                                }}
-                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-red-600 hover:to-rose-700 hover:shadow-lg"
-                            >
-                                <Icon
-                                    type="trash"
-                                    className="h-4 w-4"
-                                />
-                                Ya, Hapus
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                open={Boolean(confirmDialog)}
+                title={confirmDialog?.title}
+                message={confirmDialog?.message}
+                confirmLabel={confirmDialog?.confirmLabel}
+                tone={confirmDialog?.tone}
+                onConfirm={() => confirmDialog?.onConfirm?.()}
+                onCancel={() => setConfirmDialog(null)}
+            />
         </>
     );
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Http\Controllers\CheckSheetImportController;
 
 Route::get('/', [
     PreventifMesinController::class,
@@ -99,6 +100,18 @@ Route::middleware('auth')->group(function () {
         '/preventif-mesin/{preventifMesin}/bulanan',
         [PreventifMesinController::class, 'updateBulanan']
     )->name('preventif-mesin.bulanan');
+
+    // Import Excel CheckSheet
+    Route::post(
+        '/check-sheets/{checkSheet}/import/preview',
+        [CheckSheetImportController::class, 'preview']
+    )->name('check-sheets.import.preview');
+
+    Route::post(
+        '/check-sheets/{checkSheet}/import',
+        [CheckSheetImportController::class, 'store']
+    )->name('check-sheets.import.store');
+
 });
 
 Route::middleware(['auth', 'role:pimpinan'])->group(function () {
