@@ -6,6 +6,7 @@ use App\Models\CheckSheet;
 use App\Services\CheckSheetImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CheckSheetImportController extends Controller
 {
@@ -17,7 +18,6 @@ class CheckSheetImportController extends Controller
      * Step 1: baca file, kirim header + tebakan mapping + contoh data (JSON).
      * Tidak ada data yang disimpan di tahap ini.
      */
-    
     public function preview(Request $request, CheckSheet $checkSheet): JsonResponse
     {
         $request->validate([
@@ -27,16 +27,14 @@ class CheckSheetImportController extends Controller
         try {
             $rows = $this->svc->readRows($request->file('file'));
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error(
+            Log::error(
                 'Gagal membaca Excel CheckSheet: ' . $e->getMessage(),
                 ['exception' => $e]
             );
 
             return response()->json([
                 'message' => 'File tidak bisa dibaca.',
-                'debug' => config('app.debug')
-                    ? $e->getMessage()
-                    : null,
+                'debug' => config('app.debug') ? $e->getMessage() : null,
             ], 422);
         }
 
@@ -67,13 +65,11 @@ class CheckSheetImportController extends Controller
         ]);
     }
 
-
     /** Step 2: parse + simpan. */
     public function store(Request $request, CheckSheet $checkSheet)
     {
         $request->validate([
             'file'                     => 'required|file|mimes:xlsx,xls,csv|max:10240',
-            // 'header_row'               => 'required|integer|min:1',
             'mapping.inspection_point' => 'required|array|min:1',
             'mapping.condition'        => 'nullable|array',
             'mapping.method'           => 'nullable|array',
@@ -81,9 +77,9 @@ class CheckSheetImportController extends Controller
             'shifts.*'                 => 'in:A,B',
         ]);
 
-        $rows   = $this->svc->readRows($request->file('file'));
+        $rows      = $this->svc->readRows($request->file('file'));
         $headerRow = $this->svc->detectHeaderRow($rows);
-        $parsed = $this->svc->parse(
+        $parsed    = $this->svc->parse(
             $rows,
             $request->mapping,
             $headerRow
@@ -97,6 +93,9 @@ class CheckSheetImportController extends Controller
 
         $shifts = array_values(array_unique($request->shifts));
         $total  = $this->svc->import($checkSheet, $parsed['items'], $shifts);
+
+        // Nomor setelah import dibuat berurutan lagi
+        $checkSheet->susunUlangNomorItem();
 
         $message = count($parsed['items']) . ' inspection point diimport (' . $total . ' item untuk semua shift).';
 

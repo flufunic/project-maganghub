@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+
 class PimpinanController extends Controller
 {
     public function index(Request $request): Response
@@ -62,26 +63,30 @@ class PimpinanController extends Controller
         $bulan = $tanggalPengiriman->month;
         $tahun = $tanggalPengiriman->year;
 
-        $preventifMesins = PreventifMesin::with([
-            'checklists' => function ($query) use ($tanggal) {
-                $query->whereDate('tanggal', $tanggal);
-            },
+        $preventifMesins = PreventifMesin::where('is_hidden', false)
+            ->with([
+                'checklists' => function ($query) use ($tanggal) {
+                    $query->whereDate('tanggal', $tanggal);
+                },
 
-            // Nilai durasi/total_durasi/dot/hot khusus bulan pengiriman
-            'bulanans' => function ($query) use ($bulan, $tahun) {
-                $query->where('tahun', $tahun)
-                    ->where('bulan', $bulan);
-            },
-        ])
+                // Nilai durasi/total_durasi/dot/hot khusus bulan pengiriman
+                'bulanans' => function ($query) use ($bulan, $tahun) {
+                    $query->where('tahun', $tahun)
+                        ->where('bulan', $bulan);
+                },
+            ])
             ->orderBy('divisi')
             ->orderBy('no_item')
             ->get();
 
         // =========================
-        // REVISI
+        // REVISI (hanya untuk item yang masih tampil)
         // =========================
+        $idItemTampil = $preventifMesins->pluck('no')->all();
+
         $revisis = $pengiriman->revisis()
             ->with('pengubah')
+            ->whereIn('preventif_mesin_id', $idItemTampil)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get();
@@ -138,7 +143,6 @@ class PimpinanController extends Controller
                     'dot' => $nilai['dot'],
                     'hot' => $nilai['hot'],
 
-                    // Tetap kirim tanggal yang dikirim saja
                     'tanggal_plan' => $adaPlan
                         ? [$tanggal]
                         : [],
@@ -362,4 +366,5 @@ class PimpinanController extends Controller
 
         return $hasil;
     }
+    
 }

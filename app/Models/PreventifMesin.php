@@ -37,6 +37,7 @@ class PreventifMesin extends Model
         'total_durasi' => 'decimal:2',
         'dot' => 'decimal:2',
         'hot' => 'decimal:2',
+        'is_hidden' => 'boolean',
     ];
 
     public function checklists(): HasMany

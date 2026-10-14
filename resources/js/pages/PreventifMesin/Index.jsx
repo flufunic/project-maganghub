@@ -57,6 +57,7 @@ const ICONS = {
     },
     list: { paths: ['M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10'] },
     clock: { paths: ['M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'] },
+    arrow: { sw: 2, paths: ['M5 12h14M13 6l6 6-6 6'] },
 };
 
 function Icon({ type, className = 'h-4 w-4' }) {
@@ -187,6 +188,14 @@ export default function Index({
     // bentuk: { title, message, confirmLabel, tone, onConfirm }
     const [confirmDialog, setConfirmDialog] = useState(null);
 
+    // [BARU] Fokus dari klik notifikasi
+    // highlight      : { no, day } baris + tanggal yang sedang disorot
+    // searching      : sedang mencari data ke halaman lain
+    // warningMessage : toast peringatan jika data tidak ditemukan di semua halaman
+    const [highlight, setHighlight] = useState(null);
+    const [searching, setSearching] = useState(false);
+    const [warningMessage, setWarningMessage] = useState('');
+
     // =========================
     // STATE EDIT BULANAN
     // =========================
@@ -233,6 +242,17 @@ export default function Index({
 
         return () => clearTimeout(timer);
     }, [showSuccess]);
+
+    // Auto-hide toast peringatan
+    useEffect(() => {
+        if (!warningMessage) {
+            return;
+        }
+
+        const timer = setTimeout(() => setWarningMessage(''), 5000);
+
+        return () => clearTimeout(timer);
+    }, [warningMessage]);
 
     // =========================
     // CEK CHECKLIST
@@ -431,7 +451,7 @@ export default function Index({
     const saveBulanan = () => {
         setConfirmDialog({
             title: 'Simpan perubahan?',
-            message: `Apakah kamu yakin ingin menyimpan data ${months[selectedMonth]} ${selectedYear}?`,
+            message: `Apakah kamu yakin ingin menyimpan data ini?`,
             confirmLabel: 'Ya, Simpan',
             tone: 'blue',
             onConfirm: () => {
@@ -467,7 +487,7 @@ export default function Index({
     const confirmDelete = (preventif) => {
         setConfirmDialog({
             title: 'Hapus data?',
-            message: `Apakah kamu yakin ingin menghapus "${preventif.item_preventif}"? Data tidak bisa dikembalikan.`,
+            message: `Apakah kamu yakin ingin menghapus ${preventif.item_preventif}`,
             confirmLabel: 'Ya, Hapus',
             tone: 'red',
             onConfirm: () => {
@@ -497,6 +517,162 @@ export default function Index({
             }
         );
     };
+
+    // =========================
+    // [BARU] FOKUS KE DATA DARI NOTIFIKASI
+    // Otomatis pindah bulan/tahun + mencari ke semua halaman pagination
+    // =========================
+
+    // Cari baris pada sekumpulan data.
+    // Prioritas: notif.no (id baris) -> fallback no_item + divisi.
+    const findRowIn = (data, target) => {
+        return (data ?? []).find((item) => {
+            if (target.no !== null && target.no !== undefined) {
+                return String(item.no) === String(target.no);
+            }
+
+            return (
+                String(item.no_item) === String(target.no_item) &&
+                String(item.divisi) === String(target.divisi)
+            );
+        });
+    };
+
+    // Kunjungi 1 halaman tertentu dan kembalikan props barunya
+    const visitPage = (month, year, nextStatus, pageNumber) => {
+        return new Promise((resolve) => {
+            router.get(
+                '/preventif-mesin',
+                {
+                    bulan: month + 1,
+                    tahun: year,
+                    status: nextStatus,
+                    page: pageNumber,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onSuccess: (page) => resolve(page.props),
+                    onError: () => resolve(null),
+                    onCancel: () => resolve(null),
+                }
+            );
+        });
+    };
+
+    // Klik notifikasi jadwal
+    const handleNotifClick = async (notif) => {
+        setShowNotifications(false);
+
+        if (searching) {
+            return;
+        }
+
+        const [year, month, day] = String(notif.tanggal)
+            .substring(0, 10)
+            .split('-')
+            .map(Number);
+
+        if (!year || !month || !day) {
+            return;
+        }
+
+        const target = {
+            no: notif.no ?? notif.preventif_no ?? null,
+            no_item: notif.no_item,
+            divisi: notif.divisi,
+        };
+
+        const bedaPeriode =
+            month - 1 !== selectedMonth ||
+            year !== selectedYear ||
+            statusFilter !== 'all';
+
+        // 1) Periode sama: cek dulu di halaman yang sedang tampil
+        if (!bedaPeriode) {
+            const row = findRowIn(preventifMesins.data, target);
+
+            if (row) {
+                setHighlight({ no: row.no, day });
+                return;
+            }
+        }
+
+        // 2) Belum ketemu: cari ke halaman lain
+        setSearching(true);
+        setSelectedMonth(month - 1);
+        setSelectedYear(year);
+        setStatusFilter('all');
+
+        const sudahDicek = new Set();
+
+        if (!bedaPeriode) {
+            sudahDicek.add(preventifMesins.current_page ?? 1);
+        }
+
+        let lastPage = bedaPeriode ? 1 : preventifMesins.last_page ?? 1;
+        let found = null;
+
+        for (let p = 1; p <= lastPage; p++) {
+            if (sudahDicek.has(p)) {
+                continue;
+            }
+
+            const props = await visitPage(month - 1, year, 'all', p);
+
+            if (!props) {
+                break;
+            }
+
+            sudahDicek.add(p);
+            lastPage = props.preventifMesins?.last_page ?? lastPage;
+
+            const row = findRowIn(props.preventifMesins?.data, target);
+
+            if (row) {
+                found = row;
+                break;
+            }
+        }
+
+        setSearching(false);
+
+        if (found) {
+            // beri waktu React merender halaman baru
+            setTimeout(() => setHighlight({ no: found.no, day }), 150);
+        } else {
+            setWarningMessage(
+                `Data No. ${target.no_item} (${target.divisi}) tidak ditemukan di bulan ${months[month - 1]} ${year}.`
+            );
+        }
+    };
+
+    // Scroll ke kotak tanggal + hilangkan sorotan setelah 5 detik
+    useEffect(() => {
+        if (!highlight) {
+            return;
+        }
+
+        const scrollTimer = setTimeout(() => {
+            const cell = document.getElementById(
+                `cell-${highlight.no}-${highlight.day}`
+            );
+
+            cell?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'center',
+            });
+        }, 150);
+
+        const clearTimer = setTimeout(() => setHighlight(null), 5000);
+
+        return () => {
+            clearTimeout(scrollTimer);
+            clearTimeout(clearTimer);
+        };
+    }, [highlight]);
 
     const totalNotif = notifikasi.length + jumlahPengirimanDitolak;
 
@@ -532,6 +708,13 @@ export default function Index({
                     from { opacity: 0; transform: translateY(18px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+                @keyframes idxPulse {
+                    0%, 100% { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.95), 0 0 0 0 rgba(245, 158, 11, 0.55); }
+                    50% { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.95), 0 0 0 7px rgba(245, 158, 11, 0); }
+                }
+                @keyframes idxSpin {
+                    to { transform: rotate(360deg); }
+                }
 
                 .idx-gradient {
                     background-size: 250% 250%;
@@ -540,6 +723,8 @@ export default function Index({
                 .idx-float { animation: idxFloat 14s ease-in-out infinite; }
                 .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
                 .idx-rise { animation: idxRise 0.7s ease-out both; }
+                .idx-pulse { animation: idxPulse 1.2s ease-in-out infinite; }
+                .idx-spin { animation: idxSpin 0.8s linear infinite; }
 
                 .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
                 .idx-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -552,6 +737,7 @@ export default function Index({
                     .idx-gradient,
                     .idx-float,
                     .idx-float-reverse,
+                    .idx-pulse,
                     .idx-rise { animation: none !important; }
                 }
             `}</style>
@@ -621,100 +807,77 @@ export default function Index({
                                         )}
                                     </button>
 
-                                    {/* DROPDOWN */}
+                                    {/* =================================================
+                                        DROPDOWN NOTIFIKASI (flat / tidak seperti tombol)
+                                    ================================================== */}
                                     {showNotifications && (
-                                        <div className="absolute right-0 top-12 z-[80] w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-white/40 bg-white/[0.97] shadow-2xl shadow-slate-950/40 backdrop-blur-2xl">
-                                            {/* HEADER NOTIFIKASI */}
-                                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 px-5 pb-5 pt-5 text-white">
-                                                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-                                                <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-indigo-400/20 blur-xl" />
+                                        <div className="absolute right-0 top-12 z-[80] w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30">
+                                            {/* HEADER */}
+                                            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                                                        <Icon type="bell" className="h-4 w-4" />
+                                                    </span>
 
-                                                <div className="relative">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-                                                                <Icon type="bell" className="h-5 w-5" />
-                                                            </div>
+                                                    <div>
+                                                        <h3 className="text-sm font-bold leading-tight text-slate-800">
+                                                            Notifikasi
+                                                        </h3>
 
-                                                            <div>
-                                                                <h3 className="text-sm font-bold tracking-tight">
-                                                                    Notifikasi
-                                                                </h3>
-
-                                                                <p className="mt-0.5 text-[11px] text-blue-100">
-                                                                    Informasi jadwal & aktivitas preventif
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex min-w-[52px] flex-col items-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5">
-                                                            <span className="text-base font-extrabold leading-none">
-                                                                {totalNotif}
-                                                            </span>
-
-                                                            <span className="mt-1 text-[10px] font-semibold text-blue-100">
-                                                                Notif
-                                                            </span>
-                                                        </div>
+                                                        <p className="text-[11px] leading-tight text-slate-400">
+                                                            Jadwal & aktivitas preventif
+                                                        </p>
                                                     </div>
-
-                                                    {totalNotif > 0 && (
-                                                        <div className="mt-4 flex items-center gap-2">
-                                                            {jumlahPengirimanDitolak > 0 && (
-                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-red-300/20 bg-red-500/25 px-2.5 py-1 text-[11px] font-bold text-red-100">
-                                                                    <span className="h-1.5 w-1.5 rounded-full bg-red-300" />
-                                                                    {jumlahPengirimanDitolak} Ditolak
-                                                                </div>
-                                                            )}
-
-                                                            {notifikasi.length > 0 && (
-                                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-blue-100">
-                                                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                                                                    {notifikasi.length} Jadwal
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
+
+                                                {totalNotif > 0 && (
+                                                    <div className="flex items-center gap-3 text-[11px] font-semibold">
+                                                        {jumlahPengirimanDitolak > 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-red-500">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                                                {jumlahPengirimanDitolak} ditolak
+                                                            </span>
+                                                        )}
+
+                                                        {notifikasi.length > 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-amber-600">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                                {notifikasi.length} jadwal
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {/* ISI NOTIFIKASI */}
-                                            <div className="idx-scroll max-h-[430px] overflow-y-auto bg-slate-50/70">
+                                            {/* ISI */}
+                                            <div className="idx-scroll max-h-[420px] overflow-y-auto">
                                                 {/* PENGIRIMAN DITOLAK */}
                                                 {notifikasiPengiriman
                                                     .filter((item) => item.status === 'ditolak')
                                                     .map((notif, index) => (
                                                         <div
                                                             key={`ditolak-${notif.tanggal}-${index}`}
-                                                            className="border-b border-red-100 bg-gradient-to-r from-red-50 via-rose-50/60 to-white px-4 py-3.5 transition-all duration-200 hover:from-red-100/80 hover:via-rose-50 hover:to-white"
+                                                            className="relative border-b border-slate-100 bg-white px-4 py-3 pl-5"
                                                         >
-                                                            <div className="flex items-start gap-3">
-                                                                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200">
-                                                                    <Icon type="close" className="h-[18px] w-[18px]" />
+                                                            <span className="absolute left-0 top-0 h-full w-1 bg-red-400" />
 
-                                                                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-red-600 text-[8px] font-bold text-white">
-                                                                        !
-                                                                    </span>
-                                                                </div>
+                                                            <div className="flex items-start gap-3">
+                                                                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
+                                                                    <Icon type="close" className="h-4 w-4" />
+                                                                </span>
 
                                                                 <div className="min-w-0 flex-1">
-                                                                    <div className="flex items-start justify-between gap-2">
-                                                                        <div>
-                                                                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-600">
-                                                                                Ditolak
-                                                                            </span>
+                                                                    <div className="flex items-baseline justify-between gap-2">
+                                                                        <p className="text-xs font-bold text-slate-800">
+                                                                            Pengiriman Ditolak
+                                                                        </p>
 
-                                                                            <p className="mt-1 text-xs font-bold text-slate-800">
-                                                                                Pengiriman Preventif
-                                                                            </p>
-                                                                        </div>
-
-                                                                        <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[10px] font-semibold text-slate-400 shadow-sm ring-1 ring-red-100">
+                                                                        <span className="shrink-0 text-[10px] font-semibold text-slate-400">
                                                                             {notif.tanggal_format}
                                                                         </span>
                                                                     </div>
 
-                                                                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                                                                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
                                                                         Data preventif tanggal{' '}
                                                                         <span className="font-semibold text-slate-700">
                                                                             {notif.tanggal_format}
@@ -722,27 +885,18 @@ export default function Index({
                                                                         ditolak oleh pimpinan.
                                                                     </p>
 
-                                                                    <div className="mt-2.5 rounded-xl border border-red-100 bg-white/80 px-3 py-2.5 shadow-sm">
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <span className="flex h-4 w-4 items-center justify-center rounded-md bg-red-100 text-[9px] text-red-500">
-                                                                                !
-                                                                            </span>
-
-                                                                            <p className="text-[10px] font-extrabold text-red-500">
-                                                                                Alasan Penolakan
-                                                                            </p>
-                                                                        </div>
-
-                                                                        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">
-                                                                            {notif.alasan_penolakan || '-'}
-                                                                        </p>
-                                                                    </div>
+                                                                    <p className="mt-2 border-l-2 border-red-200 pl-2.5 text-[11px] leading-relaxed text-slate-600">
+                                                                        <span className="font-bold text-red-500">
+                                                                            Alasan:
+                                                                        </span>{' '}
+                                                                        {notif.alasan_penolakan || '-'}
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     ))}
 
-                                                {/* NOTIFIKASI JADWAL */}
+                                                {/* NOTIFIKASI JADWAL (BISA DIKLIK) */}
                                                 {notifikasi.length > 0 &&
                                                     notifikasi.map((notif, index) => {
                                                         const terlambat = notif.tipe === 'terlambat';
@@ -750,71 +904,78 @@ export default function Index({
                                                         return (
                                                             <div
                                                                 key={`${notif.tanggal}-${notif.no_item}-${index}`}
-                                                                className={`border-b px-4 py-3.5 transition-all duration-200 ${
-                                                                    terlambat
-                                                                        ? 'border-amber-100 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-white hover:from-amber-100/70'
-                                                                        : 'border-blue-100 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white hover:from-blue-100/60'
-                                                                }`}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                title="Klik untuk melihat data"
+                                                                onClick={() => handleNotifClick(notif)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        handleNotifClick(notif);
+                                                                    }
+                                                                }}
+                                                                className="group/notif relative cursor-pointer border-b border-slate-100 bg-white px-4 py-3 pl-5 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50"
                                                             >
+                                                                <span
+                                                                    className={`absolute left-0 top-0 h-full w-1 ${
+                                                                        terlambat
+                                                                            ? 'bg-amber-400'
+                                                                            : 'bg-blue-400'
+                                                                    }`}
+                                                                />
+
                                                                 <div className="flex items-start gap-3">
-                                                                    <div
-                                                                        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ${
+                                                                    <span
+                                                                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                                                                             terlambat
-                                                                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-200'
-                                                                                : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
+                                                                                ? 'bg-amber-50 text-amber-600'
+                                                                                : 'bg-blue-50 text-blue-600'
                                                                         }`}
                                                                     >
                                                                         <Icon
                                                                             type={terlambat ? 'alert' : 'schedule'}
-                                                                            className="h-5 w-5"
+                                                                            className="h-4 w-4"
                                                                         />
-                                                                    </div>
+                                                                    </span>
 
                                                                     <div className="min-w-0 flex-1">
-                                                                        <div className="flex items-start justify-between gap-2">
-                                                                            <div className="min-w-0">
-                                                                                <span
-                                                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                                                                                        terlambat
-                                                                                            ? 'bg-amber-100 text-amber-700'
-                                                                                            : 'bg-blue-100 text-blue-700'
-                                                                                    }`}
-                                                                                >
-                                                                                    {terlambat
-                                                                                        ? 'Perlu Perhatian'
-                                                                                        : 'Besok'}
-                                                                                </span>
+                                                                        <div className="flex items-baseline justify-between gap-2">
+                                                                            <p className="text-xs font-bold text-slate-800">
+                                                                                {terlambat
+                                                                                    ? 'Pengecekan Belum Dilakukan'
+                                                                                    : 'Pengecekan Besok'}
+                                                                            </p>
 
-                                                                                <p className="mt-1 text-xs font-bold text-slate-800">
-                                                                                    {terlambat
-                                                                                        ? 'Pengecekan Belum Dilakukan'
-                                                                                        : 'Pengecekan Besok'}
-                                                                                </p>
-                                                                            </div>
-
-                                                                            <span
-                                                                                className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold ${
-                                                                                    terlambat
-                                                                                        ? 'bg-amber-100/80 text-amber-700'
-                                                                                        : 'bg-blue-100/80 text-blue-700'
-                                                                                }`}
-                                                                            >
+                                                                            <span className="shrink-0 text-[10px] font-semibold text-slate-400">
                                                                                 {notif.divisi}
                                                                             </span>
                                                                         </div>
 
-                                                                        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                                                                        <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
                                                                             {notif.pesan}
                                                                         </p>
 
-                                                                        <div className="mt-2.5 flex items-center gap-2">
-                                                                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-slate-400">
-                                                                                <Icon type="list" className="h-3 w-3" />
+                                                                        <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                                                                            <span className="font-medium text-slate-400">
+                                                                                No. {notif.no_item}
+                                                                                <span className="mx-1.5 text-slate-300">·</span>
+                                                                                <span
+                                                                                    className={`font-semibold ${
+                                                                                        terlambat
+                                                                                            ? 'text-amber-600'
+                                                                                            : 'text-blue-600'
+                                                                                    }`}
+                                                                                >
+                                                                                    {terlambat
+                                                                                        ? 'Perlu perhatian'
+                                                                                        : 'Besok'}
+                                                                                </span>
                                                                             </span>
 
-                                                                            <span className="text-[11px] font-semibold text-slate-400">
-                                                                                No. {notif.no_item}
-                                                                            </span>
+                                                                            <Icon
+                                                                                type="arrow"
+                                                                                className="h-3.5 w-3.5 text-slate-300 transition-all duration-200 group-hover/notif:translate-x-0.5 group-hover/notif:text-blue-500"
+                                                                            />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -825,14 +986,10 @@ export default function Index({
                                                 {/* EMPTY STATE */}
                                                 {notifikasi.length === 0 &&
                                                     jumlahPengirimanDitolak === 0 && (
-                                                        <div className="flex flex-col items-center px-6 py-12 text-center">
-                                                            <div className="relative mb-4">
-                                                                <div className="absolute inset-0 rounded-3xl bg-blue-100 blur-xl" />
-
-                                                                <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-500 shadow-sm ring-1 ring-blue-100">
-                                                                    <Icon type="bell" className="h-7 w-7" />
-                                                                </div>
-                                                            </div>
+                                                        <div className="flex flex-col items-center px-6 py-10 text-center">
+                                                            <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                                                                <Icon type="bell" className="h-6 w-6" />
+                                                            </span>
 
                                                             <p className="text-sm font-bold text-slate-700">
                                                                 Semua aman ✨
@@ -845,16 +1002,11 @@ export default function Index({
                                                     )}
                                             </div>
 
-                                            {/* FOOTER DROPDOWN */}
+                                            {/* FOOTER */}
                                             {totalNotif > 0 && (
-                                                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3">
+                                                <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-2.5">
                                                     <span className="text-[11px] font-medium text-slate-400">
-                                                        Sistem Schedule Preventif
-                                                    </span>
-
-                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
-                                                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                                                        Sistem aktif
+                                                        Klik notifikasi untuk membuka datanya
                                                     </span>
                                                 </div>
                                             )}
@@ -1092,10 +1244,18 @@ export default function Index({
                                                     const rowStatus =
                                                         getStatus(preventif);
 
+                                                    const rowHighlighted =
+                                                        highlight?.no === preventif.no;
+
                                                     return (
                                                         <tr
                                                             key={preventif.no}
-                                                            className="group transition-colors hover:bg-blue-50/50"
+                                                            id={`row-${preventif.no}`}
+                                                            className={`group transition-colors duration-500 ${
+                                                                rowHighlighted
+                                                                    ? 'bg-amber-100/70'
+                                                                    : 'hover:bg-blue-50/50'
+                                                            }`}
                                                         >
                                                             {/* DIVISI */}
                                                             {rowSpan > 0 && (
@@ -1184,11 +1344,17 @@ export default function Index({
                                                                         String(checklist.catatan).trim() !== ''
                                                                 );
 
+                                                                const cellHighlighted =
+                                                                    rowHighlighted && highlight?.day === day;
+
                                                                 return (
                                                                     <td
                                                                         key={day}
+                                                                        id={`cell-${preventif.no}-${day}`}
                                                                         className={`border border-slate-200 px-1.5 py-2 text-center transition-colors ${
-                                                                            checked
+                                                                            cellHighlighted
+                                                                                ? 'idx-pulse !bg-amber-200'
+                                                                                : checked
                                                                                 ? 'bg-emerald-50'
                                                                                 : plan
                                                                                 ? 'bg-blue-50/40'
@@ -1532,6 +1698,50 @@ export default function Index({
             )}
 
             {/* =====================================================
+                [BARU] TOAST MENCARI DATA
+            ====================================================== */}
+            {searching && (
+                <div className="fixed right-5 top-5 z-[100] flex items-center gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-2xl shadow-slate-950/40">
+                    <span className="idx-spin h-5 w-5 rounded-full border-2 border-blue-200 border-t-blue-600" />
+
+                    <p className="text-sm font-semibold text-slate-700">
+                        Mencari data...
+                    </p>
+                </div>
+            )}
+
+            {/* =====================================================
+                WARNING TOAST (data tidak ditemukan di semua halaman)
+            ====================================================== */}
+            {warningMessage && (
+                <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
+                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 text-amber-600">
+                        <Icon type="alert" className="h-5 w-5" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800">
+                            Data tidak ditemukan
+                        </p>
+
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-500">
+                            {warningMessage}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setWarningMessage('')}
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
+
+            {/* =====================================================
                 MODAL EDIT BULANAN
             ====================================================== */}
             {showBulanan && selectedBulanan && (
@@ -1568,15 +1778,15 @@ export default function Index({
                                 </button>
                             </div>
 
-                            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                            {/* <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
                                 {selectedBulanan.item_preventif}
-                            </p>
+                            </p> */}
                         </div>
 
                         {/* FORM */}
                         <div className="px-6 py-5">
                             <div className="mb-4">
-                                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                {/* <label className="mb-2 block text-sm font-semibold text-slate-700">
                                     Item Preventif
                                 </label>
 
@@ -1591,7 +1801,7 @@ export default function Index({
                                     }
                                     placeholder="Isi jika pekerjaan bulan ini berbeda"
                                     className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
-                                />
+                                /> */}
 
                                 <p className="mt-1.5 text-xs text-slate-400">
                                     Nama item master:{' '}
@@ -1632,47 +1842,31 @@ export default function Index({
 
                             <p className="mt-4 text-xs leading-relaxed text-slate-400">
                                 Nilai ini hanya berlaku untuk {months[selectedMonth]}{' '}
-                                {selectedYear}. Bulan lain tidak ikut berubah. Item
-                                Preventif yang dikosongkan atau sama dengan item master
-                                akan memakai nama master. Klik Kosongkan Bulan Ini untuk
-                                menghapus semua data bulan ini.
+                                {selectedYear}. Bulan lain tidak ikut berubah.
                             </p>
                         </div>
 
+
                         {/* FOOTER */}
-                        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-                            <div>
-                                {selectedBulanan.punya_data_bulanan && (
-                                    <button
-                                        type="button"
-                                        onClick={resetBulanan}
-                                        disabled={savingBulanan}
-                                        className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        Kosongkan Bulan Ini
-                                    </button>
-                                )}
-                            </div>
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={closeBulanan}
+                                className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                            >
+                                Batal
+                            </button>
 
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={closeBulanan}
-                                    className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
-                                >
-                                    Batal
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={saveBulanan}
-                                    disabled={savingBulanan}
-                                    className="cursor-pointer rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {savingBulanan ? 'Menyimpan...' : 'Simpan'}
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={saveBulanan}
+                                disabled={savingBulanan}
+                                className="cursor-pointer rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {savingBulanan ? 'Menyimpan...' : 'Simpan'}
+                            </button>
                         </div>
+
                     </div>
                 </div>
             )}

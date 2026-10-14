@@ -8,9 +8,6 @@ use App\Models\Divisi;
 use Inertia\Inertia;
 use Inertia\Response;
 use Carbon\Carbon;
-use App\Models\CheckSheetItem;
-use App\Models\CheckSheetChecklist;
-use App\Models\CheckSheetAbnormality;
 use Maatwebsite\Excel\Facades\Excel;
 
 class CheckSheetController extends Controller
@@ -48,23 +45,12 @@ class CheckSheetController extends Controller
     public function update(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'divisi_id' => [
-                'required',
-                'exists:divisis,id',
-            ],
+            'divisi_id' => ['required', 'exists:divisis,id'],
 
             // Nomor dokumen boleh sama dengan check sheet lain
-            'nomor_dokumen' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+            'nomor_dokumen' => ['required', 'string', 'max:255'],
 
-            'nama_checksheet' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+            'nama_checksheet' => ['required', 'string', 'max:255'],
         ]);
 
         $checkSheet->update($validated);
@@ -72,7 +58,6 @@ class CheckSheetController extends Controller
         return redirect()
             ->route('check-sheets.index')
             ->with('success', 'Check Sheet berhasil diperbarui.');
-
     }
 
     public function destroy(CheckSheet $checkSheet)
@@ -87,23 +72,12 @@ class CheckSheetController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'divisi_id' => [
-                'required',
-                'exists:divisis,id',
-            ],
+            'divisi_id' => ['required', 'exists:divisis,id'],
 
             // Nomor dokumen boleh sama dengan check sheet lain
-            'nomor_dokumen' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+            'nomor_dokumen' => ['required', 'string', 'max:255'],
 
-            'nama_checksheet' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+            'nama_checksheet' => ['required', 'string', 'max:255'],
         ]);
 
         CheckSheet::create($validated);
@@ -115,6 +89,9 @@ class CheckSheetController extends Controller
 
     public function show(Request $request, CheckSheet $checkSheet): Response
     {
+        // Rapikan nomor (self-heal untuk data lama yang masih bolong)
+        $checkSheet->susunUlangNomorItem();
+
         $bulan = (int) ($request->bulan ?? now()->month);
         $tahun = (int) ($request->tahun ?? now()->year);
 
@@ -126,6 +103,10 @@ class CheckSheetController extends Controller
 
         $checkSheet->load([
             'divisi',
+
+            'items' => function ($query) {
+                $query->orderBy('shift')->orderBy('no')->orderBy('id');
+            },
 
             'items.checklists' => function ($query) use ($awalBulan, $akhirBulan) {
                 $query->whereBetween('tanggal', [
@@ -142,11 +123,7 @@ class CheckSheetController extends Controller
         for ($i = 1; $i <= $jumlahHari; $i++) {
             $tanggal[] = [
                 'tanggal' => $i,
-                'tanggal_lengkap' => Carbon::create(
-                    $tahun,
-                    $bulan,
-                    $i
-                )->format('Y-m-d'),
+                'tanggal_lengkap' => Carbon::create($tahun, $bulan, $i)->format('Y-m-d'),
             ];
         }
 
@@ -161,22 +138,10 @@ class CheckSheetController extends Controller
     public function storeItem(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'inspection_point' => [
-                'required',
-                'string',
-            ],
-            'condition' => [
-                'nullable',
-                'string',
-            ],
-            'method' => [
-                'nullable',
-                'string',
-            ],
-            'shift' => [
-                'required',
-                'in:A,B',
-            ],
+            'inspection_point' => ['required', 'string'],
+            'condition' => ['nullable', 'string'],
+            'method' => ['nullable', 'string'],
+            'shift' => ['required', 'in:A,B'],
         ]);
 
         // Nomor otomatis: lanjut dari nomor terakhir pada shift yang sama
@@ -187,6 +152,8 @@ class CheckSheetController extends Controller
 
         $checkSheet->items()->create($validated);
 
+        $checkSheet->susunUlangNomorItem();
+
         return redirect()
             ->route('check-sheets.show', $checkSheet)
             ->with('success', 'Item pemeriksaan berhasil ditambahkan.');
@@ -195,22 +162,10 @@ class CheckSheetController extends Controller
     public function updateItem(Request $request, CheckSheet $checkSheet, int $item)
     {
         $validated = $request->validate([
-            'inspection_point' => [
-                'required',
-                'string',
-            ],
-            'condition' => [
-                'nullable',
-                'string',
-            ],
-            'method' => [
-                'nullable',
-                'string',
-            ],
-            'shift' => [
-                'required',
-                'in:A,B',
-            ],
+            'inspection_point' => ['required', 'string'],
+            'condition' => ['nullable', 'string'],
+            'method' => ['nullable', 'string'],
+            'shift' => ['required', 'in:A,B'],
         ]);
 
         $checkSheetItem = $checkSheet->items()
@@ -227,12 +182,9 @@ class CheckSheetController extends Controller
 
         $checkSheetItem->update($validated);
 
-        $this->susunUlangNomor($checkSheet);
+        $checkSheet->susunUlangNomorItem();
 
-        return back()->with(
-            'success',
-            'Inspection Point berhasil diperbarui.'
-        );
+        return back()->with('success', 'Inspection Point berhasil diperbarui.');
     }
 
     public function destroyItem(CheckSheet $checkSheet, int $item)
@@ -244,42 +196,26 @@ class CheckSheetController extends Controller
         $checkSheetItem->delete();
 
         // Nomor yang tersisa disusun ulang (1, 2, 3, ...)
-        $this->susunUlangNomor($checkSheet);
+        $checkSheet->susunUlangNomorItem();
 
-        return back()->with(
-            'success',
-            'Inspection Point berhasil dihapus.'
-        );
+        return back()->with('success', 'Inspection Point berhasil dihapus.');
     }
 
     public function storeChecklist(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'check_sheet_item_id' => [
-                'required',
-                'exists:check_sheet_items,id',
-            ],
-            'tanggal' => [
-                'required',
-                'date',
-            ],
-            'status' => [
-                'required',
-                'boolean',
-            ],
+            'check_sheet_item_id' => ['required', 'exists:check_sheet_items,id'],
+            'tanggal' => ['required', 'date'],
+            'status' => ['required', 'boolean'],
         ]);
 
         $item = $checkSheet->items()
             ->where('id', $validated['check_sheet_item_id'])
             ->firstOrFail();
 
-        $checklist = $item->checklists()->updateOrCreate(
-            [
-                'tanggal' => $validated['tanggal'],
-            ],
-            [
-                'status' => $validated['status'],
-            ]
+        $item->checklists()->updateOrCreate(
+            ['tanggal' => $validated['tanggal']],
+            ['status' => $validated['status']]
         );
 
         return back();
@@ -288,36 +224,16 @@ class CheckSheetController extends Controller
     public function storeAbnormality(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'tanggal' => [
-                'required',
-                'date',
-            ],
-            'abnormality' => [
-                'required',
-                'string',
-            ],
-            'countermeasure' => [
-                'nullable',
-                'string',
-            ],
-            'status' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'pic' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+            'tanggal' => ['required', 'date'],
+            'abnormality' => ['required', 'string'],
+            'countermeasure' => ['nullable', 'string'],
+            'status' => ['required', 'string', 'max:255'],
+            'pic' => ['nullable', 'string', 'max:255'],
         ]);
 
         $checkSheet->abnormalities()->create($validated);
 
-        return back()->with(
-            'success',
-            'Abnormality berhasil ditambahkan.'
-        );
+        return back()->with('success', 'Abnormality berhasil ditambahkan.');
     }
 
     public function updateAbnormality(
@@ -326,28 +242,11 @@ class CheckSheetController extends Controller
         int $abnormality
     ) {
         $validated = $request->validate([
-            'tanggal' => [
-                'required',
-                'date',
-            ],
-            'abnormality' => [
-                'required',
-                'string',
-            ],
-            'countermeasure' => [
-                'nullable',
-                'string',
-            ],
-            'status' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'pic' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+            'tanggal' => ['required', 'date'],
+            'abnormality' => ['required', 'string'],
+            'countermeasure' => ['nullable', 'string'],
+            'status' => ['required', 'string', 'max:255'],
+            'pic' => ['nullable', 'string', 'max:255'],
         ]);
 
         $checkSheetAbnormality = $checkSheet->abnormalities()
@@ -356,26 +255,18 @@ class CheckSheetController extends Controller
 
         $checkSheetAbnormality->update($validated);
 
-        return back()->with(
-            'success',
-            'Abnormality berhasil diperbarui.'
-        );
+        return back()->with('success', 'Abnormality berhasil diperbarui.');
     }
 
-    public function destroyAbnormality(
-        CheckSheet $checkSheet,
-        int $abnormality
-    ) {
+    public function destroyAbnormality(CheckSheet $checkSheet, int $abnormality)
+    {
         $checkSheetAbnormality = $checkSheet->abnormalities()
             ->where('id', $abnormality)
             ->firstOrFail();
 
         $checkSheetAbnormality->delete();
 
-        return back()->with(
-            'success',
-            'Abnormality berhasil dihapus.'
-        );
+        return back()->with('success', 'Abnormality berhasil dihapus.');
     }
 
     /**
@@ -388,36 +279,11 @@ class CheckSheetController extends Controller
             ->max('no')) + 1;
     }
 
-    /**
-     * Susun ulang nomor Inspection Point supaya selalu berurutan
-     * 1, 2, 3, ... dan tidak ada nomor yang bolong.
-     *
-     * Penomoran dihitung per shift (Shift A mulai dari 1, Shift B mulai dari 1).
-     * Urutan mengikuti nomor yang ada, lalu id.
-     *
-     * Kalau mau satu urutan untuk semua shift, hapus ->groupBy('shift')
-     * dan pakai $items = $semuaItem langsung.
-     */
-    private function susunUlangNomor(CheckSheet $checkSheet): void
-    {
-        $semuaItem = $checkSheet->items()
-            ->orderBy('no')
-            ->orderBy('id')
-            ->get();
-
-        $semuaItem->groupBy('shift')->each(function ($items) {
-            $items->values()->each(function ($item, $index) {
-                $nomor = $index + 1;
-
-                if ((int) $item->no !== $nomor) {
-                    $item->update(['no' => $nomor]);
-                }
-            });
-        });
-    }
-
     public function exportExcel(Request $request, CheckSheet $checkSheet)
     {
+        // Pastikan nomor di database sudah berurutan sebelum diexport
+        $checkSheet->susunUlangNomorItem();
+
         $bulan = (int) $request->bulan;
         $tahun = (int) $request->tahun;
 

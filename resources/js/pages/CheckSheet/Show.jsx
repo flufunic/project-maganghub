@@ -29,16 +29,18 @@ const ICONS = {
             'M8 13l2 2-2 2M12 13l2 2-2 2',
         ],
     },
-    // BARU: icon upload untuk tombol Import Excel
     upload: {
         paths: ['M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12'],
     },
     check: { sw: 2.5, paths: ['M5 12l4 4L19 6'] },
-    calendar: {
-        rect: { x: 3, y: 4, width: 18, height: 17, rx: 2 },
-        paths: ['M16 2v4M8 2v4M3 10h18'],
-    },
     close: { sw: 2, paths: ['M6 6l12 12M18 6L6 18'] },
+    save: {
+        paths: [
+            'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z',
+            'M17 21v-8H7v8',
+            'M7 3v5h8',
+        ],
+    },
 };
 
 const Icon = ({ type, className = 'h-4 w-4' }) => {
@@ -77,16 +79,21 @@ const glassCard =
 const inputClass =
     'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100';
 
-const selectClass = inputClass;
+// select di dalam form: cursor telunjuk
+const selectClass = `${inputClass} cursor-pointer`;
+
+// select kecil untuk toolbar
+const toolbarSelect =
+    'h-8 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
 // tableHeadBase = tanpa padding horizontal (supaya bisa di-override tanpa konflik px-*)
 const tableHeadBase =
-    'border-r border-white/10 py-4 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
+    'border-r border-white/10 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
 
-const tableHead = `${tableHeadBase} px-4`;
+const tableHead = `${tableHeadBase} px-3`;
 
 // Lebar kolom sticky "No" (HARUS sama dengan offset left kolom Inspection Point)
-// w-16 = 64px  ->  left-[64px]
+// w-12 = 48px  ->  left-[48px]
 
 // =========================================================
 // SMALL COMPONENTS
@@ -104,7 +111,7 @@ const IconButton = ({ title, onClick, variant = 'blue', children }) => {
             type="button"
             title={title}
             onClick={onClick}
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${variants[variant]}`}
+            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${variants[variant]}`}
         >
             {children}
         </button>
@@ -126,54 +133,30 @@ const Field = ({ label, children, error, required = false, className = '' }) => 
     </div>
 );
 
-const SectionHead = ({ icon, tone, title, desc, badge, badgeTone, action }) => {
-    const tones = {
-        blue: 'from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50',
-        amber: 'from-amber-400 to-orange-500 shadow-amber-300/50',
-    };
+// Header section ringkas: judul + jumlah (teks biasa) + tombol aksi
+const SectionHead = ({ title, desc, count, tone = 'blue', action }) => (
+    <div
+        className={`flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+            tone === 'amber' ? 'bg-amber-50/40' : 'bg-blue-50/40'
+        }`}
+    >
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <h2 className="text-sm font-bold text-slate-900">{title}</h2>
 
-    const badgeTones = {
-        blue: 'border-blue-100 bg-blue-50 text-blue-600',
-        amber: 'border-amber-100 bg-amber-50 text-amber-600',
-    };
+            {count !== undefined && (
+                <span className="text-xs font-semibold text-slate-400">
+                    {count}
+                </span>
+            )}
 
-    return (
-        <div
-            className={`border-b border-slate-100 px-6 py-5 sm:px-7 ${
-                tone === 'amber'
-                    ? 'bg-gradient-to-r from-white via-amber-50/50 to-orange-50/50'
-                    : 'bg-gradient-to-r from-white via-blue-50/50 to-indigo-50/60'
-            }`}
-        >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-3">
-                    <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${tones[tone]}`}
-                    >
-                        <Icon type={icon} className="h-5 w-5" />
-                    </div>
-
-                    <div>
-                        <h2 className="text-base font-bold text-slate-900">
-                            {title}
-                        </h2>
-                        <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
-                    </div>
-
-                    {badge !== undefined && (
-                        <span
-                            className={`rounded-full border px-3 py-1 text-[11px] font-bold ${badgeTones[badgeTone]}`}
-                        >
-                            {badge}
-                        </span>
-                    )}
-                </div>
-
-                {action}
-            </div>
+            <span className="hidden text-xs text-slate-400 md:inline">
+                · {desc}
+            </span>
         </div>
-    );
-};
+
+        {action}
+    </div>
+);
 
 const FormBanner = ({ text, tone = 'blue' }) => {
     const tones = {
@@ -184,7 +167,7 @@ const FormBanner = ({ text, tone = 'blue' }) => {
     };
 
     return (
-        <div className={`rounded-2xl border bg-gradient-to-r p-4 ${tones[tone][0]}`}>
+        <div className={`rounded-xl border bg-gradient-to-r px-4 py-3 ${tones[tone][0]}`}>
             <div className="flex items-center gap-3">
                 <div className={`h-1.5 w-1.5 rounded-full ${tones[tone][1]}`} />
                 <h4 className="text-sm font-bold text-slate-800">{text}</h4>
@@ -193,8 +176,6 @@ const FormBanner = ({ text, tone = 'blue' }) => {
     );
 };
 
-// PERBAIKAN: tambah prop `disabled` + `processingLabel`
-// supaya tombol bisa nonaktif tanpa menampilkan teks "Menyimpan..."
 const FormActions = ({
     onCancel,
     processing,
@@ -207,7 +188,7 @@ const FormActions = ({
         <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
         >
             Batal
         </button>
@@ -215,7 +196,7 @@ const FormActions = ({
         <button
             type="submit"
             disabled={processing || disabled}
-            className={`rounded-xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`cursor-pointer rounded-xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
                 tone === 'amber'
                     ? 'from-amber-500 to-orange-500 shadow-amber-300/50 hover:from-amber-600 hover:to-orange-600'
                     : 'from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50 hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700'
@@ -247,7 +228,7 @@ const ItemFields = ({
                         className="w-full cursor-not-allowed rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-2.5 text-sm font-bold text-blue-700 outline-none placeholder:font-medium placeholder:text-blue-300"
                     />
 
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-500">
                         Otomatis
                     </span>
                 </div>
@@ -313,7 +294,7 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
                     type="date"
                     value={data.tanggal}
                     onChange={(e) => setData('tanggal', e.target.value)}
-                    className={inputClass}
+                    className={`${inputClass} cursor-pointer`}
                 />
             </Field>
 
@@ -363,10 +344,9 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
 );
 
 // =========================================================
-// MODAL
+// MODAL FORM
 // =========================================================
 
-// PERBAIKAN: tambah prop `maxWidth` (default tetap max-w-2xl)
 const Modal = ({
     title,
     description,
@@ -380,14 +360,14 @@ const Modal = ({
             <div
                 role="dialog"
                 aria-modal="true"
-                className={`relative w-full ${maxWidth} overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40`}
+                className={`relative w-full ${maxWidth} overflow-hidden rounded-2xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40`}
             >
                 <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-                <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-5 sm:px-7">
-                    <div className="flex items-start gap-4">
+                <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-4">
+                    <div className="flex items-start gap-3">
                         <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg ${
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md ${
                                 icon === 'alert'
                                     ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-300/50'
                                     : 'bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50'
@@ -395,17 +375,17 @@ const Modal = ({
                         >
                             <Icon
                                 type={icon === 'alert' ? 'alert' : 'clipboard'}
-                                className="h-6 w-6"
+                                className="h-5 w-5"
                             />
                         </div>
 
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                            <h3 className="text-base font-bold tracking-tight text-slate-900">
                                 {title}
                             </h3>
 
                             {description && (
-                                <p className="mt-1 text-sm leading-6 text-slate-500">
+                                <p className="mt-0.5 text-sm leading-5 text-slate-500">
                                     {description}
                                 </p>
                             )}
@@ -414,7 +394,7 @@ const Modal = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700"
+                            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                             title="Tutup"
                         >
                             <Icon type="close" className="h-4 w-4" />
@@ -422,7 +402,7 @@ const Modal = ({
                     </div>
                 </div>
 
-                <div className="max-h-[75vh] overflow-y-auto p-6 sm:p-7">
+                <div className="max-h-[75vh] overflow-y-auto p-6">
                     {children}
                 </div>
             </div>
@@ -431,7 +411,85 @@ const Modal = ({
 };
 
 // =========================================================
-// IMPORT EXCEL (BARU)
+// DIALOG KONFIRMASI (simpan / edit / hapus)
+// =========================================================
+
+const ConfirmDialog = ({ dialog, onCancel }) => {
+    if (!dialog) {
+        return null;
+    }
+
+    const isRed = dialog.tone === 'red';
+
+    return (
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                    onCancel();
+                }
+            }}
+        >
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl shadow-slate-950/40"
+            >
+                <div className="px-5 pb-4 pt-5">
+                    <div className="flex items-start gap-3">
+                        <span
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                                isRed
+                                    ? 'bg-red-50 text-red-600'
+                                    : 'bg-blue-50 text-blue-600'
+                            }`}
+                        >
+                            <Icon
+                                type={dialog.icon ?? (isRed ? 'trash' : 'save')}
+                                className="h-5 w-5"
+                            />
+                        </span>
+
+                        <div className="min-w-0">
+                            <h2 className="text-base font-bold text-slate-900">
+                                {dialog.title}
+                            </h2>
+
+                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                                {dialog.message}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => dialog.onConfirm?.()}
+                        className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-bold text-white transition ${
+                            isRed
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                    >
+                        {dialog.confirmLabel ?? 'Ya'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// =========================================================
+// IMPORT EXCEL
 // =========================================================
 
 const MAP_FIELDS = [
@@ -445,9 +503,8 @@ const MAP_FIELDS = [
     { key: 'method', label: 'Method', hint: 'Contoh: METHOD.' },
 ];
 
-const ImportModal = ({ checkSheet, onClose }) => {
+const ImportModal = ({ checkSheet, onClose, onDone }) => {
     const [file, setFile] = useState(null);
-    const [headerRow, setHeaderRow] = useState(1);
     const [preview, setPreview] = useState(null);
     const [mapping, setMapping] = useState({
         inspection_point: [],
@@ -459,8 +516,7 @@ const ImportModal = ({ checkSheet, onClose }) => {
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
 
-    // Setiap file / baris header berubah -> minta preview ke server
-    
+    // Setiap file berubah -> minta preview ke server
     useEffect(() => {
         if (!file) return;
 
@@ -498,7 +554,6 @@ const ImportModal = ({ checkSheet, onClose }) => {
         };
     }, [file, checkSheet.id]);
 
-
     const toggleCol = (field, index) =>
         setMapping((m) => ({
             ...m,
@@ -520,23 +575,25 @@ const ImportModal = ({ checkSheet, onClose }) => {
 
     const submit = (e) => {
         e.preventDefault();
+
         if (!canSubmit) return;
 
-       
-    router.post(
-        `/check-sheets/${checkSheet.id}/import`,
-        { file, mapping, shifts },
-        {
-            forceFormData: true,
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
-            onSuccess: () => onClose(),
-            onError: (errs) =>
-                setError(Object.values(errs)[0] || 'Import gagal.'),
-        }
-    );
-
+        router.post(
+            `/check-sheets/${checkSheet.id}/import`,
+            { file, mapping, shifts },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onSuccess: () => {
+                    onDone?.();
+                    onClose();
+                },
+                onError: (errs) =>
+                    setError(Object.values(errs)[0] || 'Import gagal.'),
+            }
+        );
     };
 
     const headerLabel = (h, i) => (h ? h : `Kolom ${i + 1}`);
@@ -549,29 +606,17 @@ const ImportModal = ({ checkSheet, onClose }) => {
             maxWidth="max-w-4xl"
         >
             <form onSubmit={submit} className="space-y-6">
-                <div className="grid gap-5 sm:grid-cols-[1fr_160px]">
-                    <Field label="File Excel" required>
-                        <input
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            onChange={(e) => {
-                                setFile(e.target.files[0] ?? null);
-                                setPreview(null);
-                            }}
-                            className={inputClass}
-                        />
-                    </Field>
-
-                    {/* <Field label="Baris Header">
-                        <input
-                            type="number"
-                            min="1"
-                            value={headerRow}
-                            onChange={(e) => setHeaderRow(e.target.value)}
-                            className={inputClass}
-                        />
-                    </Field> */}
-                </div>
+                <Field label="File Excel" required>
+                    <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={(e) => {
+                            setFile(e.target.files[0] ?? null);
+                            setPreview(null);
+                        }}
+                        className={`${inputClass} cursor-pointer`}
+                    />
+                </Field>
 
                 {loading && (
                     <p className="text-sm text-slate-500">Membaca file...</p>
@@ -610,7 +655,7 @@ const ImportModal = ({ checkSheet, onClose }) => {
                                                 key={i}
                                                 type="button"
                                                 onClick={() => toggleCol(f.key, i)}
-                                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                                                className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                                                     active
                                                         ? 'border-indigo-300 bg-indigo-600 text-white shadow-sm'
                                                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -638,10 +683,11 @@ const ImportModal = ({ checkSheet, onClose }) => {
                                 {['A', 'B'].map((s) => (
                                     <label
                                         key={s}
-                                        className="flex items-center gap-2 text-sm font-semibold text-slate-700"
+                                        className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700"
                                     >
                                         <input
                                             type="checkbox"
+                                            className="cursor-pointer"
                                             checked={shifts.includes(s)}
                                             onChange={() => toggleShift(s)}
                                         />
@@ -710,7 +756,7 @@ const ImportModal = ({ checkSheet, onClose }) => {
 // =========================================================
 
 export default function Show({ checkSheet, bulan, tahun, tanggal }) {
-    // Flash message (butuh shared prop `flash`, lihat tutorial langkah 6)
+    // Flash message dari backend
     const { flash } = usePage().props;
 
     // =====================================================
@@ -721,16 +767,41 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     const [editingAbnormality, setEditingAbnormality] = useState(null);
 
     const [showAddItemModal, setShowAddItemModal] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false); // BARU
-
+    const [showImportModal, setShowImportModal] = useState(false);
     const [showAddAbnormalityModal, setShowAddAbnormalityModal] =
         useState(false);
 
     const [shiftFilter, setShiftFilter] = useState('all');
 
+    // Dialog konfirmasi: { title, message, confirmLabel, tone, icon, onConfirm }
+    const [confirmDialog, setConfirmDialog] = useState(null);
+
+    // Toast: { type: 'success' | 'error', message }
+    const [toast, setToast] = useState(null);
+
+    const notify = (message, type = 'success') => setToast({ type, message });
+
+    // Toast dari flash backend
+    useEffect(() => {
+        if (flash?.success) {
+            setToast({ type: 'success', message: flash.success });
+        }
+    }, [flash]);
+
+    // Toast hilang otomatis
+    useEffect(() => {
+        if (!toast) {
+            return;
+        }
+
+        const timer = setTimeout(() => setToast(null), 4000);
+
+        return () => clearTimeout(timer);
+    }, [toast]);
+
     // =====================================================
     // FORM - ADD ITEM
-    // (nomor tidak diinput, dibuat otomatis oleh server)
+    // (nomor tidak diinput, dibuat otomatis)
     // =====================================================
 
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -834,7 +905,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     };
 
     // =====================================================
-    // CHECKLIST
+    // CHECKLIST (langsung, tanpa konfirmasi)
     // =====================================================
 
     const toggleChecklist = (item, tanggalLengkap) => {
@@ -858,105 +929,187 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     };
 
     // =====================================================
-    // ADD ITEM
+    // ADD ITEM  (konfirmasi dulu)
     // =====================================================
 
     const submit = (e) => {
         e.preventDefault();
 
-        post(`/check-sheets/${checkSheet.id}/items`, {
-            onSuccess: () => {
-                reset();
-                setShowAddItemModal(false);
+        setConfirmDialog({
+            title: 'Simpan data?',
+            message: 'Apakah kamu yakin ingin menyimpan Inspection Point ini?',
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            icon: 'save',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                post(`/check-sheets/${checkSheet.id}/items`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        reset();
+                        setShowAddItemModal(false);
+                        notify('Inspection Point berhasil ditambahkan.');
+                    },
+                    onError: () =>
+                        notify('Data gagal disimpan. Periksa kembali isian kamu.', 'error'),
+                });
             },
         });
     };
 
     // =====================================================
-    // EDIT ITEM
+    // EDIT ITEM  (konfirmasi dulu)
     // =====================================================
 
     const submitEdit = (e) => {
         e.preventDefault();
 
-        putEdit(`/check-sheets/${checkSheet.id}/items/${editingItem.id}`, {
-            onSuccess: () => {
-                setEditingItem(null);
-                resetEdit();
+        setConfirmDialog({
+            title: 'Simpan perubahan?',
+            message: 'Apakah kamu yakin ingin menyimpan perubahan Inspection Point ini?',
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            icon: 'edit',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                putEdit(`/check-sheets/${checkSheet.id}/items/${editingItem.id}`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setEditingItem(null);
+                        resetEdit();
+                        notify('Inspection Point berhasil diperbarui.');
+                    },
+                    onError: () =>
+                        notify('Perubahan gagal disimpan. Periksa kembali isian kamu.', 'error'),
+                });
             },
         });
     };
 
     // =====================================================
-    // ADD ABNORMALITY
+    // ADD ABNORMALITY  (konfirmasi dulu)
     // =====================================================
 
     const submitAbnormality = (e) => {
         e.preventDefault();
 
-        postAbnormality(`/check-sheets/${checkSheet.id}/abnormalities`, {
-            onSuccess: () => {
-                resetAbnormality();
-                setShowAddAbnormalityModal(false);
+        setConfirmDialog({
+            title: 'Simpan data?',
+            message: 'Apakah kamu yakin ingin menyimpan data abnormality ini?',
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            icon: 'save',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                postAbnormality(`/check-sheets/${checkSheet.id}/abnormalities`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        resetAbnormality();
+                        setShowAddAbnormalityModal(false);
+                        notify('Abnormality berhasil ditambahkan.');
+                    },
+                    onError: () =>
+                        notify('Data gagal disimpan. Periksa kembali isian kamu.', 'error'),
+                });
             },
         });
     };
 
     // =====================================================
-    // EDIT ABNORMALITY
+    // EDIT ABNORMALITY  (konfirmasi dulu)
     // =====================================================
 
     const submitEditAbnormality = (e) => {
         e.preventDefault();
 
-        putEditAbnormality(
-            `/check-sheets/${checkSheet.id}/abnormalities/${editingAbnormality.id}`,
-            {
-                onSuccess: () => {
-                    setEditingAbnormality(null);
-                    resetEditAbnormality();
-                },
-            }
-        );
+        setConfirmDialog({
+            title: 'Simpan perubahan?',
+            message: 'Apakah kamu yakin ingin menyimpan perubahan abnormality ini?',
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            icon: 'edit',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                putEditAbnormality(
+                    `/check-sheets/${checkSheet.id}/abnormalities/${editingAbnormality.id}`,
+                    {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setEditingAbnormality(null);
+                            resetEditAbnormality();
+                            notify('Abnormality berhasil diperbarui.');
+                        },
+                        onError: () =>
+                            notify('Perubahan gagal disimpan. Periksa kembali isian kamu.', 'error'),
+                    }
+                );
+            },
+        });
     };
 
     // =====================================================
-    // NOMOR OTOMATIS
-    // Nomor berikutnya pada shift tertentu = nomor terakhir + 1.
-    // (Hanya untuk tampilan, nomor sebenarnya ditentukan server.)
+    // URUTKAN SEMUA ITEM
+    // Shift A dulu, lalu B. Di dalam shift: urut nomor lama,
+    // kalau nomornya sama/kosong, urut berdasarkan id.
     // =====================================================
 
+    const sortedAllItems = [...(checkSheet.items ?? [])].sort(
+        (a, b) =>
+            String(a.shift ?? '').localeCompare(String(b.shift ?? '')) ||
+            (Number(a.no) || 0) - (Number(b.no) || 0) ||
+            (Number(a.id) || 0) - (Number(b.id) || 0)
+    );
+
+    // =====================================================
+    // NOMOR OTOMATIS (BERURUT PER SHIFT)
+    // Nomor tampilan dihitung ulang: 1, 2, 3, ... per shift,
+    // jadi kalau ada data yang dihapus, nomornya langsung
+    // menyesuaikan walaupun nilai di database masih loncat.
+    // =====================================================
+
+    const nomorUrut = (() => {
+        const counter = {};
+        const map = {};
+
+        sortedAllItems.forEach((item) => {
+            const key = item.shift ?? '';
+
+            counter[key] = (counter[key] ?? 0) + 1;
+            map[item.id] = counter[key];
+        });
+
+        return map;
+    })();
+
+    // Nomor berikutnya pada shift tertentu = jumlah item di shift itu + 1
     const nomorBerikutnya = (shift) => {
         if (!shift) {
             return '';
         }
 
-        const nomorShift = checkSheet.items
-            .filter((item) => item.shift === shift)
-            .map((item) => Number(item.no) || 0);
+        const jumlah = sortedAllItems.filter(
+            (item) => item.shift === shift
+        ).length;
 
-        return (nomorShift.length > 0 ? Math.max(...nomorShift) : 0) + 1;
+        return jumlah + 1;
     };
 
     // =====================================================
-    // FILTER + URUTKAN
-    // Shift A dulu (berurutan 1, 2, 3, ...), baru Shift B (1, 2, 3, ...)
+    // FILTER (urutan sudah benar dari sortedAllItems)
     // =====================================================
 
-    const filteredItems = checkSheet.items
-        .filter((item) => {
-            if (shiftFilter === 'all') return true;
+    const filteredItems = sortedAllItems.filter((item) => {
+        if (shiftFilter === 'all') return true;
 
-            return item.shift === shiftFilter;
-        })
-        .sort(
-            (a, b) =>
-                String(a.shift ?? '').localeCompare(String(b.shift ?? '')) ||
-                (Number(a.no) || 0) - (Number(b.no) || 0)
-        );
+        return item.shift === shiftFilter;
+    });
 
     // =====================================================
-    // EDIT ITEM
+    // BUKA FORM EDIT
     // =====================================================
 
     const bukaEditItem = (item) => {
@@ -969,10 +1122,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
             shift: item.shift,
         });
     };
-
-    // =====================================================
-    // EDIT ABNORMALITY
-    // =====================================================
 
     const bukaEditAbnormality = (abnormality) => {
         setEditingAbnormality(abnormality);
@@ -987,34 +1136,52 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     };
 
     // =====================================================
-    // DELETE ITEM
+    // DELETE ITEM  (modal konfirmasi)
     // =====================================================
 
     const hapusItem = (item) => {
-        if (
-            confirm(
-                'Yakin ingin menghapus Inspection Point ini? Checklist yang terkait juga akan terhapus. Nomor yang tersisa akan disusun ulang.'
-            )
-        ) {
-            router.delete(`/check-sheets/${checkSheet.id}/items/${item.id}`, {
-                preserveScroll: true,
-            });
-        }
+        setConfirmDialog({
+            title: 'Hapus Inspection Point?',
+            message: `Apakah kamu yakin ingin menghapus ${item.inspection_point}?`,
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            icon: 'trash',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                router.delete(`/check-sheets/${checkSheet.id}/items/${item.id}`, {
+                    preserveScroll: true,
+                    onSuccess: () => notify('Inspection Point berhasil dihapus.'),
+                    onError: () => notify('Data gagal dihapus.', 'error'),
+                });
+            },
+        });
     };
 
     // =====================================================
-    // DELETE ABNORMALITY
+    // DELETE ABNORMALITY  (modal konfirmasi)
     // =====================================================
 
     const hapusAbnormality = (abnormality) => {
-        if (confirm('Yakin ingin menghapus abnormality ini?')) {
-            router.delete(
-                `/check-sheets/${checkSheet.id}/abnormalities/${abnormality.id}`,
-                {
-                    preserveScroll: true,
-                }
-            );
-        }
+        setConfirmDialog({
+            title: 'Hapus Abnormality?',
+            message: 'Apakah kamu yakin ingin menghapus data abnormality ini?',
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            icon: 'trash',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                router.delete(
+                    `/check-sheets/${checkSheet.id}/abnormalities/${abnormality.id}`,
+                    {
+                        preserveScroll: true,
+                        onSuccess: () => notify('Abnormality berhasil dihapus.'),
+                        onError: () => notify('Data gagal dihapus.', 'error'),
+                    }
+                );
+            },
+        });
     };
 
     // =====================================================
@@ -1039,14 +1206,14 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
     const getStatusClass = (status) => {
         if (status === 'Closed') {
-            return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            return 'text-emerald-700';
         }
 
         if (status === 'Progress') {
-            return 'border-amber-200 bg-amber-50 text-amber-700';
+            return 'text-amber-700';
         }
 
-        return 'border-red-200 bg-red-50 text-red-700';
+        return 'text-red-700';
     };
 
     const getStatusDot = (status) => {
@@ -1108,6 +1275,10 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     from { opacity: 0; transform: translateY(18px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+                @keyframes idxToast {
+                    from { opacity: 0; transform: translateX(24px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
 
                 .idx-gradient {
                     background-size: 250% 250%;
@@ -1116,6 +1287,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                 .idx-float { animation: idxFloat 14s ease-in-out infinite; }
                 .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
                 .idx-rise { animation: idxRise 0.7s ease-out both; }
+                .idx-toast { animation: idxToast 0.3s ease-out both; }
 
                 .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
                 .idx-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -1128,14 +1300,13 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     .idx-gradient,
                     .idx-float,
                     .idx-float-reverse,
+                    .idx-toast,
                     .idx-rise { animation: none !important; }
                 }
             `}</style>
 
             <div className="relative flex min-h-screen flex-col overflow-x-hidden text-slate-800">
-                {/* =================================================
-                    BACKGROUND
-                ================================================== */}
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
@@ -1145,75 +1316,37 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                 </div>
 
                 {/* =================================================
-                    HEADER (TRANSPARAN)
+                    HEADER (RINGKAS, SATU BARIS)
                 ================================================== */}
-                <header className="border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
-                    <div className="mx-auto max-w-[1500px] px-5 py-6 sm:px-6 lg:px-8">
-                        {/* Breadcrumb */}
-                        <div className="mb-5 flex items-center gap-2 text-xs font-medium text-blue-200/80">
-                            <Link
-                                href="/check-sheets"
-                                className="transition hover:text-white"
-                            >
-                                Check Sheet Prediktif
-                            </Link>
+                <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
+                    <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+                        <Link
+                            href="/check-sheets"
+                            title="Kembali"
+                            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
+                        >
+                            <Icon type="back" className="h-4 w-4" />
+                        </Link>
 
-                            <span className="text-blue-300/60">/</span>
-
-                            <span className="max-w-[280px] truncate text-white/90">
+                        <div className="min-w-0">
+                            <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
                                 {checkSheet.nama_checksheet}
-                            </span>
-                        </div>
+                            </h1>
 
-                        {/* Title */}
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                            <div className="flex min-w-0 items-start gap-4">
-                                <div className="relative shrink-0">
-                                    <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
-
-                                    <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 text-white shadow-lg">
-                                        <Icon type="clipboard" className="h-7 w-7" />
-                                    </div>
-                                </div>
-
-                                <div className="min-w-0">
-                                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                                        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                            {checkSheet.nama_checksheet}
-                                        </h1>
-
-                                        <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-blue-100 backdrop-blur-sm">
-                                            Check Sheet
-                                        </span>
-                                    </div>
-
-                                    <p className="max-w-3xl text-sm leading-6 text-white/65">
-                                        Kelola inspection point, checklist
-                                        harian, dan abnormality dalam satu
-                                        halaman.
-                                    </p>
-
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <span className="rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                                            {checkSheet.divisi?.nama_divisi ?? '-'}
-                                        </span>
-
-                                        <span className="text-blue-300/60">•</span>
-
-                                        <span className="rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 font-mono text-xs font-semibold text-white backdrop-blur-sm">
-                                            {checkSheet.nomor_dokumen ?? '-'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Link
-                                href="/check-sheets"
-                                className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-white/20 bg-white/15 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/25"
-                            >
-                                <Icon type="back" />
-                                Kembali
-                            </Link>
+                            <p className="truncate text-[11px] text-white/60">
+                                <Link
+                                    href="/check-sheets"
+                                    className="cursor-pointer transition hover:text-white"
+                                >
+                                    Check Sheet Prediktif
+                                </Link>
+                                <span className="mx-1.5 text-white/30">/</span>
+                                {checkSheet.divisi?.nama_divisi ?? '-'}
+                                <span className="mx-1.5 text-white/30">·</span>
+                                <span className="font-mono">
+                                    {checkSheet.nomor_dokumen ?? '-'}
+                                </span>
+                            </p>
                         </div>
                     </div>
                 </header>
@@ -1221,106 +1354,55 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                 {/* =================================================
                     MAIN
                 ================================================== */}
-                <main className="mx-auto w-full max-w-[1500px] flex-1 px-5 py-8 sm:px-6 lg:px-8">
-                    {/* FLASH MESSAGE (BARU) */}
-                    {flash?.success && (
-                        <div className="idx-rise mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700 shadow-lg">
-                            <Icon type="check" className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span>{flash.success}</span>
-                        </div>
-                    )}
-
-                    {/* INFO CARD */}
+                <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-4 sm:px-6 lg:px-8">
+                    {/* INFO + PERIODE (SATU TOOLBAR KECIL) */}
                     <section
-                        className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
+                        className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}
                     >
-                        <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-5 sm:px-7">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-300/50">
-                                    <Icon type="clipboard" className="h-5 w-5" />
+                        <div className="flex flex-col gap-3 px-4 py-3 xl:flex-row xl:items-end xl:justify-between">
+                            {/* INFO */}
+                            <dl className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
+                                <div>
+                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Divisi
+                                    </dt>
+                                    <dd className="mt-0.5 font-semibold text-slate-800">
+                                        {checkSheet.divisi?.nama_divisi ?? '-'}
+                                    </dd>
                                 </div>
 
                                 <div>
-                                    <h2 className="text-base font-bold text-slate-900">
-                                        Informasi Check Sheet
-                                    </h2>
-
-                                    <p className="mt-0.5 text-xs text-slate-500">
-                                        Detail dokumen yang sedang dikelola.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4 p-6 sm:grid-cols-3 sm:p-7">
-                            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-5">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-500">
-                                    Divisi
-                                </p>
-
-                                <p className="mt-2 text-base font-bold text-slate-900">
-                                    {checkSheet.divisi?.nama_divisi ?? '-'}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-5">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-500">
-                                    Nama Check Sheet
-                                </p>
-
-                                <p className="mt-2 text-base font-bold text-slate-900">
-                                    {checkSheet.nama_checksheet}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-white p-5">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-violet-500">
-                                    Nomor Dokumen
-                                </p>
-
-                                <p className="mt-2 font-mono text-base font-bold text-slate-900">
-                                    {checkSheet.nomor_dokumen}
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* PERIOD TOOLBAR */}
-                    <section
-                        style={{ animationDelay: '100ms' }}
-                        className={`idx-rise relative mb-6 overflow-hidden rounded-3xl ${glassCard}`}
-                    >
-                        <div className="flex flex-col gap-5 p-6 sm:p-7 xl:flex-row xl:items-end xl:justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-300/50">
-                                    <Icon type="calendar" className="h-5 w-5" />
+                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Nama Check Sheet
+                                    </dt>
+                                    <dd className="mt-0.5 font-semibold text-slate-800">
+                                        {checkSheet.nama_checksheet}
+                                    </dd>
                                 </div>
 
                                 <div>
-                                    <h2 className="text-base font-bold text-slate-900">
-                                        Periode Checklist
-                                    </h2>
-
-                                    <p className="text-xs text-slate-500">
-                                        Pilih periode dan shift yang ingin
-                                        ditampilkan.
-                                    </p>
+                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Nomor Dokumen
+                                    </dt>
+                                    <dd className="mt-0.5 font-mono font-semibold text-blue-700">
+                                        {checkSheet.nomor_dokumen ?? '-'}
+                                    </dd>
                                 </div>
-                            </div>
+                            </dl>
 
-                            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                                {/* BULAN */}
-                                <div className="min-w-[170px]">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                            {/* FILTER PERIODE */}
+                            <div className="flex flex-wrap items-end gap-2">
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                         Bulan
-                                    </label>
+                                    </span>
 
                                     <select
                                         value={bulan}
                                         onChange={(e) =>
                                             ubahPeriode(e.target.value, tahun)
                                         }
-                                        className={selectClass}
+                                        className={toolbarSelect}
                                     >
                                         {namaBulan.map((nama, index) => (
                                             <option key={nama} value={index + 1}>
@@ -1328,20 +1410,19 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                             </option>
                                         ))}
                                     </select>
-                                </div>
+                                </label>
 
-                                {/* TAHUN */}
-                                <div className="min-w-[120px]">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                         Tahun
-                                    </label>
+                                    </span>
 
                                     <select
                                         value={tahun}
                                         onChange={(e) =>
                                             ubahPeriode(bulan, e.target.value)
                                         }
-                                        className={selectClass}
+                                        className={toolbarSelect}
                                     >
                                         {Array.from(
                                             { length: 7 },
@@ -1353,73 +1434,67 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                             </option>
                                         ))}
                                     </select>
-                                </div>
+                                </label>
 
-                                {/* SHIFT */}
-                                <div className="min-w-[150px]">
-                                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                         Shift
-                                    </label>
+                                    </span>
 
                                     <select
                                         value={shiftFilter}
                                         onChange={(e) =>
                                             setShiftFilter(e.target.value)
                                         }
-                                        className={selectClass}
+                                        className={toolbarSelect}
                                     >
                                         <option value="all">Semua Shift</option>
                                         <option value="A">Shift A</option>
                                         <option value="B">Shift B</option>
                                     </select>
-                                </div>
+                                </label>
 
-                                {/* EXPORT */}
-                                <div className="flex items-end">
-                                    <a
-                                        href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}`}
-                                        className="group inline-flex h-[43px] items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
-                                    >
-                                        <Icon type="excel" />
-                                        Export Excel
-                                    </a>
-                                </div>
+                                <a
+                                    href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}`}
+                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    <Icon type="excel" className="h-3.5 w-3.5" />
+                                    Export Excel
+                                </a>
                             </div>
                         </div>
 
-                        <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+                        <div className="h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </section>
 
                     {/* INSPECTION POINT */}
                     <section
-                        style={{ animationDelay: '200ms' }}
-                        className={`idx-rise mb-6 overflow-hidden rounded-3xl ${glassCard}`}
+                        style={{ animationDelay: '100ms' }}
+                        className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}
                     >
                         <SectionHead
-                            icon="clipboard"
                             tone="blue"
                             title="Inspection Point"
                             desc="Kelola titik pemeriksaan dan checklist harian."
-                            badge={`${filteredItems.length} Item`}
-                            badgeTone="blue"
+                            count={`${filteredItems.length} item`}
                             action={
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"
                                         onClick={() => setShowImportModal(true)}
-                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md"
+                                        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                                     >
-                                        <Icon type="upload" />
+                                        <Icon type="upload" className="h-3.5 w-3.5" />
                                         Import Excel
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => setShowAddItemModal(true)}
-                                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
+                                        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
                                     >
-                                        <Icon type="plus" />
-                                        Tambah Inspection Point
+                                        <Icon type="plus" className="h-3.5 w-3.5" />
+                                        Tambah
                                     </button>
                                 </div>
                             }
@@ -1427,37 +1502,37 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
                         <div className="idx-scroll overflow-x-auto">
                             {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
-                            <table className="w-full min-w-[1200px] border-separate border-spacing-0">
+                            <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
                                 <thead>
                                     <tr className="text-white">
-                                        {/* No (sticky, lebar dikunci 64px) */}
+                                        {/* No (sticky, lebar dikunci 48px) */}
                                         <th
-                                            className={`sticky left-0 z-20 w-16 min-w-[64px] max-w-[64px] bg-[#0a1a4d] px-0 text-center ${tableHeadBase}`}
+                                            className={`sticky left-0 z-20 w-12 min-w-[48px] max-w-[48px] bg-[#0a1a4d] px-0 text-center ${tableHeadBase}`}
                                         >
                                             No
                                         </th>
 
-                                        {/* Inspection Point (sticky, offset 64px = lebar kolom No) */}
+                                        {/* Inspection Point (sticky, offset 48px = lebar kolom No) */}
                                         <th
-                                            className={`sticky left-[64px] z-20 min-w-[230px] bg-[#0a1a4d] text-left shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)] ${tableHead}`}
+                                            className={`sticky left-[48px] z-20 min-w-[220px] bg-[#0a1a4d] text-left shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)] ${tableHead}`}
                                         >
                                             Inspection Point
                                         </th>
 
                                         <th
-                                            className={`min-w-[170px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                            className={`min-w-[160px] bg-[#0a1a4d] text-left ${tableHead}`}
                                         >
                                             Condition
                                         </th>
 
                                         <th
-                                            className={`min-w-[180px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                            className={`min-w-[170px] bg-[#0a1a4d] text-left ${tableHead}`}
                                         >
                                             Method
                                         </th>
 
                                         <th
-                                            className={`w-28 bg-[#0a1a4d] text-center ${tableHead}`}
+                                            className={`w-20 bg-[#0a1a4d] text-center ${tableHead}`}
                                         >
                                             Shift
                                         </th>
@@ -1481,9 +1556,9 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                             return (
                                                 <th
                                                     key={tanggalLengkap || index}
-                                                    className="w-12 min-w-12 border-r border-white/10 bg-[#0a1a4d] px-1 py-4 text-center text-[11px] font-bold"
+                                                    className="w-10 min-w-10 border-r border-white/10 bg-[#0a1a4d] px-1 py-3 text-center text-[11px] font-bold"
                                                 >
-                                                    <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
+                                                    <div className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/10">
                                                         {tanggalValue}
                                                     </div>
                                                 </th>
@@ -1497,59 +1572,56 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                         <tr>
                                             <td
                                                 colSpan={6 + tanggal.length}
-                                                className="px-6 py-14 text-center"
+                                                className="px-6 py-12 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                                                        <Icon type="clipboard" className="h-7 w-7" />
+                                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                                                        <Icon type="clipboard" className="h-6 w-6" />
                                                     </div>
 
-                                                    <p className="font-semibold text-slate-700">
+                                                    <p className="text-sm font-semibold text-slate-700">
                                                         Belum ada Inspection Point
                                                     </p>
 
-                                                    <p className="mt-1 text-sm text-slate-400">
-                                                        Tambahkan inspection point
-                                                        atau import dari Excel
-                                                        untuk mulai menggunakan
-                                                        checklist.
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        Tambahkan inspection point atau
+                                                        import dari Excel untuk mulai
+                                                        menggunakan checklist.
                                                     </p>
                                                 </div>
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredItems.map((item, index) => (
+                                        filteredItems.map((item) => (
                                             <tr
                                                 key={item.id}
                                                 className="group transition-colors hover:bg-blue-50/50"
                                             >
-                                                {/* No (sticky) */}
-                                                <td className="sticky left-0 z-10 w-16 min-w-[64px] max-w-[64px] border-b border-r border-slate-100 bg-white px-0 py-3 text-center text-sm font-bold text-slate-500 group-hover:bg-blue-50">
-                                                    {item.no ?? index + 1}
+                                                {/* No (sticky) - nomor urut per shift */}
+                                                <td className="sticky left-0 z-10 w-12 min-w-[48px] max-w-[48px] border-b border-r border-slate-100 bg-white px-0 py-2 text-center text-xs font-bold text-slate-500 group-hover:bg-blue-50">
+                                                    {nomorUrut[item.id]}
                                                 </td>
 
                                                 {/* Inspection Point (sticky) */}
-                                                <td className="sticky left-[64px] z-10 border-b border-r border-slate-100 bg-white px-4 py-3 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
-                                                    <div className="font-semibold text-slate-800">
+                                                <td className="sticky left-[48px] z-10 border-b border-r border-slate-100 bg-white px-3 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
+                                                    <div className="text-sm font-semibold text-slate-800">
                                                         {item.inspection_point}
                                                     </div>
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
                                                     {item.condition || '-'}
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-sm text-slate-600">
+                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
                                                     {item.method || '-'}
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-center">
-                                                    <span className="inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600">
-                                                        {item.shift || '-'}
-                                                    </span>
+                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-center text-xs font-bold text-indigo-600">
+                                                    {item.shift || '-'}
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-2 py-3">
+                                                <td className="border-b border-r border-slate-100 px-2 py-2">
                                                     <div className="flex justify-center gap-1.5">
                                                         <IconButton
                                                             title="Edit"
@@ -1589,25 +1661,35 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                                     return (
                                                         <td
                                                             key={tanggalLengkap || idx}
-                                                            className={`border-b border-r border-slate-100 px-1 py-2 text-center ${
+                                                            className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
                                                                 checked ? 'bg-emerald-50/70' : ''
                                                             }`}
                                                         >
                                                             <button
                                                                 type="button"
+                                                                title={
+                                                                    checked
+                                                                        ? 'Klik untuk membatalkan'
+                                                                        : 'Klik untuk menandai selesai'
+                                                                }
                                                                 onClick={() =>
                                                                     toggleChecklist(
                                                                         item,
                                                                         tanggalLengkap
                                                                     )
                                                                 }
-                                                                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-200 ${
+                                                                className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
                                                                     checked
-                                                                        ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5 hover:from-emerald-500 hover:to-teal-600'
-                                                                        : 'border-slate-200 bg-slate-50 text-transparent hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100'
+                                                                        ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:-translate-y-0.5 hover:from-emerald-500 hover:to-teal-600'
+                                                                        : 'border-slate-200 bg-slate-50 text-transparent hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
                                                                 }`}
                                                             >
-                                                                {checked && <Icon type="check" />}
+                                                                {checked && (
+                                                                    <Icon
+                                                                        type="check"
+                                                                        className="h-3.5 w-3.5"
+                                                                    />
+                                                                )}
                                                             </button>
                                                         </td>
                                                     );
@@ -1622,53 +1704,51 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
 
                     {/* ABNORMALITY */}
                     <section
-                        style={{ animationDelay: '300ms' }}
-                        className={`idx-rise overflow-hidden rounded-3xl ${glassCard}`}
+                        style={{ animationDelay: '200ms' }}
+                        className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
                     >
                         <SectionHead
-                            icon="alert"
                             tone="amber"
                             title="Abnormality"
                             desc="Catat abnormality, countermeasure, status, dan PIC."
-                            badge={`${checkSheet.abnormalities?.length ?? 0} Data`}
-                            badgeTone="amber"
+                            count={`${checkSheet.abnormalities?.length ?? 0} data`}
                             action={
                                 <button
                                     type="button"
                                     onClick={() => setShowAddAbnormalityModal(true)}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-amber-600 hover:to-orange-600 hover:shadow-lg"
+                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 text-xs font-bold text-white transition hover:from-amber-600 hover:to-orange-600"
                                 >
-                                    <Icon type="plus" />
-                                    Tambah Abnormality
+                                    <Icon type="plus" className="h-3.5 w-3.5" />
+                                    Tambah
                                 </button>
                             }
                         />
 
                         <div className="idx-scroll overflow-x-auto">
-                            <table className="w-full min-w-[900px] border-collapse">
+                            <table className="w-full min-w-[800px] border-collapse text-sm">
                                 <thead>
                                     <tr className="bg-gradient-to-r from-[#0a1a4d] via-indigo-900 to-violet-900 text-white">
-                                        <th className={`w-36 text-left ${tableHead}`}>
+                                        <th className={`w-32 text-left ${tableHead}`}>
                                             Tanggal
                                         </th>
 
-                                        <th className={`min-w-[230px] text-left ${tableHead}`}>
+                                        <th className={`min-w-[220px] text-left ${tableHead}`}>
                                             Abnormality
                                         </th>
 
-                                        <th className={`min-w-[260px] text-left ${tableHead}`}>
+                                        <th className={`min-w-[240px] text-left ${tableHead}`}>
                                             Countermeasure
                                         </th>
 
-                                        <th className={`w-32 text-center ${tableHead}`}>
+                                        <th className={`w-28 text-center ${tableHead}`}>
                                             Status
                                         </th>
 
-                                        <th className={`w-40 text-left ${tableHead}`}>
+                                        <th className={`w-36 text-left ${tableHead}`}>
                                             PIC
                                         </th>
 
-                                        <th className="w-24 px-3 py-4 text-center text-[11px] font-bold uppercase tracking-wider">
+                                        <th className="w-24 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                                             Aksi
                                         </th>
                                     </tr>
@@ -1680,21 +1760,20 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                         <tr>
                                             <td
                                                 colSpan="6"
-                                                className="px-6 py-14 text-center"
+                                                className="px-6 py-12 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
-                                                        <Icon type="alert" className="h-7 w-7" />
+                                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-500">
+                                                        <Icon type="alert" className="h-6 w-6" />
                                                     </div>
 
-                                                    <p className="font-semibold text-slate-700">
+                                                    <p className="text-sm font-semibold text-slate-700">
                                                         Belum ada abnormality
                                                     </p>
 
-                                                    <p className="mt-1 text-sm text-slate-400">
-                                                        Tambahkan data abnormality
-                                                        jika ditemukan kondisi
-                                                        tidak normal.
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        Tambahkan data abnormality jika
+                                                        ditemukan kondisi tidak normal.
                                                     </p>
                                                 </div>
                                             </td>
@@ -1706,21 +1785,21 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                                     key={abnormality.id}
                                                     className="group border-b border-slate-100 transition-colors last:border-b-0 hover:bg-amber-50/40"
                                                 >
-                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-700">
+                                                    <td className="px-3 py-3 text-xs font-semibold text-slate-700">
                                                         {formatTanggal(abnormality.tanggal)}
                                                     </td>
 
-                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-800">
+                                                    <td className="px-3 py-3 text-sm font-semibold text-slate-800">
                                                         {abnormality.abnormality || '-'}
                                                     </td>
 
-                                                    <td className="px-4 py-4 text-sm leading-6 text-slate-600">
+                                                    <td className="px-3 py-3 text-sm leading-5 text-slate-600">
                                                         {abnormality.countermeasure || '-'}
                                                     </td>
 
-                                                    <td className="px-4 py-4 text-center">
+                                                    <td className="px-3 py-3 text-center">
                                                         <span
-                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm ${getStatusClass(
+                                                            className={`inline-flex items-center gap-1.5 text-xs font-bold ${getStatusClass(
                                                                 abnormality.status
                                                             )}`}
                                                         >
@@ -1734,11 +1813,11 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                                         </span>
                                                     </td>
 
-                                                    <td className="px-4 py-4 text-sm font-semibold text-slate-600">
+                                                    <td className="px-3 py-3 text-sm text-slate-600">
                                                         {abnormality.pic || '-'}
                                                     </td>
 
-                                                    <td className="px-3 py-4">
+                                                    <td className="px-2 py-3">
                                                         <div className="flex justify-center gap-1.5">
                                                             <IconButton
                                                                 title="Edit"
@@ -1771,11 +1850,9 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     </section>
                 </main>
 
-                {/* =================================================
-                    FOOTER (TRANSPARAN)
-                ================================================== */}
-                <footer className="mt-4 border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
-                    <div className="mx-auto flex min-h-[60px] max-w-[1500px] items-center justify-center px-5 py-4 sm:px-6 lg:px-8">
+                {/* FOOTER */}
+                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                    <div className="mx-auto flex max-w-[1500px] items-center justify-center px-5 py-3 sm:px-6 lg:px-8">
                         <p className="text-xs font-medium text-white/70">
                             © {new Date().getFullYear()} Emma Sarkilla · Check Sheet Prediktif
                         </p>
@@ -1784,12 +1861,68 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
             </div>
 
             {/* =====================================================
-                MODAL - IMPORT EXCEL (BARU)
+                TOAST (berhasil / gagal)
+            ====================================================== */}
+            {toast && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className={`idx-toast fixed right-5 top-5 z-[120] flex w-[340px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-xl border bg-white p-3.5 shadow-2xl shadow-slate-950/40 ${
+                        toast.type === 'error'
+                            ? 'border-red-100'
+                            : 'border-emerald-100'
+                    }`}
+                >
+                    <div
+                        className={`absolute left-0 top-0 h-full w-1 ${
+                            toast.type === 'error'
+                                ? 'bg-gradient-to-b from-red-400 to-rose-600'
+                                : 'bg-gradient-to-b from-emerald-400 to-green-600'
+                        }`}
+                    />
+
+                    <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                            toast.type === 'error'
+                                ? 'bg-red-50 text-red-600'
+                                : 'bg-emerald-50 text-emerald-600'
+                        }`}
+                    >
+                        <Icon
+                            type={toast.type === 'error' ? 'alert' : 'check'}
+                            className="h-4 w-4"
+                        />
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800">
+                            {toast.type === 'error' ? 'Gagal' : 'Berhasil'}
+                        </p>
+
+                        <p className="mt-0.5 break-words text-sm leading-snug text-slate-500">
+                            {toast.message}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setToast(null)}
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                        aria-label="Tutup"
+                    >
+                        <Icon type="close" className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            )}
+
+            {/* =====================================================
+                MODAL - IMPORT EXCEL
             ====================================================== */}
             {showImportModal && (
                 <ImportModal
                     checkSheet={checkSheet}
                     onClose={() => setShowImportModal(false)}
+                    onDone={() => notify('Import data berhasil.')}
                 />
             )}
 
@@ -1803,7 +1936,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     onClose={() => setShowAddItemModal(false)}
                 >
                     <form onSubmit={submit} className="space-y-6">
-                        <FormBanner text="Identitas Inspection Point" tone="blue" />
 
                         <ItemFields
                             data={data}
@@ -1835,7 +1967,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     }}
                 >
                     <form onSubmit={submitEdit} className="space-y-6">
-                        <FormBanner text="Perbarui Data" tone="indigo" />
 
                         <ItemFields
                             data={editData}
@@ -1843,7 +1974,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             errors={editErrors}
                             nomor={
                                 editData.shift === editingItem.shift
-                                    ? editingItem.no
+                                    ? nomorUrut[editingItem.id]
                                     : nomorBerikutnya(editData.shift)
                             }
                         />
@@ -1871,7 +2002,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     onClose={() => setShowAddAbnormalityModal(false)}
                 >
                     <form onSubmit={submitAbnormality} className="space-y-6">
-                        <FormBanner text="Detail Abnormality" tone="amber" />
 
                         <AbnormalityFields
                             data={abnormalityData}
@@ -1904,7 +2034,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     }}
                 >
                     <form onSubmit={submitEditAbnormality} className="space-y-6">
-                        <FormBanner text="Perbarui Data Abnormality" tone="orange" />
 
                         <AbnormalityFields
                             data={editAbnormalityData}
@@ -1924,6 +2053,14 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                     </form>
                 </Modal>
             )}
+
+            {/* =====================================================
+                DIALOG KONFIRMASI (simpan / edit / hapus)
+            ====================================================== */}
+            <ConfirmDialog
+                dialog={confirmDialog}
+                onCancel={() => setConfirmDialog(null)}
+            />
         </>
     );
 }
