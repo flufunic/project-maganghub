@@ -13,6 +13,7 @@ class CheckSheet extends Model
         'divisi_id',
         'nomor_dokumen',
         'nama_checksheet',
+        'line_id',
     ];
 
     public function divisi(): BelongsTo
@@ -28,6 +29,11 @@ class CheckSheet extends Model
     public function abnormalities(): HasMany
     {
         return $this->hasMany(CheckSheetAbnormality::class);
+    }
+    
+    public function line()
+    {
+        return $this->belongsTo(Line::class);
     }
 
     /**

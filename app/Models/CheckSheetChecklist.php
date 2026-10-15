@@ -9,6 +9,7 @@ class CheckSheetChecklist extends Model
 {
     protected $fillable = [
         'check_sheet_item_id',
+        'line_id',
         'tanggal',
         'status',
         'catatan',
@@ -25,5 +26,10 @@ class CheckSheetChecklist extends Model
     public function checkSheetItem(): BelongsTo
     {
         return $this->belongsTo(CheckSheetItem::class);
+    }
+
+    public function line(): BelongsTo
+    {
+        return $this->belongsTo(Line::class);
     }
 }

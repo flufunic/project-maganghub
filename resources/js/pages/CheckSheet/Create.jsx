@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 // =========================================================
@@ -50,9 +50,8 @@ const Icon = ({ type, className = 'h-4 w-4' }) => {
 const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
-// cursor-pointer: kursor jadi jari saat diarahkan ke input / select
 const inputBase =
-    'w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100';
+    'w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70';
 
 const labelClass =
     'mb-2 block text-xs font-bold uppercase tracking-wide text-slate-600';
@@ -147,14 +146,38 @@ const ConfirmDialog = ({
 // PAGE
 // =========================================================
 
-export default function Create({ divisis }) {
+export default function Create({ divisis, mesins = [], line }) {
     const [showConfirm, setShowConfirm] = useState(false);
 
+    // Divisi otomatis terpilih sesuai line yang tadi di-scan.
+    // line_id hanya diisi kalau barcode yang di-scan adalah barcode per mesin.
     const { data, setData, post, processing, errors } = useForm({
-        divisi_id: '',
+        divisi_id: line?.divisi_id ?? '',
+        line_id: line?.per_mesin ? line.id : '',
         nomor_dokumen: '',
         nama_checksheet: '',
     });
+
+    // Mesin yang tampil hanya milik divisi yang sedang dipilih
+    const mesinTersedia = useMemo(
+        () =>
+            mesins.filter(
+                (m) => Number(m.divisi_id) === Number(data.divisi_id)
+            ),
+        [mesins, data.divisi_id]
+    );
+
+    // Ganti divisi -> pilihan mesin direset
+    const gantiDivisi = (value) => {
+        setData({
+            ...data,
+            divisi_id: value,
+            line_id: '',
+        });
+    };
+
+    // Tujuan tombol kembali / batal: daftar line yang tadi di-scan
+    const backUrl = line ? `/check-sheets/line/${line.kode}` : '/check-sheets';
 
     // Submit form -> tampilkan modal konfirmasi dulu
     const submit = (e) => {
@@ -226,7 +249,7 @@ export default function Create({ divisis }) {
                 <header className="border-b border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
                     <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-4 sm:px-6">
                         <Link
-                            href="/check-sheets"
+                            href={backUrl}
                             title="Kembali"
                             className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
                         >
@@ -239,7 +262,9 @@ export default function Create({ divisis }) {
                             </h1>
 
                             <p className="text-xs text-white/60">
-                                Check Sheet Prediktif / Tambah Data
+                                {line
+                                    ? `${line.divisi?.nama_divisi} · ${line.nama_line}`
+                                    : 'Check Sheet Prediktif / Tambah Data'}
                             </p>
                         </div>
                     </div>
@@ -255,9 +280,9 @@ export default function Create({ divisis }) {
                             <div className="relative">
                                 <select
                                     value={data.divisi_id}
-                                    onChange={(e) =>
-                                        setData('divisi_id', e.target.value)
-                                    }
+                                    onChange={(e) => gantiDivisi(e.target.value)}
+                                    // dikunci kalau datang dari line tertentu
+                                    disabled={!!line}
                                     className={`${inputBase} appearance-none pr-10`}
                                 >
                                     <option value="">Pilih Divisi</option>
@@ -275,6 +300,34 @@ export default function Create({ divisis }) {
                                 />
                             </div>
                         </Field>
+
+                        {/* MESIN: hanya muncul untuk divisi per mesin (Utility / Saidan) */}
+                        {mesinTersedia.length > 0 && (
+                            <Field label="Mesin" error={errors.line_id}>
+                                <div className="relative">
+                                    <select
+                                        value={data.line_id}
+                                        onChange={(e) =>
+                                            setData('line_id', e.target.value)
+                                        }
+                                        className={`${inputBase} appearance-none pr-10`}
+                                    >
+                                        <option value="">Pilih Mesin</option>
+
+                                        {mesinTersedia.map((mesin) => (
+                                            <option key={mesin.id} value={mesin.id}>
+                                                {mesin.nama_line}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <Icon
+                                        type="down"
+                                        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    />
+                                </div>
+                            </Field>
+                        )}
 
                         <Field label="Nomor Dokumen" error={errors.nomor_dokumen}>
                             <input
@@ -306,7 +359,7 @@ export default function Create({ divisis }) {
                         {/* TOMBOL */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                             <Link
-                                href="/check-sheets"
+                                href={backUrl}
                                 className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Batal

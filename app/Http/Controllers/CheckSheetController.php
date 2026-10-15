@@ -3,97 +3,288 @@
 namespace App\Http\Controllers;
 
 use App\Models\CheckSheet;
-use Illuminate\Http\Request;
 use App\Models\Divisi;
+use App\Models\Line;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 
 class CheckSheetController extends Controller
 {
+    // =====================================================
+    // SCAN BARCODE
+    // =====================================================
+
     public function index()
     {
-        $checkSheets = CheckSheet::with('divisi')
-            ->orderBy('id', 'desc')
-            ->get();
+        return Inertia::render('CheckSheet/Scan');
+    }
+
+    public function resolve(Request $request)
+    {
+        $data = $request->validate([
+            'kode' => ['required', 'string', 'max:100'],
+        ]);
+
+        $line = Line::where('kode', strtoupper(trim($data['kode'])))->first();
+
+        if (! $line) {
+            return back()->withErrors([
+                'kode' => 'Barcode tidak dikenali. Pastikan barcode mesin yang benar.',
+            ]);
+        }
+
+        return redirect()->route('check-sheets.line', $line->kode);
+    }
+
+    // Daftar check sheet dari barcode yang di-scan
+    public function byLine(string $kode)
+    {
+        $line = Line::with('divisi')->where('kode', $kode)->firstOrFail();
+
+        session(['last_line' => $line->kode]);
+
+        $query = CheckSheet::with('divisi')->orderBy('id');
+
+        if ($line->per_mesin) {
+            // Utility / Saidan: hanya check sheet milik mesin ini
+            $query->where('line_id', $line->id);
+        } else {
+            // Headrest: semua check sheet divisi (yang bukan milik mesin tertentu)
+            $query->where('divisi_id', $line->divisi_id)->whereNull('line_id');
+        }
 
         return Inertia::render('CheckSheet/Index', [
-            'checkSheets' => $checkSheets,
+            'line'        => $line,
+            'checkSheets' => $query->get(),
         ]);
     }
 
+    public function barcodes()
+    {
+        return Inertia::render('CheckSheet/Barcodes', [
+            'lines' => Line::with('divisi')->orderBy('divisi_id')->orderBy('id')->get(),
+        ]);
+    }
+
+    // =====================================================
+    // HELPER LINE
+    // =====================================================
+
+    /**
+     * Line terakhir yang di-scan. Kalau $divisiId tidak cocok dengan
+     * divisi line tersebut, pakai line pertama milik divisi itu.
+     */
+    private function lineAktif(?int $divisiId = null): ?Line
+    {
+        $kode = session('last_line');
+
+        $line = $kode
+            ? Line::with('divisi')->where('kode', $kode)->first()
+            : null;
+
+        if ($line && (! $divisiId || (int) $line->divisi_id === $divisiId)) {
+            return $line;
+        }
+
+        if ($divisiId) {
+            return Line::with('divisi')
+                ->where('divisi_id', $divisiId)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return $line;
+    }
+
+    /**
+     * Line yang berlaku untuk sebuah check sheet.
+     * - Check sheet milik mesin  -> selalu mesinnya.
+     * - Check sheet Headrest     -> $lineId kalau valid (line satu divisi, bukan per mesin),
+     *                               kalau tidak, line terakhir yang di-scan.
+     */
+    private function lineUntuk(CheckSheet $checkSheet, ?int $lineId = null): ?Line
+    {
+        if ($checkSheet->line_id) {
+            return Line::with('divisi')->find($checkSheet->line_id);
+        }
+
+        if ($lineId) {
+            $line = Line::with('divisi')
+                ->where('id', $lineId)
+                ->where('divisi_id', $checkSheet->divisi_id)
+                ->where('per_mesin', false)
+                ->first();
+
+            if ($line) {
+                return $line;
+            }
+        }
+
+        return $this->lineAktif((int) $checkSheet->divisi_id);
+    }
+
+    private function kembaliKeDaftar(?Line $line, string $pesan)
+    {
+        $redirect = $line
+            ? redirect()->route('check-sheets.line', $line->kode)
+            : redirect()->route('check-sheets.index');
+
+        return $redirect->with('success', $pesan);
+    }
+
+    /**
+     * Divisi yang punya barcode per mesin (Utility / Saidan) WAJIB memilih mesin,
+     * dan mesin itu harus milik divisinya. Divisi lain (Headrest) selalu NULL.
+     */
+    private function tentukanLineId(int $divisiId, $lineId): ?int
+    {
+        $adaPerMesin = Line::where('divisi_id', $divisiId)
+            ->where('per_mesin', true)
+            ->exists();
+
+        if (! $adaPerMesin) {
+            return null;
+        }
+
+        if (! $lineId) {
+            throw ValidationException::withMessages([
+                'line_id' => 'Pilih mesin untuk check sheet ini.',
+            ]);
+        }
+
+        $valid = Line::where('id', $lineId)
+            ->where('divisi_id', $divisiId)
+            ->where('per_mesin', true)
+            ->exists();
+
+        if (! $valid) {
+            throw ValidationException::withMessages([
+                'line_id' => 'Mesin tidak sesuai dengan divisi yang dipilih.',
+            ]);
+        }
+
+        return (int) $lineId;
+    }
+
+    private function daftarMesin()
+    {
+        return Line::where('per_mesin', true)
+            ->orderBy('divisi_id')
+            ->orderBy('nama_line')
+            ->get(['id', 'divisi_id', 'nama_line', 'kode']);
+    }
+
+    // =====================================================
+    // CRUD CHECK SHEET
+    // =====================================================
+
     public function create()
     {
-        $divisis = Divisi::orderBy('nama_divisi')->get();
-
         return Inertia::render('CheckSheet/Create', [
-            'divisis' => $divisis,
+            'divisis' => Divisi::orderBy('nama_divisi')->get(),
+            'mesins'  => $this->daftarMesin(),
+            'line'    => $this->lineAktif(),
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'divisi_id'       => ['required', 'exists:divisis,id'],
+            'line_id'         => ['nullable', 'exists:lines,id'],
+            'nomor_dokumen'   => ['required', 'string', 'max:255'],
+            'nama_checksheet' => ['required', 'string', 'max:255'],
+        ]);
+
+        $lineId = $this->tentukanLineId(
+            (int) $validated['divisi_id'],
+            $validated['line_id'] ?? null
+        );
+
+        CheckSheet::create([
+            'divisi_id'       => $validated['divisi_id'],
+            'line_id'         => $lineId,
+            'nomor_dokumen'   => $validated['nomor_dokumen'],
+            'nama_checksheet' => $validated['nama_checksheet'],
+        ]);
+
+        $line = $lineId
+            ? Line::with('divisi')->find($lineId)
+            : $this->lineAktif((int) $validated['divisi_id']);
+
+        return $this->kembaliKeDaftar($line, 'Check Sheet berhasil ditambahkan.');
     }
 
     public function edit(CheckSheet $checkSheet)
     {
-        $divisis = Divisi::orderBy('nama_divisi')->get();
-
         return Inertia::render('CheckSheet/Edit', [
             'checkSheet' => $checkSheet,
-            'divisis' => $divisis,
+            'divisis'    => Divisi::orderBy('nama_divisi')->get(),
+            'mesins'     => $this->daftarMesin(),
+            'line'       => $this->lineUntuk($checkSheet),
         ]);
     }
 
     public function update(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'divisi_id' => ['required', 'exists:divisis,id'],
-
-            // Nomor dokumen boleh sama dengan check sheet lain
-            'nomor_dokumen' => ['required', 'string', 'max:255'],
-
+            'divisi_id'       => ['required', 'exists:divisis,id'],
+            'line_id'         => ['nullable', 'exists:lines,id'],
+            'nomor_dokumen'   => ['required', 'string', 'max:255'],
             'nama_checksheet' => ['required', 'string', 'max:255'],
         ]);
 
+        // check sheet milik mesin tidak boleh pindah divisi
+        if ($checkSheet->line_id) {
+            $validated['divisi_id'] = $checkSheet->divisi_id;
+        }
+
+        $validated['line_id'] = $this->tentukanLineId(
+            (int) $validated['divisi_id'],
+            $validated['line_id'] ?? null
+        );
+
         $checkSheet->update($validated);
 
-        return redirect()
-            ->route('check-sheets.index')
-            ->with('success', 'Check Sheet berhasil diperbarui.');
+        return $this->kembaliKeDaftar(
+            $this->lineUntuk($checkSheet->fresh()),
+            'Check Sheet berhasil diperbarui.'
+        );
     }
 
     public function destroy(CheckSheet $checkSheet)
     {
+        // tentukan tujuan kembali SEBELUM data dihapus
+        $line = $this->lineUntuk($checkSheet);
+
         $checkSheet->delete();
 
-        return redirect()
-            ->route('check-sheets.index')
-            ->with('success', 'Check Sheet berhasil dihapus.');
+        return $this->kembaliKeDaftar($line, 'Check Sheet berhasil dihapus.');
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'divisi_id' => ['required', 'exists:divisis,id'],
-
-            // Nomor dokumen boleh sama dengan check sheet lain
-            'nomor_dokumen' => ['required', 'string', 'max:255'],
-
-            'nama_checksheet' => ['required', 'string', 'max:255'],
-        ]);
-
-        CheckSheet::create($validated);
-
-        return redirect()
-            ->route('check-sheets.index')
-            ->with('success', 'Check Sheet berhasil ditambahkan.');
-    }
+    // =====================================================
+    // HALAMAN CHECK SHEET (per line / mesin)
+    // =====================================================
 
     public function show(Request $request, CheckSheet $checkSheet): Response
     {
-        // Rapikan nomor (self-heal untuk data lama yang masih bolong)
         $checkSheet->susunUlangNomorItem();
 
         $bulan = (int) ($request->bulan ?? now()->month);
         $tahun = (int) ($request->tahun ?? now()->year);
+
+        // Line yang sedang dilihat (Headrest bisa lewat ?line_id=, kalau tidak pakai session)
+        $line   = $this->lineUntuk($checkSheet, $request->integer('line_id') ?: null);
+        $lineId = $line?->id;
+
+        if ($line) {
+            session(['last_line' => $line->kode]);
+        }
 
         $tanggalAwal = Carbon::create($tahun, $bulan, 1);
         $jumlahHari = $tanggalAwal->daysInMonth;
@@ -108,14 +299,25 @@ class CheckSheetController extends Controller
                 $query->orderBy('shift')->orderBy('no')->orderBy('id');
             },
 
-            'items.checklists' => function ($query) use ($awalBulan, $akhirBulan) {
-                $query->whereBetween('tanggal', [
-                    $awalBulan->toDateString(),
-                    $akhirBulan->toDateString(),
-                ]);
+            // centang HANYA milik line ini
+            'items.checklists' => function ($query) use ($awalBulan, $akhirBulan, $lineId) {
+                $query->where('line_id', $lineId)
+                    ->whereBetween('tanggal', [
+                        $awalBulan->toDateString(),
+                        $akhirBulan->toDateString(),
+                    ]);
             },
 
-            'abnormalities',
+            // abnormality HANYA milik line ini
+            'abnormalities' => function ($query) use ($awalBulan, $akhirBulan, $lineId) {
+                $query->where('line_id', $lineId)
+                    ->whereBetween('tanggal', [
+                        $awalBulan->toDateString(),
+                        $akhirBulan->toDateString(),
+                    ])
+                    ->orderBy('tanggal')
+                    ->orderBy('id');
+            },
         ]);
 
         $tanggal = [];
@@ -129,11 +331,16 @@ class CheckSheetController extends Controller
 
         return Inertia::render('CheckSheet/Show', [
             'checkSheet' => $checkSheet,
-            'bulan' => $bulan,
-            'tahun' => $tahun,
-            'tanggal' => $tanggal,
+            'bulan'      => $bulan,
+            'tahun'      => $tahun,
+            'tanggal'    => $tanggal,
+            'line'       => $line,
         ]);
     }
+
+    // =====================================================
+    // ITEM (Inspection Point dipakai bersama oleh semua line)
+    // =====================================================
 
     public function storeItem(Request $request, CheckSheet $checkSheet)
     {
@@ -144,18 +351,17 @@ class CheckSheetController extends Controller
             'shift' => ['required', 'in:A,B'],
         ]);
 
-        // Nomor otomatis: lanjut dari nomor terakhir pada shift yang sama
-        $validated['no'] = $this->nomorBerikutnya(
-            $checkSheet,
-            $validated['shift']
-        );
+        $validated['no'] = $this->nomorBerikutnya($checkSheet, $validated['shift']);
 
         $checkSheet->items()->create($validated);
 
         $checkSheet->susunUlangNomorItem();
 
         return redirect()
-            ->route('check-sheets.show', $checkSheet)
+            ->route('check-sheets.show', [
+                'check_sheet' => $checkSheet->id,
+                'line_id'     => $this->lineUntuk($checkSheet)?->id,
+            ])
             ->with('success', 'Item pemeriksaan berhasil ditambahkan.');
     }
 
@@ -172,12 +378,8 @@ class CheckSheetController extends Controller
             ->where('id', $item)
             ->firstOrFail();
 
-        // Pindah shift: nomor menyesuaikan di akhir shift tujuan
         if ($checkSheetItem->shift !== $validated['shift']) {
-            $validated['no'] = $this->nomorBerikutnya(
-                $checkSheet,
-                $validated['shift']
-            );
+            $validated['no'] = $this->nomorBerikutnya($checkSheet, $validated['shift']);
         }
 
         $checkSheetItem->update($validated);
@@ -195,16 +397,20 @@ class CheckSheetController extends Controller
 
         $checkSheetItem->delete();
 
-        // Nomor yang tersisa disusun ulang (1, 2, 3, ...)
         $checkSheet->susunUlangNomorItem();
 
         return back()->with('success', 'Inspection Point berhasil dihapus.');
     }
 
+    // =====================================================
+    // CHECKLIST (per line)
+    // =====================================================
+
     public function storeChecklist(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
             'check_sheet_item_id' => ['required', 'exists:check_sheet_items,id'],
+            'line_id' => ['nullable', 'integer'],
             'tanggal' => ['required', 'date'],
             'status' => ['required', 'boolean'],
         ]);
@@ -213,17 +419,27 @@ class CheckSheetController extends Controller
             ->where('id', $validated['check_sheet_item_id'])
             ->firstOrFail();
 
+        $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+
         $item->checklists()->updateOrCreate(
-            ['tanggal' => $validated['tanggal']],
+            [
+                'line_id' => $line?->id,
+                'tanggal' => $validated['tanggal'],
+            ],
             ['status' => $validated['status']]
         );
 
         return back();
     }
 
+    // =====================================================
+    // ABNORMALITY (per line)
+    // =====================================================
+
     public function storeAbnormality(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
+            'line_id' => ['nullable', 'integer'],
             'tanggal' => ['required', 'date'],
             'abnormality' => ['required', 'string'],
             'countermeasure' => ['nullable', 'string'],
@@ -231,9 +447,17 @@ class CheckSheetController extends Controller
             'pic' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $checkSheet->abnormalities()->create($validated);
+        $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
 
-        return back()->with('success', 'Abnormality berhasil ditambahkan.');
+        unset($validated['line_id']);
+
+        $checkSheet->abnormalities()->create($validated + [
+            'line_id' => $line?->id,
+        ]);
+
+        // Arahkan ke bulan sesuai tanggal abnormality, supaya langsung terlihat
+        return $this->redirectKePeriode($checkSheet, $validated['tanggal'], $line?->id)
+            ->with('success', 'Abnormality berhasil ditambahkan.');
     }
 
     public function updateAbnormality(
@@ -255,7 +479,12 @@ class CheckSheetController extends Controller
 
         $checkSheetAbnormality->update($validated);
 
-        return back()->with('success', 'Abnormality berhasil diperbarui.');
+        // line tidak berubah saat edit
+        return $this->redirectKePeriode(
+            $checkSheet,
+            $validated['tanggal'],
+            $checkSheetAbnormality->line_id
+        )->with('success', 'Abnormality berhasil diperbarui.');
     }
 
     public function destroyAbnormality(CheckSheet $checkSheet, int $abnormality)
@@ -269,9 +498,22 @@ class CheckSheetController extends Controller
         return back()->with('success', 'Abnormality berhasil dihapus.');
     }
 
-    /**
-     * Nomor berikutnya untuk shift tertentu (nomor terakhir + 1).
-     */
+    // =====================================================
+    // LAIN-LAIN
+    // =====================================================
+
+    private function redirectKePeriode(CheckSheet $checkSheet, string $tanggal, ?int $lineId = null)
+    {
+        $date = Carbon::parse($tanggal);
+
+        return redirect()->route('check-sheets.show', [
+            'check_sheet' => $checkSheet->id,
+            'bulan' => $date->month,
+            'tahun' => $date->year,
+            'line_id' => $lineId,
+        ]);
+    }
+
     private function nomorBerikutnya(CheckSheet $checkSheet, string $shift): int
     {
         return ((int) $checkSheet->items()
@@ -284,16 +526,24 @@ class CheckSheetController extends Controller
         // Pastikan nomor di database sudah berurutan sebelum diexport
         $checkSheet->susunUlangNomorItem();
 
-        $bulan = (int) $request->bulan;
-        $tahun = (int) $request->tahun;
+        $bulan = (int) ($request->bulan ?: now()->month);
+        $tahun = (int) ($request->tahun ?: now()->year);
+
+        // Line / mesin yang sedang dilihat user
+        $line = $this->lineUntuk($checkSheet, $request->integer('line_id') ?: null);
+
+        $namaFile = 'check-sheet-' . $checkSheet->id
+            . ($line ? '-' . Str::slug($line->nama_line) : '')
+            . '-' . $bulan . '-' . $tahun . '.xlsx';
 
         return Excel::download(
             new \App\Exports\CheckSheetExport(
                 $checkSheet->id,
                 $bulan,
-                $tahun
+                $tahun,
+                $line?->id
             ),
-            'check-sheet-' . $checkSheet->id . '-' . $bulan . '-' . $tahun . '.xlsx'
+            $namaFile
         );
     }
 }

@@ -755,9 +755,13 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
 // MAIN
 // =========================================================
 
-export default function Show({ checkSheet, bulan, tahun, tanggal }) {
+// [BARU] props menerima `line`
+export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
     // Flash message dari backend
     const { flash } = usePage().props;
+
+    // [BARU] tujuan tombol kembali: daftar line yang tadi di-scan
+    const backUrl = line ? `/check-sheets/line/${line.kode}` : '/check-sheets';
 
     // =====================================================
     // STATE
@@ -841,6 +845,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
         errors: abnormalityErrors,
         reset: resetAbnormality,
     } = useForm({
+        line_id: line?.id ?? '',
         tanggal: '',
         abnormality: '',
         countermeasure: '',
@@ -896,6 +901,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
             {
                 bulan: bulanBaru,
                 tahun: tahunBaru,
+                line_id: line?.id,
             },
             {
                 preserveState: true,
@@ -919,6 +925,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
             `/check-sheets/${checkSheet.id}/checklist`,
             {
                 check_sheet_item_id: item.id,
+                line_id: line?.id ?? null,
                 tanggal: tanggalLengkap,
                 status: statusBaru,
             },
@@ -1136,6 +1143,35 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
     };
 
     // =====================================================
+    // BUKA FORM TAMBAH ABNORMALITY
+    // Tanggal default mengikuti bulan & tahun yang sedang dilihat:
+    // - bulan yang dilihat = bulan sekarang -> hari ini
+    // - bulan lain                          -> tanggal 1 bulan tersebut
+    // =====================================================
+
+    const tanggalDefaultAbnormality = () => {
+        const pad = (n) => String(n).padStart(2, '0');
+        const hariIni = new Date();
+
+        const bulanSekarang =
+            hariIni.getMonth() + 1 === Number(bulan) &&
+            hariIni.getFullYear() === Number(tahun);
+
+        if (bulanSekarang) {
+            return `${hariIni.getFullYear()}-${pad(hariIni.getMonth() + 1)}-${pad(
+                hariIni.getDate()
+            )}`;
+        }
+
+        return `${tahun}-${pad(bulan)}-01`;
+    };
+
+    const bukaTambahAbnormality = () => {
+        setAbnormalityData('tanggal', tanggalDefaultAbnormality());
+        setShowAddAbnormalityModal(true);
+    };
+
+    // =====================================================
     // DELETE ITEM  (modal konfirmasi)
     // =====================================================
 
@@ -1320,8 +1356,9 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                 ================================================== */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
                     <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+                        {/* [BARU] href -> backUrl */}
                         <Link
-                            href="/check-sheets"
+                            href={backUrl}
                             title="Kembali"
                             className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
                         >
@@ -1334,14 +1371,26 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                             </h1>
 
                             <p className="truncate text-[11px] text-white/60">
+                                {/* [BARU] href -> backUrl */}
                                 <Link
-                                    href="/check-sheets"
+                                    href={backUrl}
                                     className="cursor-pointer transition hover:text-white"
                                 >
                                     Check Sheet Prediktif
                                 </Link>
                                 <span className="mx-1.5 text-white/30">/</span>
                                 {checkSheet.divisi?.nama_divisi ?? '-'}
+
+                                {/* [BARU] nama line */}
+                                {line && (
+                                    <>
+                                        <span className="mx-1.5 text-white/30">·</span>
+                                        <span className="font-semibold text-blue-200">
+                                            {line.nama_line}
+                                        </span>
+                                    </>
+                                )}
+
                                 <span className="mx-1.5 text-white/30">·</span>
                                 <span className="font-mono">
                                     {checkSheet.nomor_dokumen ?? '-'}
@@ -1370,6 +1419,18 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                         {checkSheet.divisi?.nama_divisi ?? '-'}
                                     </dd>
                                 </div>
+
+                                {/* [BARU] info line */}
+                                {line && (
+                                    <div>
+                                        <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                            Line
+                                        </dt>
+                                        <dd className="mt-0.5 font-semibold text-slate-800">
+                                            {line.nama_line}
+                                        </dd>
+                                    </div>
+                                )}
 
                                 <div>
                                     <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -1455,7 +1516,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                 </label>
 
                                 <a
-                                    href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}`}
+                                    href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}&line_id=${line?.id ?? ''}`}
                                     className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                                 >
                                     <Icon type="excel" className="h-3.5 w-3.5" />
@@ -1702,20 +1763,20 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                         </div>
                     </section>
 
-                    {/* ABNORMALITY */}
+                    {/* ABNORMALITY (per bulan & tahun yang dipilih) */}
                     <section
                         style={{ animationDelay: '200ms' }}
                         className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
                     >
                         <SectionHead
                             tone="amber"
-                            title="Abnormality"
+                            title={`Abnormality ${namaBulan[bulan - 1]} ${tahun}${line ? ' · ' + line.nama_line : ''}`}
                             desc="Catat abnormality, countermeasure, status, dan PIC."
                             count={`${checkSheet.abnormalities?.length ?? 0} data`}
                             action={
                                 <button
                                     type="button"
-                                    onClick={() => setShowAddAbnormalityModal(true)}
+                                    onClick={bukaTambahAbnormality}
                                     className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 text-xs font-bold text-white transition hover:from-amber-600 hover:to-orange-600"
                                 >
                                     <Icon type="plus" className="h-3.5 w-3.5" />
@@ -1768,7 +1829,8 @@ export default function Show({ checkSheet, bulan, tahun, tanggal }) {
                                                     </div>
 
                                                     <p className="text-sm font-semibold text-slate-700">
-                                                        Belum ada abnormality
+                                                        Belum ada abnormality bulan{' '}
+                                                        {namaBulan[bulan - 1]} {tahun}
                                                     </p>
 
                                                     <p className="mt-1 text-xs text-slate-400">

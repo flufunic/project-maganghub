@@ -71,7 +71,7 @@ const getNamaDivisi = (checkSheet) => checkSheet.divisi?.nama_divisi || '-';
 // Kunci penyimpanan pesan toast dari halaman Create / Edit
 const TOAST_KEY = 'checksheet_toast';
 
-export default function Index({ checkSheets = [], flash }) {
+export default function Index({ checkSheets = [], line, flash }) {
     const [showSidebar, setShowSidebar] = useState(false);
     const [selectedCheckSheet, setSelectedCheckSheet] = useState(null);
     const [deleting, setDeleting] = useState(false);
@@ -245,6 +245,9 @@ export default function Index({ checkSheets = [], flash }) {
                                 <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
                                     Check Sheet Prediktif
                                 </h1>
+                                <p className="truncate text-xs font-medium text-blue-200">
+                                    {line?.divisi?.nama_divisi} · {line?.nama_line}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -258,22 +261,30 @@ export default function Index({ checkSheets = [], flash }) {
                     >
                         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
                             <div className="flex min-w-0 items-baseline gap-2">
-                                <h2 className="text-sm font-bold tracking-tight text-slate-900">
-                                    Data Check Sheet
+                                <h2 className="truncate text-sm font-bold tracking-tight text-slate-900">
+                                    {line?.divisi?.nama_divisi} — {line?.nama_line}
                                 </h2>
-
-                                <span className="text-xs text-slate-400">
+                                <span className="shrink-0 text-xs text-slate-400">
                                     {checkSheets.length} data
                                 </span>
                             </div>
 
-                            <Link
-                                href="/check-sheets/create"
-                                className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
-                            >
-                                <Icon type="plus" className="h-3.5 w-3.5" />
-                                Tambah
-                            </Link>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Link
+                                    href="/check-sheets"
+                                    className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Scan Ulang
+                                </Link>
+
+                                <Link
+                                    href="/check-sheets/create"
+                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
+                                >
+                                    <Icon type="plus" className="h-3.5 w-3.5" />
+                                    Tambah
+                                </Link>
+                            </div>
                         </div>
 
                         <div className="h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />

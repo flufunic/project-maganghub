@@ -42,6 +42,22 @@ Route::middleware('auth')->group(function () {
     ])->name('preventif-mesin.export');
 
     Route::resource('/preventif-mesin', PreventifMesinController::class);
+        // Scan barcode & daftar per line (harus sebelum resource)
+    Route::post('/check-sheets/scan', [
+        CheckSheetController::class,
+        'resolve'
+    ])->name('check-sheets.resolve');
+
+    Route::get('/check-sheets/line/{kode}', [
+        CheckSheetController::class,
+        'byLine'
+    ])->name('check-sheets.line');
+
+    Route::get('/check-sheets-barcodes', [
+        CheckSheetController::class,
+        'barcodes'
+    ])->name('check-sheets.barcodes');
+
     Route::resource('/check-sheets', CheckSheetController::class);
 
     Route::post('/check-sheets/{checkSheet}/items', [

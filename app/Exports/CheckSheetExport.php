@@ -11,12 +11,14 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
+use App\Models\Line;
 
 class CheckSheetExport implements FromArray, WithEvents
 {
     protected $checkSheetId;
     protected $bulan;
     protected $tahun;
+    protected ?int $lineId;
 
     protected int $lastColumnNumber;
     protected string $lastColumn;
@@ -36,11 +38,12 @@ class CheckSheetExport implements FromArray, WithEvents
     protected int $abnormalityStartRow = 0;
     protected int $abnormalityEndRow = 0;
 
-    public function __construct($checkSheetId, $bulan, $tahun)
+    public function __construct($checkSheetId, $bulan, $tahun, $lineId = null)
     {
         $this->checkSheetId = $checkSheetId;
         $this->bulan = (int) $bulan;
         $this->tahun = (int) $tahun;
+        $this->lineId = $lineId ? (int) $lineId : null;
 
         $jumlahHari = cal_days_in_month(
             CAL_GREGORIAN,
@@ -61,21 +64,41 @@ class CheckSheetExport implements FromArray, WithEvents
      */
     public function array(): array
     {
+        // Rentang tanggal bulan yang diexport
+        $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->startOfMonth();
+        $akhirBulan = $awalBulan->copy()->endOfMonth();
+
         $checkSheet = CheckSheet::with([
             'divisi',
 
+            'items' => function ($query) {
+                $query->orderBy('shift')->orderBy('no')->orderBy('id');
+            },
+
+            // centang HANYA milik line / mesin yang diexport
             'items.checklists' => function ($query) {
                 $query
+                    ->where('line_id', $this->lineId)
                     ->whereMonth('tanggal', $this->bulan)
                     ->whereYear('tanggal', $this->tahun)
                     ->orderBy('tanggal');
             },
 
-            'abnormalities' => function ($query) {
-                $query->orderBy('tanggal');
+            // abnormality HANYA milik line / mesin yang diexport, bulan & tahun yang dipilih
+            'abnormalities' => function ($query) use ($awalBulan, $akhirBulan) {
+                $query
+                    ->where('line_id', $this->lineId)
+                    ->whereBetween('tanggal', [
+                        $awalBulan->toDateString(),
+                        $akhirBulan->toDateString(),
+                    ])
+                    ->orderBy('tanggal')
+                    ->orderBy('id');
             },
 
         ])->findOrFail($this->checkSheetId);
+
+        $line = $this->lineId ? Line::find($this->lineId) : null;
 
         $items = collect($checkSheet->items ?? []);
 
@@ -126,6 +149,7 @@ class CheckSheetExport implements FromArray, WithEvents
         $rows[] = $this->makeRow([
             'Nomor Dokumen: ' . ($checkSheet->nomor_dokumen ?? '')
             . '     |     Divisi: ' . ($checkSheet->divisi->nama_divisi ?? '')
+            . ($line ? '     |     Mesin/Line: ' . $line->nama_line : '')
             . '     |     Bulan: ' . $namaBulan,
         ]);
 
@@ -201,7 +225,7 @@ class CheckSheetExport implements FromArray, WithEvents
 
         /*
         |--------------------------------------------------------------------------
-        | ABNORMALITY
+        | ABNORMALITY (hanya bulan yang diexport)
         |--------------------------------------------------------------------------
         */
 
@@ -780,7 +804,8 @@ class CheckSheetExport implements FromArray, WithEvents
                         ->setVisible(true)
                         ->setWidth(4.2);
                 }
-                                /*
+
+                /*
                 |--------------------------------------------------------------------------
                 | ROW HEIGHT DATA
                 |--------------------------------------------------------------------------
@@ -832,8 +857,6 @@ class CheckSheetExport implements FromArray, WithEvents
                     ->setPrintArea(
                         "A1:{$this->lastColumn}{$highestRow}"
                     );
-
-
 
                 /*
                 |--------------------------------------------------------------------------

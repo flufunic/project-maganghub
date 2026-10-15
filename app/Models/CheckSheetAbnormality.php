@@ -9,6 +9,7 @@ class CheckSheetAbnormality extends Model
 {
     protected $fillable = [
         'check_sheet_id',
+        'line_id',
         'tanggal',
         'abnormality',
         'countermeasure',
@@ -26,5 +27,10 @@ class CheckSheetAbnormality extends Model
     public function checkSheet(): BelongsTo
     {
         return $this->belongsTo(CheckSheet::class);
+    }
+
+    public function line(): BelongsTo
+    {
+        return $this->belongsTo(Line::class);
     }
 }
