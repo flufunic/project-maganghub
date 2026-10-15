@@ -12,9 +12,10 @@ class CheckSheetChecklist extends Model
         'line_id',
         'tanggal',
         'status',
+        'actual',
+        'selisih',
         'catatan',
     ];
-
     protected function casts(): array
     {
         return [

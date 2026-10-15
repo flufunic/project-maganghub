@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\CheckSheet;
+use App\Models\Line;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -11,7 +12,6 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
-use App\Models\Line;
 
 class CheckSheetExport implements FromArray, WithEvents
 {
@@ -19,6 +19,10 @@ class CheckSheetExport implements FromArray, WithEvents
     protected $bulan;
     protected $tahun;
     protected ?int $lineId;
+
+    // Mode KWH: tiap tanggal = 3 kolom (Act, Sel, Catatan). Mode biasa: 1 kolom (centang).
+    protected bool $pakaiActual = false;
+    protected int $perTanggal = 1;
 
     protected int $lastColumnNumber;
     protected string $lastColumn;
@@ -38,12 +42,21 @@ class CheckSheetExport implements FromArray, WithEvents
     protected int $abnormalityStartRow = 0;
     protected int $abnormalityEndRow = 0;
 
+    // Sel yang perlu diberi warna (diisi saat array() dibuat)
+    protected array $redCells = [];     // selisih tidak 0
+    protected array $manualCells = [];  // actual dikoreksi manual
+
     public function __construct($checkSheetId, $bulan, $tahun, $lineId = null)
     {
         $this->checkSheetId = $checkSheetId;
         $this->bulan = (int) $bulan;
         $this->tahun = (int) $tahun;
         $this->lineId = $lineId ? (int) $lineId : null;
+
+        $this->pakaiActual = (bool) CheckSheet::whereKey($checkSheetId)
+            ->value('pakai_actual');
+
+        $this->perTanggal = $this->pakaiActual ? 3 : 1;
 
         $jumlahHari = cal_days_in_month(
             CAL_GREGORIAN,
@@ -52,11 +65,20 @@ class CheckSheetExport implements FromArray, WithEvents
         );
 
         // A-D = informasi item
-        // E dst = tanggal
-        $this->lastColumnNumber = 4 + $jumlahHari;
+        // E dst = tanggal (1 kolom per tanggal, atau 3 kolom di mode KWH)
+        $this->lastColumnNumber = 4 + ($jumlahHari * $this->perTanggal);
         $this->lastColumn = $this->columnLetter(
             $this->lastColumnNumber
         );
+    }
+
+    /**
+     * Nomor kolom untuk tanggal $hari.
+     * $sub: 0 = Act (atau centang), 1 = Sel, 2 = Catatan.
+     */
+    private function dayColumn(int $hari, int $sub = 0): int
+    {
+        return 4 + (($hari - 1) * $this->perTanggal) + 1 + $sub;
     }
 
     /**
@@ -64,6 +86,9 @@ class CheckSheetExport implements FromArray, WithEvents
      */
     public function array(): array
     {
+        $this->redCells = [];
+        $this->manualCells = [];
+
         // Rentang tanggal bulan yang diexport
         $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->startOfMonth();
         $akhirBulan = $awalBulan->copy()->endOfMonth();
@@ -75,7 +100,7 @@ class CheckSheetExport implements FromArray, WithEvents
                 $query->orderBy('shift')->orderBy('no')->orderBy('id');
             },
 
-            // centang HANYA milik line / mesin yang diexport
+            // centang / nilai HANYA milik line / mesin yang diexport
             'items.checklists' => function ($query) {
                 $query
                     ->where('line_id', $this->lineId)
@@ -150,7 +175,10 @@ class CheckSheetExport implements FromArray, WithEvents
             'Nomor Dokumen: ' . ($checkSheet->nomor_dokumen ?? '')
             . '     |     Divisi: ' . ($checkSheet->divisi->nama_divisi ?? '')
             . ($line ? '     |     Mesin/Line: ' . $line->nama_line : '')
-            . '     |     Bulan: ' . $namaBulan,
+            . '     |     Bulan: ' . $namaBulan
+            . ($this->pakaiActual
+                ? '     |     Kuning = Actual dikoreksi manual, Merah = ada selisih'
+                : ''),
         ]);
 
         /*
@@ -169,12 +197,17 @@ class CheckSheetExport implements FromArray, WithEvents
 
         $rows[] = $this->makeMainHeader($jumlahHari);
 
+        if ($this->pakaiActual) {
+            $rows[] = $this->makeSubHeader($jumlahHari);
+        }
+
         $this->shiftAStartRow = count($rows) + 1;
 
         foreach ($itemsShiftA as $item) {
             $rows[] = $this->makeItemRow(
                 $item,
-                $jumlahHari
+                $jumlahHari,
+                count($rows) + 1
             );
         }
 
@@ -204,12 +237,17 @@ class CheckSheetExport implements FromArray, WithEvents
 
         $rows[] = $this->makeMainHeader($jumlahHari);
 
+        if ($this->pakaiActual) {
+            $rows[] = $this->makeSubHeader($jumlahHari);
+        }
+
         $this->shiftBStartRow = count($rows) + 1;
 
         foreach ($itemsShiftB as $item) {
             $rows[] = $this->makeItemRow(
                 $item,
-                $jumlahHari
+                $jumlahHari,
+                count($rows) + 1
             );
         }
 
@@ -255,6 +293,7 @@ class CheckSheetExport implements FromArray, WithEvents
 
     /**
      * Header tabel Shift A dan Shift B.
+     * Mode KWH: angka tanggal ditaruh di kolom pertama, lalu di-merge 3 kolom.
      */
     private function makeMainHeader(int $jumlahHari): array
     {
@@ -267,15 +306,83 @@ class CheckSheetExport implements FromArray, WithEvents
 
         for ($hari = 1; $hari <= $jumlahHari; $hari++) {
             $row[] = $hari;
+
+            if ($this->pakaiActual) {
+                $row[] = '';
+                $row[] = '';
+            }
         }
 
         return $this->makeRow($row);
     }
 
     /**
+     * Baris header kedua (khusus KWH): Act / Sel / Catatan per tanggal.
+     */
+    private function makeSubHeader(int $jumlahHari): array
+    {
+        $row = ['', '', '', ''];
+
+        for ($hari = 1; $hari <= $jumlahHari; $hari++) {
+            $row[] = 'Act';
+            $row[] = 'Sel';
+            $row[] = 'Catatan';
+        }
+
+        return $this->makeRow($row);
+    }
+
+    /**
+     * Hitung Actual / Selisih / Catatan tiap tanggal untuk satu item.
+     * Aturan sama dengan di halaman web:
+     * Actual otomatis hari ini = actual kemarin - selisih kemarin.
+     * Actual yang tersimpan (tgl 1 / koreksi manual) menimpa hitungan otomatis.
+     */
+    private function hitungNilai($item, int $jumlahHari): array
+    {
+        $hasil = [];
+        $prev = null;
+
+        for ($hari = 1; $hari <= $jumlahHari; $hari++) {
+            $tanggal = Carbon::create($this->tahun, $this->bulan, $hari);
+
+            $c = $item->checklists->first(
+                function ($checklist) use ($tanggal) {
+                    return $checklist->tanggal
+                        && Carbon::parse($checklist->tanggal)->isSameDay($tanggal);
+                }
+            );
+
+            $auto = ($prev && $prev['selisih'] !== null)
+                ? round($prev['actual'] - $prev['selisih'], 2)
+                : null;
+
+            $stored = ($c && $c->actual !== null) ? (float) $c->actual : null;
+            $selisih = ($c && $c->selisih !== null) ? (float) $c->selisih : null;
+
+            $actual = $stored ?? $auto;
+
+            $hasil[$hari] = [
+                'actual'  => $actual,
+                'selisih' => $selisih,
+                'catatan' => $c->catatan ?? '',
+                'manual'  => $stored !== null
+                    && $auto !== null
+                    && abs($stored - $auto) > 0.00001,
+            ];
+
+            $prev = $actual !== null
+                ? ['actual' => $actual, 'selisih' => $selisih]
+                : null;
+        }
+
+        return $hasil;
+    }
+
+    /**
      * Data inspection point.
      */
-    private function makeItemRow($item, int $jumlahHari): array
+    private function makeItemRow($item, int $jumlahHari, int $rowNumber): array
     {
         $row = [
             $item->no,
@@ -284,6 +391,36 @@ class CheckSheetExport implements FromArray, WithEvents
             $item->method ?? '',
         ];
 
+        /*
+         * MODE KWH: Act / Sel / Catatan
+         */
+        if ($this->pakaiActual) {
+            $nilai = $this->hitungNilai($item, $jumlahHari);
+
+            for ($hari = 1; $hari <= $jumlahHari; $hari++) {
+                $n = $nilai[$hari];
+
+                $row[] = $n['actual'] ?? '';
+                $row[] = $n['selisih'] ?? '';
+                $row[] = $n['catatan'] ?? '';
+
+                if ($n['manual']) {
+                    $this->manualCells[] =
+                        $this->columnLetter($this->dayColumn($hari, 0)) . $rowNumber;
+                }
+
+                if ($n['selisih'] !== null && abs($n['selisih']) > 0.00001) {
+                    $this->redCells[] =
+                        $this->columnLetter($this->dayColumn($hari, 1)) . $rowNumber;
+                }
+            }
+
+            return $this->makeRow($row);
+        }
+
+        /*
+         * MODE BIASA: centang
+         */
         for ($hari = 1; $hari <= $jumlahHari; $hari++) {
 
             $tanggal = Carbon::create(
@@ -392,6 +529,9 @@ class CheckSheetExport implements FromArray, WithEvents
                 $sheet = $event->sheet->getDelegate();
 
                 $highestRow = $sheet->getHighestRow();
+
+                // jumlah baris header tabel (2 di mode KWH, 1 di mode biasa)
+                $headerSpan = $this->pakaiActual ? 2 : 1;
 
                 /*
                 |--------------------------------------------------------------------------
@@ -537,8 +677,10 @@ class CheckSheetExport implements FromArray, WithEvents
                     $this->shiftBHeaderRow,
                 ] as $row) {
 
+                    $rowEnd = $row + $headerSpan - 1;
+
                     $sheet->getStyle(
-                        "A{$row}:{$this->lastColumn}{$row}"
+                        "A{$row}:{$this->lastColumn}{$rowEnd}"
                     )->applyFromArray([
                         'font' => [
                             'bold' => true,
@@ -568,6 +710,15 @@ class CheckSheetExport implements FromArray, WithEvents
                     ]);
 
                     $sheet->getRowDimension($row)->setRowHeight(30);
+
+                    if ($this->pakaiActual) {
+                        $sheet->getRowDimension($rowEnd)->setRowHeight(20);
+
+                        // No, Inspection Point, Condition, Method: gabung 2 baris header
+                        foreach (['A', 'B', 'C', 'D'] as $col) {
+                            $sheet->mergeCells("{$col}{$row}:{$col}{$rowEnd}");
+                        }
+                    }
                 }
 
                 /*
@@ -589,10 +740,8 @@ class CheckSheetExport implements FromArray, WithEvents
 
                     for ($hari = 1; $hari <= $jumlahHari; $hari++) {
 
-                        $columnNumber = 4 + $hari;
-
                         $column = $this->columnLetter(
-                            $columnNumber
+                            $this->dayColumn($hari, 0)
                         );
 
                         // Tulis angka tanggal langsung ke cell
@@ -601,10 +750,16 @@ class CheckSheetExport implements FromArray, WithEvents
                             $hari
                         );
 
-                        // Pastikan kolom tidak tersembunyi
-                        $sheet->getColumnDimension($column)
-                            ->setVisible(true)
-                            ->setWidth(4.2);
+                        // Mode KWH: tanggal digabung selebar 3 kolom
+                        if ($this->pakaiActual) {
+                            $columnAkhir = $this->columnLetter(
+                                $this->dayColumn($hari, 2)
+                            );
+
+                            $sheet->mergeCells(
+                                "{$column}{$headerRow}:{$columnAkhir}{$headerRow}"
+                            );
+                        }
 
                         // Pastikan header tanggal terlihat
                         $sheet->getStyle(
@@ -669,6 +824,26 @@ class CheckSheetExport implements FromArray, WithEvents
                     $this->shiftBHeaderRow,
                     $this->shiftBEndRow
                 );
+
+                /*
+                |--------------------------------------------------------------------------
+                | WARNA KHUSUS KWH (setelah weekend, supaya tidak tertimpa)
+                |--------------------------------------------------------------------------
+                */
+
+                foreach ($this->manualCells as $cell) {
+                    $sheet->getStyle($cell)->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('FFE699');
+
+                    $sheet->getStyle($cell)->getFont()->setBold(true);
+                }
+
+                foreach ($this->redCells as $cell) {
+                    $sheet->getStyle($cell)->getFont()
+                        ->setBold(true)
+                        ->getColor()->setRGB('C00000');
+                }
 
                 /*
                 |--------------------------------------------------------------------------
@@ -792,17 +967,31 @@ class CheckSheetExport implements FromArray, WithEvents
                 $sheet->getColumnDimension('C')->setWidth(20);
                 $sheet->getColumnDimension('D')->setWidth(18);
 
-                // Kolom tanggal dibuat kecil
-                for (
-                    $column = 5;
-                    $column <= $this->lastColumnNumber;
-                    $column++
-                ) {
-                    $letter = $this->columnLetter($column);
+                // Kolom tanggal
+                for ($hari = 1; $hari <= $jumlahHari; $hari++) {
 
-                    $sheet->getColumnDimension($letter)
-                        ->setVisible(true)
-                        ->setWidth(4.2);
+                    if ($this->pakaiActual) {
+                        // Act, Sel, Catatan
+                        $lebar = [9, 7, 16];
+
+                        for ($sub = 0; $sub < 3; $sub++) {
+                            $letter = $this->columnLetter(
+                                $this->dayColumn($hari, $sub)
+                            );
+
+                            $sheet->getColumnDimension($letter)
+                                ->setVisible(true)
+                                ->setWidth($lebar[$sub]);
+                        }
+                    } else {
+                        $letter = $this->columnLetter(
+                            $this->dayColumn($hari, 0)
+                        );
+
+                        $sheet->getColumnDimension($letter)
+                            ->setVisible(true)
+                            ->setWidth(4.2);
+                    }
                 }
 
                 /*
@@ -811,18 +1000,28 @@ class CheckSheetExport implements FromArray, WithEvents
                 |--------------------------------------------------------------------------
                 */
 
+                $barisKhusus = [
+                    1,
+                    2,
+                    3,
+                    $this->shiftATitleRow,
+                    $this->shiftBTitleRow,
+                    $this->abnormalityTitleRow,
+                    $this->abnormalityHeaderRow,
+                ];
+
+                foreach ([
+                    $this->shiftAHeaderRow,
+                    $this->shiftBHeaderRow,
+                ] as $headerRow) {
+                    for ($i = 0; $i < $headerSpan; $i++) {
+                        $barisKhusus[] = $headerRow + $i;
+                    }
+                }
+
                 for ($row = 1; $row <= $highestRow; $row++) {
 
-                    if (
-                        $row !== 1 &&
-                        $row !== 2 &&
-                        $row !== $this->shiftATitleRow &&
-                        $row !== $this->shiftAHeaderRow &&
-                        $row !== $this->shiftBTitleRow &&
-                        $row !== $this->shiftBHeaderRow &&
-                        $row !== $this->abnormalityTitleRow &&
-                        $row !== $this->abnormalityHeaderRow
-                    ) {
+                    if (! in_array($row, $barisKhusus, true)) {
                         $sheet->getRowDimension($row)
                             ->setRowHeight(22);
                     }
@@ -914,11 +1113,34 @@ class CheckSheetExport implements FromArray, WithEvents
         );
 
         /*
-         * ✓ dibuat lebih jelas.
+         * ✓ dibuat lebih jelas (mode biasa) / angka (mode KWH).
          */
         $sheet->getStyle(
             "E{$startRow}:{$this->lastColumn}{$endRow}"
-        )->getFont()->setSize(11);
+        )->getFont()->setSize($this->pakaiActual ? 10 : 11);
+
+        /*
+         * Mode KWH: kolom Catatan rata kiri dan font kecil
+         */
+        if ($this->pakaiActual) {
+            $jumlahHari = cal_days_in_month(
+                CAL_GREGORIAN,
+                $this->bulan,
+                $this->tahun
+            );
+
+            for ($hari = 1; $hari <= $jumlahHari; $hari++) {
+                $col = $this->columnLetter($this->dayColumn($hari, 2));
+
+                $sheet->getStyle("{$col}{$startRow}:{$col}{$endRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+                $sheet->getStyle("{$col}{$startRow}:{$col}{$endRow}")
+                    ->getFont()
+                    ->setSize(9);
+            }
+        }
     }
 
     /**
@@ -951,23 +1173,25 @@ class CheckSheetExport implements FromArray, WithEvents
                 continue;
             }
 
-            $columnNumber = 4 + $hari;
+            // semua kolom milik tanggal ini (1 atau 3 kolom)
+            for ($sub = 0; $sub < $this->perTanggal; $sub++) {
 
-            $column = $this->columnLetter(
-                $columnNumber
-            );
+                $column = $this->columnLetter(
+                    $this->dayColumn($hari, $sub)
+                );
 
-            $sheet->getStyle(
-                "{$column}{$headerRow}:{$column}{$endRow}"
-            )->getFill()->setFillType(
-                Fill::FILL_SOLID
-            );
+                $sheet->getStyle(
+                    "{$column}{$headerRow}:{$column}{$endRow}"
+                )->getFill()->setFillType(
+                    Fill::FILL_SOLID
+                );
 
-            $sheet->getStyle(
-                "{$column}{$headerRow}:{$column}{$endRow}"
-            )->getFill()->getStartColor()->setRGB(
-                'F2F2F2'
-            );
+                $sheet->getStyle(
+                    "{$column}{$headerRow}:{$column}{$endRow}"
+                )->getFill()->getStartColor()->setRGB(
+                    'F2F2F2'
+                );
+            }
         }
     }
 

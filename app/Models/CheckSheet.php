@@ -14,7 +14,15 @@ class CheckSheet extends Model
         'nomor_dokumen',
         'nama_checksheet',
         'line_id',
+        'pakai_actual',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'pakai_actual' => 'boolean',
+        ];
+    }
 
     public function divisi(): BelongsTo
     {
@@ -30,7 +38,7 @@ class CheckSheet extends Model
     {
         return $this->hasMany(CheckSheetAbnormality::class);
     }
-    
+
     public function line()
     {
         return $this->belongsTo(Line::class);

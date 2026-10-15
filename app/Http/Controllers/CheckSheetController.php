@@ -199,6 +199,7 @@ class CheckSheetController extends Controller
             'line_id'         => ['nullable', 'exists:lines,id'],
             'nomor_dokumen'   => ['required', 'string', 'max:255'],
             'nama_checksheet' => ['required', 'string', 'max:255'],
+            'pakai_actual'    => ['nullable', 'boolean'],
         ]);
 
         $lineId = $this->tentukanLineId(
@@ -211,6 +212,7 @@ class CheckSheetController extends Controller
             'line_id'         => $lineId,
             'nomor_dokumen'   => $validated['nomor_dokumen'],
             'nama_checksheet' => $validated['nama_checksheet'],
+            'pakai_actual'    => $request->boolean('pakai_actual'),
         ]);
 
         $line = $lineId
@@ -237,6 +239,7 @@ class CheckSheetController extends Controller
             'line_id'         => ['nullable', 'exists:lines,id'],
             'nomor_dokumen'   => ['required', 'string', 'max:255'],
             'nama_checksheet' => ['required', 'string', 'max:255'],
+            'pakai_actual'    => ['nullable', 'boolean'],
         ]);
 
         // check sheet milik mesin tidak boleh pindah divisi
@@ -248,6 +251,9 @@ class CheckSheetController extends Controller
             (int) $validated['divisi_id'],
             $validated['line_id'] ?? null
         );
+
+        // checkbox yang tidak dicentang = false (bukan "tidak diubah")
+        $validated['pakai_actual'] = $request->boolean('pakai_actual');
 
         $checkSheet->update($validated);
 
@@ -299,7 +305,7 @@ class CheckSheetController extends Controller
                 $query->orderBy('shift')->orderBy('no')->orderBy('id');
             },
 
-            // centang HANYA milik line ini
+            // centang / nilai HANYA milik line ini
             'items.checklists' => function ($query) use ($awalBulan, $akhirBulan, $lineId) {
                 $query->where('line_id', $lineId)
                     ->whereBetween('tanggal', [
@@ -427,6 +433,43 @@ class CheckSheetController extends Controller
                 'tanggal' => $validated['tanggal'],
             ],
             ['status' => $validated['status']]
+        );
+
+        return back();
+    }
+
+    // =====================================================
+    // NILAI ACTUAL / SELISIH / CATATAN (khusus KWH, per line)
+    // =====================================================
+
+    public function storeNilai(Request $request, CheckSheet $checkSheet)
+    {
+        $validated = $request->validate([
+            'check_sheet_item_id' => ['required', 'exists:check_sheet_items,id'],
+            'line_id' => ['nullable', 'integer'],
+            'tanggal' => ['required', 'date'],
+            'actual'  => ['nullable', 'numeric'],
+            'selisih' => ['nullable', 'numeric'],
+            'catatan' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $item = $checkSheet->items()
+            ->where('id', $validated['check_sheet_item_id'])
+            ->firstOrFail();
+
+        $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+
+        $item->checklists()->updateOrCreate(
+            [
+                'line_id' => $line?->id,
+                'tanggal' => $validated['tanggal'],
+            ],
+            [
+                'actual'  => $validated['actual'] ?? null,
+                'selisih' => $validated['selisih'] ?? null,
+                'catatan' => $validated['catatan'] ?? null,
+                'status'  => isset($validated['actual']) || isset($validated['selisih']),
+            ]
         );
 
         return back();

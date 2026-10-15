@@ -85,6 +85,11 @@ Route::middleware('auth')->group(function () {
         'storeChecklist'
     ])->name('check-sheets.checklist.store');
 
+    Route::post('/check-sheets/{checkSheet}/nilai', [
+        CheckSheetController::class,
+        'storeNilai'
+    ])->name('check-sheets.nilai.store');
+
     Route::post('/check-sheets/{checkSheet}/abnormalities', [
         CheckSheetController::class,
         'storeAbnormality'

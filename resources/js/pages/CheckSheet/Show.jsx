@@ -95,6 +95,10 @@ const tableHead = `${tableHeadBase} px-3`;
 // Lebar kolom sticky "No" (HARUS sama dengan offset left kolom Inspection Point)
 // w-12 = 48px  ->  left-[48px]
 
+// input kecil untuk sel Actual / Selisih / Catatan
+const miniInput =
+    'w-full rounded border border-slate-200 bg-white px-1 py-0.5 text-center text-[11px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+
 // =========================================================
 // SMALL COMPONENTS
 // =========================================================
@@ -342,6 +346,125 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
         </Field>
     </>
 );
+
+// =========================================================
+// SEL ACTUAL / SELISIH / CATATAN  (khusus checksheet KWH)
+// ---------------------------------------------------------
+// nilai = {
+//   auto    : actual hasil hitung otomatis (actual kemarin - selisih kemarin) atau null
+//   stored  : actual yang tersimpan di DB (koreksi manual / tgl 1) atau null
+//   actual  : yang ditampilkan (stored ?? auto)
+//   selisih : selisih tersimpan atau null
+//   catatan : catatan tersimpan
+//   manual  : true kalau stored berbeda dari auto (dikoreksi manual)
+// }
+// Actual hanya DISIMPAN kalau berbeda dari hitungan otomatis,
+// jadi kalau tgl sebelumnya direvisi, hari-hari berikutnya ikut berubah.
+// =========================================================
+
+const NilaiCell = ({ nilai, onSave }) => {
+    const [act, setAct] = useState(nilai.actual ?? '');
+    const [sel, setSel] = useState(nilai.selisih ?? '');
+    const [cat, setCat] = useState(nilai.catatan ?? '');
+
+    // Sinkron per field (terpisah) supaya ketikan di field lain tidak tertimpa
+    useEffect(() => {
+        setAct(nilai.actual ?? '');
+    }, [nilai.actual]);
+
+    useEffect(() => {
+        setSel(nilai.selisih ?? '');
+    }, [nilai.selisih]);
+
+    useEffect(() => {
+        setCat(nilai.catatan ?? '');
+    }, [nilai.catatan]);
+
+    const simpan = () => {
+        const actNum = act === '' ? null : Number(act);
+        const selNum = sel === '' ? null : Number(sel);
+
+        if (
+            (actNum !== null && Number.isNaN(actNum)) ||
+            (selNum !== null && Number.isNaN(selNum))
+        ) {
+            return;
+        }
+
+        // simpan Actual hanya kalau beda dari hitungan otomatis
+        const actualKirim =
+            actNum !== null && actNum !== nilai.auto ? actNum : null;
+
+        // tidak ada perubahan -> tidak usah kirim
+        if (
+            actualKirim === nilai.stored &&
+            selNum === nilai.selisih &&
+            cat === (nilai.catatan ?? '')
+        ) {
+            return;
+        }
+
+        onSave({
+            actual: actualKirim,
+            selisih: selNum,
+            catatan: cat.trim() === '' ? null : cat,
+        });
+    };
+
+    const isAuto = nilai.stored === null && nilai.auto !== null;
+    const selisihAda = sel !== '' && Number(sel) !== 0;
+
+    return (
+        <div className="mx-auto flex w-24 flex-col gap-0.5">
+            <input
+                type="number"
+                step="any"
+                value={act}
+                placeholder="Act"
+                title={
+                    nilai.manual
+                        ? 'Actual dikoreksi manual'
+                        : isAuto
+                        ? 'Actual otomatis (kemarin - selisih kemarin)'
+                        : 'Actual'
+                }
+                onChange={(e) => setAct(e.target.value)}
+                onBlur={simpan}
+                className={`${miniInput} ${
+                    nilai.manual
+                        ? 'border-amber-300 bg-amber-100 font-bold text-slate-800'
+                        : isAuto
+                        ? 'italic text-slate-400'
+                        : 'font-bold text-slate-800'
+                }`}
+            />
+
+            <input
+                type="number"
+                step="any"
+                value={sel}
+                placeholder="Sel"
+                title="Selisih"
+                onChange={(e) => setSel(e.target.value)}
+                onBlur={simpan}
+                className={`${miniInput} ${
+                    selisihAda ? 'border-red-200 font-bold text-red-600' : 'text-slate-700'
+                }`}
+            />
+
+            <input
+                type="text"
+                value={cat}
+                placeholder="Catatan"
+                title="Catatan / preventif"
+                maxLength={255}
+                onChange={(e) => setCat(e.target.value)}
+                onBlur={simpan}
+                className={`${miniInput} text-left`}
+            />
+        </div>
+    );
+};
 
 // =========================================================
 // MODAL FORM
@@ -755,13 +878,15 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
 // MAIN
 // =========================================================
 
-// [BARU] props menerima `line`
 export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
     // Flash message dari backend
     const { flash } = usePage().props;
 
-    // [BARU] tujuan tombol kembali: daftar line yang tadi di-scan
+    // tujuan tombol kembali: daftar line yang tadi di-scan
     const backUrl = line ? `/check-sheets/line/${line.kode}` : '/check-sheets';
+
+    // Checksheet ini memakai kolom Actual / Selisih / Catatan (KWH)?
+    const pakaiActual = Boolean(checkSheet.pakai_actual);
 
     // =====================================================
     // STATE
@@ -931,6 +1056,73 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
             },
             {
                 preserveScroll: true,
+            }
+        );
+    };
+
+    // =====================================================
+    // NILAI ACTUAL / SELISIH / CATATAN (khusus KWH)
+    // =====================================================
+
+    const bulatkan = (n) => Math.round(n * 100) / 100;
+
+    // Hitung nilai tiap tanggal untuk satu item.
+    // Actual otomatis hari ini = actual kemarin - selisih kemarin.
+    // Kalau kemarin belum ada actual / selisih, rantai berhenti (auto = null).
+    const hitungNilai = (item) => {
+        const hasil = {};
+        let prev = null;
+
+        tanggal.forEach((t) => {
+            const tl = getTanggalLengkap(t, bulan, tahun);
+            const c = getChecklist(item, tl);
+
+            const auto =
+                prev && prev.selisih !== null
+                    ? bulatkan(prev.actual - prev.selisih)
+                    : null;
+
+            const stored =
+                c?.actual !== null && c?.actual !== undefined
+                    ? Number(c.actual)
+                    : null;
+
+            const selisih =
+                c?.selisih !== null && c?.selisih !== undefined
+                    ? Number(c.selisih)
+                    : null;
+
+            const actual = stored ?? auto;
+
+            hasil[tl] = {
+                auto,
+                stored,
+                actual,
+                selisih,
+                catatan: c?.catatan ?? '',
+                manual: stored !== null && auto !== null && stored !== auto,
+            };
+
+            prev = actual !== null ? { actual, selisih } : null;
+        });
+
+        return hasil;
+    };
+
+    const simpanNilai = (item, tanggalLengkap, payload) => {
+        router.post(
+            `/check-sheets/${checkSheet.id}/nilai`,
+            {
+                check_sheet_item_id: item.id,
+                line_id: line?.id ?? null,
+                tanggal: tanggalLengkap,
+                ...payload,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () =>
+                    notify('Nilai gagal disimpan. Periksa kembali isian kamu.', 'error'),
             }
         );
     };
@@ -1332,6 +1524,14 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                     border-radius: 999px;
                 }
 
+                /* hilangkan spinner panah pada input number di sel KWH */
+                .idx-nilai input[type=number]::-webkit-outer-spin-button,
+                .idx-nilai input[type=number]::-webkit-inner-spin-button {
+                    -webkit-appearance: none;
+                    margin: 0;
+                }
+                .idx-nilai input[type=number] { -moz-appearance: textfield; }
+
                 @media (prefers-reduced-motion: reduce) {
                     .idx-gradient,
                     .idx-float,
@@ -1356,7 +1556,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 ================================================== */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
                     <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
-                        {/* [BARU] href -> backUrl */}
                         <Link
                             href={backUrl}
                             title="Kembali"
@@ -1371,7 +1570,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                             </h1>
 
                             <p className="truncate text-[11px] text-white/60">
-                                {/* [BARU] href -> backUrl */}
                                 <Link
                                     href={backUrl}
                                     className="cursor-pointer transition hover:text-white"
@@ -1381,7 +1579,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                 <span className="mx-1.5 text-white/30">/</span>
                                 {checkSheet.divisi?.nama_divisi ?? '-'}
 
-                                {/* [BARU] nama line */}
                                 {line && (
                                     <>
                                         <span className="mx-1.5 text-white/30">·</span>
@@ -1420,7 +1617,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                     </dd>
                                 </div>
 
-                                {/* [BARU] info line */}
                                 {line && (
                                     <div>
                                         <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -1536,7 +1732,11 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                         <SectionHead
                             tone="blue"
                             title="Inspection Point"
-                            desc="Kelola titik pemeriksaan dan checklist harian."
+                            desc={
+                                pakaiActual
+                                    ? 'Isi Actual, Selisih, dan Catatan harian.'
+                                    : 'Kelola titik pemeriksaan dan checklist harian.'
+                            }
                             count={`${filteredItems.length} item`}
                             action={
                                 <div className="flex flex-wrap gap-2">
@@ -1560,6 +1760,32 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                 </div>
                             }
                         />
+
+                        {/* Keterangan cara baca sel (khusus KWH) */}
+                        {pakaiActual && (
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-500">
+                                <span className="font-bold text-slate-600">
+                                    Tiap tanggal: Act / Sel / Catatan
+                                </span>
+
+                                <span>
+                                    <span className="italic text-slate-400">abu miring</span>{' '}
+                                    = Actual otomatis (kemarin − selisih kemarin)
+                                </span>
+
+                                <span>
+                                    <span className="rounded bg-amber-100 px-1 font-bold text-slate-700">
+                                        kuning
+                                    </span>{' '}
+                                    = Actual dikoreksi manual
+                                </span>
+
+                                <span>
+                                    <span className="font-bold text-red-600">merah</span> =
+                                    ada selisih
+                                </span>
+                            </div>
+                        )}
 
                         <div className="idx-scroll overflow-x-auto">
                             {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
@@ -1617,7 +1843,11 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                             return (
                                                 <th
                                                     key={tanggalLengkap || index}
-                                                    className="w-10 min-w-10 border-r border-white/10 bg-[#0a1a4d] px-1 py-3 text-center text-[11px] font-bold"
+                                                    className={`${
+                                                        pakaiActual
+                                                            ? 'min-w-[108px]'
+                                                            : 'w-10 min-w-10'
+                                                    } border-r border-white/10 bg-[#0a1a4d] px-1 py-3 text-center text-[11px] font-bold`}
                                                 >
                                                     <div className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/10">
                                                         {tanggalValue}
@@ -1653,110 +1883,142 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredItems.map((item) => (
-                                            <tr
-                                                key={item.id}
-                                                className="group transition-colors hover:bg-blue-50/50"
-                                            >
-                                                {/* No (sticky) - nomor urut per shift */}
-                                                <td className="sticky left-0 z-10 w-12 min-w-[48px] max-w-[48px] border-b border-r border-slate-100 bg-white px-0 py-2 text-center text-xs font-bold text-slate-500 group-hover:bg-blue-50">
-                                                    {nomorUrut[item.id]}
-                                                </td>
+                                        filteredItems.map((item) => {
+                                            // hitung rantai Actual otomatis sekali per item
+                                            const nilaiMap = pakaiActual
+                                                ? hitungNilai(item)
+                                                : null;
 
-                                                {/* Inspection Point (sticky) */}
-                                                <td className="sticky left-[48px] z-10 border-b border-r border-slate-100 bg-white px-3 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
-                                                    <div className="text-sm font-semibold text-slate-800">
-                                                        {item.inspection_point}
-                                                    </div>
-                                                </td>
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    className="group transition-colors hover:bg-blue-50/50"
+                                                >
+                                                    {/* No (sticky) - nomor urut per shift */}
+                                                    <td className="sticky left-0 z-10 w-12 min-w-[48px] max-w-[48px] border-b border-r border-slate-100 bg-white px-0 py-2 text-center text-xs font-bold text-slate-500 group-hover:bg-blue-50">
+                                                        {nomorUrut[item.id]}
+                                                    </td>
 
-                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
-                                                    {item.condition || '-'}
-                                                </td>
+                                                    {/* Inspection Point (sticky) */}
+                                                    <td className="sticky left-[48px] z-10 border-b border-r border-slate-100 bg-white px-3 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
+                                                        <div className="text-sm font-semibold text-slate-800">
+                                                            {item.inspection_point}
+                                                        </div>
+                                                    </td>
 
-                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
-                                                    {item.method || '-'}
-                                                </td>
+                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
+                                                        {item.condition || '-'}
+                                                    </td>
 
-                                                <td className="border-b border-r border-slate-100 px-3 py-2 text-center text-xs font-bold text-indigo-600">
-                                                    {item.shift || '-'}
-                                                </td>
+                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
+                                                        {item.method || '-'}
+                                                    </td>
 
-                                                <td className="border-b border-r border-slate-100 px-2 py-2">
-                                                    <div className="flex justify-center gap-1.5">
-                                                        <IconButton
-                                                            title="Edit"
-                                                            onClick={() => bukaEditItem(item)}
-                                                            variant="blue"
-                                                        >
-                                                            <Icon type="edit" />
-                                                        </IconButton>
+                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-center text-xs font-bold text-indigo-600">
+                                                        {item.shift || '-'}
+                                                    </td>
 
-                                                        <IconButton
-                                                            title="Hapus"
-                                                            onClick={() => hapusItem(item)}
-                                                            variant="red"
-                                                        >
-                                                            <Icon type="trash" />
-                                                        </IconButton>
-                                                    </div>
-                                                </td>
+                                                    <td className="border-b border-r border-slate-100 px-2 py-2">
+                                                        <div className="flex justify-center gap-1.5">
+                                                            <IconButton
+                                                                title="Edit"
+                                                                onClick={() => bukaEditItem(item)}
+                                                                variant="blue"
+                                                            >
+                                                                <Icon type="edit" />
+                                                            </IconButton>
 
-                                                {tanggal.map((itemTanggal, idx) => {
-                                                    const tanggalLengkap =
-                                                        getTanggalLengkap(
-                                                            itemTanggal,
-                                                            bulan,
-                                                            tahun
+                                                            <IconButton
+                                                                title="Hapus"
+                                                                onClick={() => hapusItem(item)}
+                                                                variant="red"
+                                                            >
+                                                                <Icon type="trash" />
+                                                            </IconButton>
+                                                        </div>
+                                                    </td>
+
+                                                    {tanggal.map((itemTanggal, idx) => {
+                                                        const tanggalLengkap =
+                                                            getTanggalLengkap(
+                                                                itemTanggal,
+                                                                bulan,
+                                                                tahun
+                                                            );
+
+                                                        // ---------- MODE KWH: Actual / Selisih / Catatan ----------
+                                                        if (pakaiActual) {
+                                                            const nilai =
+                                                                nilaiMap[tanggalLengkap];
+
+                                                            return (
+                                                                <td
+                                                                    key={tanggalLengkap || idx}
+                                                                    className="idx-nilai border-b border-r border-slate-100 px-1 py-1.5 text-center align-top"
+                                                                >
+                                                                    <NilaiCell
+                                                                        nilai={nilai}
+                                                                        onSave={(payload) =>
+                                                                            simpanNilai(
+                                                                                item,
+                                                                                tanggalLengkap,
+                                                                                payload
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        }
+
+                                                        // ---------- MODE BIASA: centang ----------
+                                                        const checklist = getChecklist(
+                                                            item,
+                                                            tanggalLengkap
                                                         );
 
-                                                    const checklist = getChecklist(
-                                                        item,
-                                                        tanggalLengkap
-                                                    );
+                                                        const checked = Boolean(
+                                                            checklist?.status
+                                                        );
 
-                                                    const checked = Boolean(
-                                                        checklist?.status
-                                                    );
-
-                                                    return (
-                                                        <td
-                                                            key={tanggalLengkap || idx}
-                                                            className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
-                                                                checked ? 'bg-emerald-50/70' : ''
-                                                            }`}
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                title={
-                                                                    checked
-                                                                        ? 'Klik untuk membatalkan'
-                                                                        : 'Klik untuk menandai selesai'
-                                                                }
-                                                                onClick={() =>
-                                                                    toggleChecklist(
-                                                                        item,
-                                                                        tanggalLengkap
-                                                                    )
-                                                                }
-                                                                className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
-                                                                    checked
-                                                                        ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:-translate-y-0.5 hover:from-emerald-500 hover:to-teal-600'
-                                                                        : 'border-slate-200 bg-slate-50 text-transparent hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
+                                                        return (
+                                                            <td
+                                                                key={tanggalLengkap || idx}
+                                                                className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                    checked ? 'bg-emerald-50/70' : ''
                                                                 }`}
                                                             >
-                                                                {checked && (
-                                                                    <Icon
-                                                                        type="check"
-                                                                        className="h-3.5 w-3.5"
-                                                                    />
-                                                                )}
-                                                            </button>
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))
+                                                                <button
+                                                                    type="button"
+                                                                    title={
+                                                                        checked
+                                                                            ? 'Klik untuk membatalkan'
+                                                                            : 'Klik untuk menandai selesai'
+                                                                    }
+                                                                    onClick={() =>
+                                                                        toggleChecklist(
+                                                                            item,
+                                                                            tanggalLengkap
+                                                                        )
+                                                                    }
+                                                                    className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
+                                                                        checked
+                                                                            ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:-translate-y-0.5 hover:from-emerald-500 hover:to-teal-600'
+                                                                            : 'border-slate-200 bg-slate-50 text-transparent hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
+                                                                    }`}
+                                                                >
+                                                                    {checked && (
+                                                                        <Icon
+                                                                            type="check"
+                                                                            className="h-3.5 w-3.5"
+                                                                        />
+                                                                    )}
+                                                                </button>
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>

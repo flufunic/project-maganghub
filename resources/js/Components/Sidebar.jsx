@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 
 /* ------------------------------------------------------------------
 | ICON  (UI saja, tidak ada logic)
@@ -303,21 +304,15 @@ export default function Sidebar({ open, onClose }) {
 
                                 {/* LOGOUT */}
                                 <form
-                                    method="POST"
-                                    action="/logout"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        router.post('/logout');
+                                    }}
                                     className="flex-1"
                                 >
-                                    <input
-                                        type="hidden"
-                                        name="_token"
-                                        value={document
-                                            .querySelector('meta[name="csrf-token"]')
-                                            ?.getAttribute('content')}
-                                    />
-
                                     <button
                                         type="submit"
-                                        className="w-full cursor-pointer rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-red-300/50 transition-all duration-200 hover:-translate-y-0.5 hover:from-red-600 hover:to-rose-700 hover:shadow-lg"
+                                        className="w-full cursor-pointer rounded-xl bg-red-500 px-4 py-3 font-semibold text-white hover:bg-red-600"
                                     >
                                         Logout
                                     </button>

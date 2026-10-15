@@ -75,6 +75,42 @@ const Field = ({ label, error, children }) => (
     </div>
 );
 
+// Checkbox opsi (tidak wajib, jadi tanpa tanda bintang)
+const CheckboxField = ({ label, hint, checked, onChange, error }) => (
+    <div>
+        <label
+            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition ${
+                checked
+                    ? 'border-blue-300 bg-blue-50/70'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+            }`}
+        >
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onChange(e.target.checked)}
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-blue-600"
+            />
+
+            <span className="min-w-0">
+                <span className="block text-sm font-bold text-slate-800">
+                    {label}
+                </span>
+
+                {hint && (
+                    <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                        {hint}
+                    </span>
+                )}
+            </span>
+        </label>
+
+        {error && (
+            <p className="mt-1.5 text-xs font-medium text-red-500">{error}</p>
+        )}
+    </div>
+);
+
 const ConfirmDialog = ({
     open,
     title,
@@ -156,6 +192,7 @@ export default function Create({ divisis, mesins = [], line }) {
         line_id: line?.per_mesin ? line.id : '',
         nomor_dokumen: '',
         nama_checksheet: '',
+        pakai_actual: false,
     });
 
     // Mesin yang tampil hanya milik divisi yang sedang dipilih
@@ -355,6 +392,15 @@ export default function Create({ divisis, mesins = [], line }) {
                                 className={inputBase}
                             />
                         </Field>
+
+                        {/* OPSI: kolom Actual / Selisih (khusus pengecekan KWH) */}
+                        <CheckboxField
+                            label="Pakai kolom Actual / Selisih (KWH)"
+                            hint="Centang untuk check sheet pengecekan KWH. Tiap tanggal berisi Actual, Selisih, dan Catatan, bukan centang biasa."
+                            checked={data.pakai_actual}
+                            onChange={(value) => setData('pakai_actual', value)}
+                            error={errors.pakai_actual}
+                        />
 
                         {/* TOMBOL */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
