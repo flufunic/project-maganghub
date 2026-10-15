@@ -351,20 +351,17 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
 // SEL ACTUAL / SELISIH / CATATAN  (khusus checksheet KWH)
 // ---------------------------------------------------------
 // nilai = {
-//   auto    : actual hasil hitung otomatis (actual kemarin - selisih kemarin) atau null
-//   stored  : actual yang tersimpan di DB (koreksi manual / tgl 1) atau null
-//   actual  : yang ditampilkan (stored ?? auto)
-//   selisih : selisih tersimpan atau null
+//   actual  : actual hasil input manual (atau null)
+//   selisih : OTOMATIS = actual hari ini - actual terakhir sebelumnya
+//             (lintas bulan: tgl 1 menyambung ke actual terakhir bulan lalu)
 //   catatan : catatan tersimpan
-//   manual  : true kalau stored berbeda dari auto (dikoreksi manual)
 // }
-// Actual hanya DISIMPAN kalau berbeda dari hitungan otomatis,
-// jadi kalau tgl sebelumnya direvisi, hari-hari berikutnya ikut berubah.
+// Yang dikirim ke server hanya { actual, catatan }.
+// Selisih tidak diinput & tidak disimpan, selalu dihitung di tampilan.
 // =========================================================
 
 const NilaiCell = ({ nilai, onSave }) => {
     const [act, setAct] = useState(nilai.actual ?? '');
-    const [sel, setSel] = useState(nilai.selisih ?? '');
     const [cat, setCat] = useState(nilai.catatan ?? '');
 
     // Sinkron per field (terpisah) supaya ketikan di field lain tidak tertimpa
@@ -373,46 +370,28 @@ const NilaiCell = ({ nilai, onSave }) => {
     }, [nilai.actual]);
 
     useEffect(() => {
-        setSel(nilai.selisih ?? '');
-    }, [nilai.selisih]);
-
-    useEffect(() => {
         setCat(nilai.catatan ?? '');
     }, [nilai.catatan]);
 
     const simpan = () => {
         const actNum = act === '' ? null : Number(act);
-        const selNum = sel === '' ? null : Number(sel);
 
-        if (
-            (actNum !== null && Number.isNaN(actNum)) ||
-            (selNum !== null && Number.isNaN(selNum))
-        ) {
+        if (actNum !== null && Number.isNaN(actNum)) {
             return;
         }
 
-        // simpan Actual hanya kalau beda dari hitungan otomatis
-        const actualKirim =
-            actNum !== null && actNum !== nilai.auto ? actNum : null;
-
         // tidak ada perubahan -> tidak usah kirim
-        if (
-            actualKirim === nilai.stored &&
-            selNum === nilai.selisih &&
-            cat === (nilai.catatan ?? '')
-        ) {
+        if (actNum === nilai.actual && cat === (nilai.catatan ?? '')) {
             return;
         }
 
         onSave({
-            actual: actualKirim,
-            selisih: selNum,
+            actual: actNum,
             catatan: cat.trim() === '' ? null : cat,
         });
     };
 
-    const isAuto = nilai.stored === null && nilai.auto !== null;
-    const selisihAda = sel !== '' && Number(sel) !== 0;
+    const selisihAda = nilai.selisih !== null && nilai.selisih !== 0;
 
     return (
         <div className="mx-auto flex w-24 flex-col gap-0.5">
@@ -421,36 +400,24 @@ const NilaiCell = ({ nilai, onSave }) => {
                 step="any"
                 value={act}
                 placeholder="Act"
-                title={
-                    nilai.manual
-                        ? 'Actual dikoreksi manual'
-                        : isAuto
-                        ? 'Actual otomatis (kemarin - selisih kemarin)'
-                        : 'Actual'
-                }
+                title="Actual (input manual)"
                 onChange={(e) => setAct(e.target.value)}
                 onBlur={simpan}
-                className={`${miniInput} ${
-                    nilai.manual
-                        ? 'border-amber-300 bg-amber-100 font-bold text-slate-800'
-                        : isAuto
-                        ? 'italic text-slate-400'
-                        : 'font-bold text-slate-800'
-                }`}
+                className={`${miniInput} font-bold text-slate-800`}
             />
 
-            <input
-                type="number"
-                step="any"
-                value={sel}
-                placeholder="Sel"
-                title="Selisih"
-                onChange={(e) => setSel(e.target.value)}
-                onBlur={simpan}
-                className={`${miniInput} ${
-                    selisihAda ? 'border-red-200 font-bold text-red-600' : 'text-slate-700'
+            <div
+                title="Selisih otomatis (actual ini - actual sebelumnya)"
+                className={`flex h-[22px] items-center justify-center rounded border px-1 text-[11px] ${
+                    nilai.selisih === null
+                        ? 'border-slate-100 bg-slate-50 text-slate-300'
+                        : selisihAda
+                        ? 'border-red-200 bg-red-50 font-bold text-red-600'
+                        : 'border-slate-200 bg-slate-50 text-slate-500'
                 }`}
-            />
+            >
+                {nilai.selisih === null ? 'Sel' : nilai.selisih}
+            </div>
 
             <input
                 type="text"
@@ -878,7 +845,16 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
 // MAIN
 // =========================================================
 
-export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
+// prevActuals = { [item_id]: actual terakhir SEBELUM tanggal 1 bulan ini }
+// (dikirim dari controller, supaya hitungan selisih menyambung antar bulan)
+export default function Show({
+    checkSheet,
+    bulan,
+    tahun,
+    tanggal,
+    line,
+    prevActuals = {},
+}) {
     // Flash message dari backend
     const { flash } = usePage().props;
 
@@ -1067,48 +1043,47 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
     const bulatkan = (n) => Math.round(n * 100) / 100;
 
     // Hitung nilai tiap tanggal untuk satu item.
-    // Actual otomatis hari ini = actual kemarin - selisih kemarin.
-    // Kalau kemarin belum ada actual / selisih, rantai berhenti (auto = null).
+    // - Actual   : input manual (tersimpan di DB).
+    // - Selisih  : otomatis = actual hari ini - actual terakhir sebelumnya.
+    // - Tanggal 1 menyambung ke actual terakhir bulan lalu (prevActuals).
+    // - Kalau ada hari yang actual-nya kosong, hari itu dilewati dan
+    //   selisih berikutnya dihitung dari actual terakhir yang terisi.
     const hitungNilai = (item) => {
         const hasil = {};
-        let prev = null;
+
+        const awal = prevActuals?.[item.id];
+        let prevActual =
+            awal !== null && awal !== undefined ? Number(awal) : null;
 
         tanggal.forEach((t) => {
             const tl = getTanggalLengkap(t, bulan, tahun);
             const c = getChecklist(item, tl);
 
-            const auto =
-                prev && prev.selisih !== null
-                    ? bulatkan(prev.actual - prev.selisih)
-                    : null;
-
-            const stored =
-                c?.actual !== null && c?.actual !== undefined
+            const actual =
+                c?.actual !== null && c?.actual !== undefined && c?.actual !== ''
                     ? Number(c.actual)
                     : null;
 
             const selisih =
-                c?.selisih !== null && c?.selisih !== undefined
-                    ? Number(c.selisih)
+                actual !== null && prevActual !== null
+                    ? bulatkan(actual - prevActual)
                     : null;
 
-            const actual = stored ?? auto;
-
             hasil[tl] = {
-                auto,
-                stored,
                 actual,
                 selisih,
                 catatan: c?.catatan ?? '',
-                manual: stored !== null && auto !== null && stored !== auto,
             };
 
-            prev = actual !== null ? { actual, selisih } : null;
+            if (actual !== null) {
+                prevActual = actual;
+            }
         });
 
         return hasil;
     };
 
+    // Kirim hanya actual & catatan (selisih dihitung otomatis, tidak disimpan)
     const simpanNilai = (item, tanggalLengkap, payload) => {
         router.post(
             `/check-sheets/${checkSheet.id}/nilai`,
@@ -1116,7 +1091,8 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 check_sheet_item_id: item.id,
                 line_id: line?.id ?? null,
                 tanggal: tanggalLengkap,
-                ...payload,
+                actual: payload.actual,
+                catatan: payload.catatan,
             },
             {
                 preserveScroll: true,
@@ -1265,9 +1241,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
 
     // =====================================================
     // NOMOR OTOMATIS (BERURUT PER SHIFT)
-    // Nomor tampilan dihitung ulang: 1, 2, 3, ... per shift,
-    // jadi kalau ada data yang dihapus, nomornya langsung
-    // menyesuaikan walaupun nilai di database masih loncat.
     // =====================================================
 
     const nomorUrut = (() => {
@@ -1336,9 +1309,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
 
     // =====================================================
     // BUKA FORM TAMBAH ABNORMALITY
-    // Tanggal default mengikuti bulan & tahun yang sedang dilihat:
-    // - bulan yang dilihat = bulan sekarang -> hari ini
-    // - bulan lain                          -> tanggal 1 bulan tersebut
     // =====================================================
 
     const tanggalDefaultAbnormality = () => {
@@ -1734,7 +1704,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                             title="Inspection Point"
                             desc={
                                 pakaiActual
-                                    ? 'Isi Actual, Selisih, dan Catatan harian.'
+                                    ? 'Isi Actual dan Catatan harian, Selisih dihitung otomatis.'
                                     : 'Kelola titik pemeriksaan dan checklist harian.'
                             }
                             count={`${filteredItems.length} item`}
@@ -1769,15 +1739,14 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                 </span>
 
                                 <span>
-                                    <span className="italic text-slate-400">abu miring</span>{' '}
-                                    = Actual otomatis (kemarin − selisih kemarin)
+                                    <span className="font-bold text-slate-700">Act</span> =
+                                    diisi manual
                                 </span>
 
                                 <span>
-                                    <span className="rounded bg-amber-100 px-1 font-bold text-slate-700">
-                                        kuning
-                                    </span>{' '}
-                                    = Actual dikoreksi manual
+                                    <span className="font-bold text-slate-700">Sel</span> =
+                                    otomatis (Act ini − Act sebelumnya, tanggal 1
+                                    menyambung ke bulan lalu)
                                 </span>
 
                                 <span>
@@ -1884,7 +1853,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                                         </tr>
                                     ) : (
                                         filteredItems.map((item) => {
-                                            // hitung rantai Actual otomatis sekali per item
+                                            // hitung selisih otomatis sekali per item
                                             const nilaiMap = pakaiActual
                                                 ? hitungNilai(item)
                                                 : null;
@@ -2239,9 +2208,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 </div>
             )}
 
-            {/* =====================================================
-                MODAL - IMPORT EXCEL
-            ====================================================== */}
+            {/* MODAL - IMPORT EXCEL */}
             {showImportModal && (
                 <ImportModal
                     checkSheet={checkSheet}
@@ -2250,9 +2217,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 />
             )}
 
-            {/* =====================================================
-                MODAL - ADD ITEM
-            ====================================================== */}
+            {/* MODAL - ADD ITEM */}
             {showAddItemModal && (
                 <Modal
                     title="Tambah Inspection Point"
@@ -2260,7 +2225,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                     onClose={() => setShowAddItemModal(false)}
                 >
                     <form onSubmit={submit} className="space-y-6">
-
                         <ItemFields
                             data={data}
                             setData={setData}
@@ -2278,9 +2242,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 </Modal>
             )}
 
-            {/* =====================================================
-                MODAL - EDIT ITEM
-            ====================================================== */}
+            {/* MODAL - EDIT ITEM */}
             {editingItem && (
                 <Modal
                     title="Edit Inspection Point"
@@ -2291,7 +2253,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                     }}
                 >
                     <form onSubmit={submitEdit} className="space-y-6">
-
                         <ItemFields
                             data={editData}
                             setData={setEditData}
@@ -2315,9 +2276,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 </Modal>
             )}
 
-            {/* =====================================================
-                MODAL - ADD ABNORMALITY
-            ====================================================== */}
+            {/* MODAL - ADD ABNORMALITY */}
             {showAddAbnormalityModal && (
                 <Modal
                     title="Tambah Abnormality"
@@ -2326,7 +2285,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                     onClose={() => setShowAddAbnormalityModal(false)}
                 >
                     <form onSubmit={submitAbnormality} className="space-y-6">
-
                         <AbnormalityFields
                             data={abnormalityData}
                             setData={setAbnormalityData}
@@ -2344,9 +2302,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 </Modal>
             )}
 
-            {/* =====================================================
-                MODAL - EDIT ABNORMALITY
-            ====================================================== */}
+            {/* MODAL - EDIT ABNORMALITY */}
             {editingAbnormality && (
                 <Modal
                     title="Edit Abnormality"
@@ -2358,7 +2314,6 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                     }}
                 >
                     <form onSubmit={submitEditAbnormality} className="space-y-6">
-
                         <AbnormalityFields
                             data={editAbnormalityData}
                             setData={setEditAbnormalityData}
@@ -2378,9 +2333,7 @@ export default function Show({ checkSheet, bulan, tahun, tanggal, line }) {
                 </Modal>
             )}
 
-            {/* =====================================================
-                DIALOG KONFIRMASI (simpan / edit / hapus)
-            ====================================================== */}
+            {/* DIALOG KONFIRMASI (simpan / edit / hapus) */}
             <ConfirmDialog
                 dialog={confirmDialog}
                 onCancel={() => setConfirmDialog(null)}

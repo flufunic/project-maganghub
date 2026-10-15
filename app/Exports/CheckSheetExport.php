@@ -42,9 +42,8 @@ class CheckSheetExport implements FromArray, WithEvents
     protected int $abnormalityStartRow = 0;
     protected int $abnormalityEndRow = 0;
 
-    // Sel yang perlu diberi warna (diisi saat array() dibuat)
-    protected array $redCells = [];     // selisih tidak 0
-    protected array $manualCells = [];  // actual dikoreksi manual
+    // Sel Selisih yang perlu diberi warna merah (diisi saat array() dibuat)
+    protected array $redCells = [];
 
     public function __construct($checkSheetId, $bulan, $tahun, $lineId = null)
     {
@@ -87,7 +86,6 @@ class CheckSheetExport implements FromArray, WithEvents
     public function array(): array
     {
         $this->redCells = [];
-        $this->manualCells = [];
 
         // Rentang tanggal bulan yang diexport
         $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->startOfMonth();
@@ -175,10 +173,7 @@ class CheckSheetExport implements FromArray, WithEvents
             'Nomor Dokumen: ' . ($checkSheet->nomor_dokumen ?? '')
             . '     |     Divisi: ' . ($checkSheet->divisi->nama_divisi ?? '')
             . ($line ? '     |     Mesin/Line: ' . $line->nama_line : '')
-            . '     |     Bulan: ' . $namaBulan
-            . ($this->pakaiActual
-                ? '     |     Kuning = Actual dikoreksi manual, Merah = ada selisih'
-                : ''),
+            . '     |     Bulan: ' . $namaBulan,
         ]);
 
         /*
@@ -333,15 +328,36 @@ class CheckSheetExport implements FromArray, WithEvents
     }
 
     /**
+     * Actual terakhir (yang terisi) SEBELUM tanggal 1 bulan yang diexport,
+     * supaya selisih tanggal 1 menyambung ke bulan lalu.
+     */
+    private function actualSebelumBulan($item): ?float
+    {
+        $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->toDateString();
+
+        $nilai = $item->checklists()
+            ->where('line_id', $this->lineId)
+            ->where('tanggal', '<', $awalBulan)
+            ->whereNotNull('actual')
+            ->orderByDesc('tanggal')
+            ->value('actual');
+
+        return $nilai !== null ? (float) $nilai : null;
+    }
+
+    /**
      * Hitung Actual / Selisih / Catatan tiap tanggal untuk satu item.
      * Aturan sama dengan di halaman web:
-     * Actual otomatis hari ini = actual kemarin - selisih kemarin.
-     * Actual yang tersimpan (tgl 1 / koreksi manual) menimpa hitungan otomatis.
+     * - Actual  : input manual (tersimpan di DB).
+     * - Selisih : otomatis = actual hari ini - actual terakhir sebelumnya.
+     * - Tanggal 1 menyambung ke actual terakhir bulan lalu.
+     * - Hari dengan actual kosong dilewati; selisih berikutnya dihitung
+     *   dari actual terakhir yang terisi.
      */
     private function hitungNilai($item, int $jumlahHari): array
     {
         $hasil = [];
-        $prev = null;
+        $prevActual = $this->actualSebelumBulan($item);
 
         for ($hari = 1; $hari <= $jumlahHari; $hari++) {
             $tanggal = Carbon::create($this->tahun, $this->bulan, $hari);
@@ -353,27 +369,21 @@ class CheckSheetExport implements FromArray, WithEvents
                 }
             );
 
-            $auto = ($prev && $prev['selisih'] !== null)
-                ? round($prev['actual'] - $prev['selisih'], 2)
+            $actual = ($c && $c->actual !== null) ? (float) $c->actual : null;
+
+            $selisih = ($actual !== null && $prevActual !== null)
+                ? round($actual - $prevActual, 2)
                 : null;
-
-            $stored = ($c && $c->actual !== null) ? (float) $c->actual : null;
-            $selisih = ($c && $c->selisih !== null) ? (float) $c->selisih : null;
-
-            $actual = $stored ?? $auto;
 
             $hasil[$hari] = [
                 'actual'  => $actual,
                 'selisih' => $selisih,
                 'catatan' => $c->catatan ?? '',
-                'manual'  => $stored !== null
-                    && $auto !== null
-                    && abs($stored - $auto) > 0.00001,
             ];
 
-            $prev = $actual !== null
-                ? ['actual' => $actual, 'selisih' => $selisih]
-                : null;
+            if ($actual !== null) {
+                $prevActual = $actual;
+            }
         }
 
         return $hasil;
@@ -403,11 +413,6 @@ class CheckSheetExport implements FromArray, WithEvents
                 $row[] = $n['actual'] ?? '';
                 $row[] = $n['selisih'] ?? '';
                 $row[] = $n['catatan'] ?? '';
-
-                if ($n['manual']) {
-                    $this->manualCells[] =
-                        $this->columnLetter($this->dayColumn($hari, 0)) . $rowNumber;
-                }
 
                 if ($n['selisih'] !== null && abs($n['selisih']) > 0.00001) {
                     $this->redCells[] =
@@ -551,6 +556,16 @@ class CheckSheetExport implements FromArray, WithEvents
                     "A1:{$this->lastColumn}{$highestRow}"
                 )->getFont()->setName('Calibri');
 
+                // Judul rata tengah. Di mode KWH, merge dibatasi (lihat $judulAkhir)
+                // supaya posisi tengahnya tetap ada di layar pertama.
+                $alignJudul = Alignment::HORIZONTAL_CENTER;
+
+                // Merge judul tidak perlu selebar seluruh tabel di mode KWH
+                // (bisa 90+ kolom). Batasi sampai kolom ke-22 supaya tetap tampil.
+                $judulAkhir = $this->pakaiActual
+                    ? $this->columnLetter(min($this->lastColumnNumber, 22))
+                    : $this->lastColumn;
+
                 /*
                 |--------------------------------------------------------------------------
                 | TITLE
@@ -558,43 +573,45 @@ class CheckSheetExport implements FromArray, WithEvents
                 */
 
                 $sheet->mergeCells(
-                    "A1:{$this->lastColumn}1"
+                    "A1:{$judulAkhir}1"
                 );
 
                 $sheet->mergeCells(
-                    "A2:{$this->lastColumn}2"
+                    "A2:{$judulAkhir}2"
                 );
 
                 $sheet->getStyle(
-                    "A1:{$this->lastColumn}1"
+                    "A1:{$judulAkhir}1"
                 )->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => 18,
+                        'size' => $this->pakaiActual ? 26 : 18,
+                        'color' => ['rgb' => '000000'],
                     ],
 
                     'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'horizontal' => $alignJudul,
                         'vertical' => Alignment::VERTICAL_CENTER,
                     ],
                 ]);
 
                 $sheet->getStyle(
-                    "A2:{$this->lastColumn}2"
+                    "A2:{$judulAkhir}2"
                 )->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => 11,
+                        'size' => $this->pakaiActual ? 15 : 11,
+                        'color' => ['rgb' => '000000'],
                     ],
 
                     'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'horizontal' => $alignJudul,
                         'vertical' => Alignment::VERTICAL_CENTER,
                     ],
                 ]);
 
-                $sheet->getRowDimension(1)->setRowHeight(32);
-                $sheet->getRowDimension(2)->setRowHeight(22);
+                $sheet->getRowDimension(1)->setRowHeight($this->pakaiActual ? 44 : 32);
+                $sheet->getRowDimension(2)->setRowHeight($this->pakaiActual ? 28 : 22);
 
                 /*
                 |--------------------------------------------------------------------------
@@ -602,21 +619,22 @@ class CheckSheetExport implements FromArray, WithEvents
                 |--------------------------------------------------------------------------
                 */
 
-                $sheet->mergeCells("A3:{$this->lastColumn}3");
+                $sheet->mergeCells("A3:{$judulAkhir}3");
 
-                $sheet->getStyle("A3:{$this->lastColumn}3")->applyFromArray([
+                $sheet->getStyle("A3:{$judulAkhir}3")->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => 10,
+                        'size' => $this->pakaiActual ? 13 : 10,
+                        'color' => ['rgb' => '000000'],
                     ],
                     'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'horizontal' => $alignJudul,
                         'vertical' => Alignment::VERTICAL_CENTER,
                         'wrapText' => true,
                     ],
                 ]);
 
-                $sheet->getRowDimension(3)->setRowHeight(28);
+                $sheet->getRowDimension(3)->setRowHeight($this->pakaiActual ? 30 : 28);
 
                 /*
                 |--------------------------------------------------------------------------
@@ -827,17 +845,10 @@ class CheckSheetExport implements FromArray, WithEvents
 
                 /*
                 |--------------------------------------------------------------------------
-                | WARNA KHUSUS KWH (setelah weekend, supaya tidak tertimpa)
+                | WARNA KHUSUS KWH: selisih merah
+                | (setelah weekend, supaya tidak tertimpa)
                 |--------------------------------------------------------------------------
                 */
-
-                foreach ($this->manualCells as $cell) {
-                    $sheet->getStyle($cell)->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('FFE699');
-
-                    $sheet->getStyle($cell)->getFont()->setBold(true);
-                }
 
                 foreach ($this->redCells as $cell) {
                     $sheet->getStyle($cell)->getFont()

@@ -336,12 +336,37 @@ class CheckSheetController extends Controller
         }
 
         return Inertia::render('CheckSheet/Show', [
-            'checkSheet' => $checkSheet,
-            'bulan'      => $bulan,
-            'tahun'      => $tahun,
-            'tanggal'    => $tanggal,
-            'line'       => $line,
+            'checkSheet'  => $checkSheet,
+            'bulan'       => $bulan,
+            'tahun'       => $tahun,
+            'tanggal'     => $tanggal,
+            'line'        => $line,
+            // Actual terakhir SEBELUM tanggal 1 bulan ini, supaya selisih
+            // tanggal 1 menyambung ke bulan lalu (khusus checksheet KWH)
+            'prevActuals' => $checkSheet->pakai_actual
+                ? $this->actualSebelumBulan($checkSheet, $awalBulan, $lineId)
+                : (object) [],
         ]);
+    }
+
+    /**
+     * Actual terakhir (yang terisi) sebelum $awalBulan, per item.
+     * Hasil: [item_id => actual|null]
+     */
+    private function actualSebelumBulan(CheckSheet $checkSheet, Carbon $awalBulan, ?int $lineId): array
+    {
+        $hasil = [];
+
+        foreach ($checkSheet->items as $item) {
+            $hasil[$item->id] = $item->checklists()
+                ->where('line_id', $lineId)
+                ->where('tanggal', '<', $awalBulan->toDateString())
+                ->whereNotNull('actual')
+                ->orderByDesc('tanggal')
+                ->value('actual');
+        }
+
+        return $hasil;
     }
 
     // =====================================================
@@ -439,7 +464,9 @@ class CheckSheetController extends Controller
     }
 
     // =====================================================
-    // NILAI ACTUAL / SELISIH / CATATAN (khusus KWH, per line)
+    // NILAI ACTUAL / CATATAN (khusus KWH, per line)
+    // Actual = input manual. Selisih TIDAK disimpan: dihitung
+    // otomatis di tampilan (actual ini - actual sebelumnya).
     // =====================================================
 
     public function storeNilai(Request $request, CheckSheet $checkSheet)
@@ -449,7 +476,6 @@ class CheckSheetController extends Controller
             'line_id' => ['nullable', 'integer'],
             'tanggal' => ['required', 'date'],
             'actual'  => ['nullable', 'numeric'],
-            'selisih' => ['nullable', 'numeric'],
             'catatan' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -466,9 +492,9 @@ class CheckSheetController extends Controller
             ],
             [
                 'actual'  => $validated['actual'] ?? null,
-                'selisih' => $validated['selisih'] ?? null,
                 'catatan' => $validated['catatan'] ?? null,
-                'status'  => isset($validated['actual']) || isset($validated['selisih']),
+                // dianggap terisi kalau actual diisi
+                'status'  => isset($validated['actual']),
             ]
         );
 
