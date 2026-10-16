@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CheckSheetAbnormality extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'check_sheet_id',
         'line_id',
@@ -26,7 +29,7 @@ class CheckSheetAbnormality extends Model
 
     public function checkSheet(): BelongsTo
     {
-        return $this->belongsTo(CheckSheet::class);
+        return $this->belongsTo(CheckSheet::class)->withTrashed();
     }
 
     public function line(): BelongsTo

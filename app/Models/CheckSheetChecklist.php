@@ -26,7 +26,7 @@ class CheckSheetChecklist extends Model
 
     public function checkSheetItem(): BelongsTo
     {
-        return $this->belongsTo(CheckSheetItem::class);
+        return $this->belongsTo(CheckSheetItem::class)->withTrashed();
     }
 
     public function line(): BelongsTo

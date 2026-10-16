@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CheckSheetItem extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'check_sheet_id',
         'no',
@@ -26,7 +29,7 @@ class CheckSheetItem extends Model
 
     public function checkSheet(): BelongsTo
     {
-        return $this->belongsTo(CheckSheet::class);
+        return $this->belongsTo(CheckSheet::class)->withTrashed();
     }
 
     public function checklists(): HasMany
