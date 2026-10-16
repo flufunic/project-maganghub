@@ -18,12 +18,14 @@ class CheckSheet extends Model
         'nama_checksheet',
         'line_id',
         'pakai_actual',
+        'pakai_plan_act',
+        'pakai_monitoring',
+        'pakai_bbm',
+        'bbm_kali_60',
     ];
 
     protected static function booted(): void
     {
-        // Setelah check sheet di-soft-delete, item & abnormality yang MASIH AKTIF
-        // diberi deleted_at yang SAMA dengan induknya (penanda "dihapus bersama induk").
         static::deleted(function (CheckSheet $cs) {
             if ($cs->isForceDeleting()) {
                 return;
@@ -31,25 +33,33 @@ class CheckSheet extends Model
 
             $cs->items()->update(['deleted_at' => $cs->deleted_at]);
             $cs->abnormalities()->update(['deleted_at' => $cs->deleted_at]);
+            $cs->monitoringItems()->update(['deleted_at' => $cs->deleted_at]);
+            $cs->bbmItems()->update(['deleted_at' => $cs->deleted_at]);
         });
 
-        // Restore: hanya anak dengan deleted_at yang sama yang dikembalikan.
-        // Item yang dulu dihapus manual (waktunya beda) tetap terhapus.
         static::restoring(function (CheckSheet $cs) {
             $cs->items()->onlyTrashed()
-                ->where('deleted_at', $cs->deleted_at)
-                ->restore();
+                ->where('deleted_at', $cs->deleted_at)->restore();
 
             $cs->abnormalities()->onlyTrashed()
-                ->where('deleted_at', $cs->deleted_at)
-                ->restore();
+                ->where('deleted_at', $cs->deleted_at)->restore();
+
+            $cs->monitoringItems()->onlyTrashed()
+                ->where('deleted_at', $cs->deleted_at)->restore();
+
+            $cs->bbmItems()->onlyTrashed()
+                ->where('deleted_at', $cs->deleted_at)->restore();
         });
     }
 
     protected function casts(): array
     {
         return [
-            'pakai_actual' => 'boolean',
+            'pakai_actual'     => 'boolean',
+            'pakai_plan_act'   => 'boolean',
+            'pakai_monitoring' => 'boolean',
+            'pakai_bbm'        => 'boolean',
+            'bbm_kali_60' => 'boolean',
         ];
     }
 
@@ -68,6 +78,16 @@ class CheckSheet extends Model
         return $this->hasMany(CheckSheetAbnormality::class);
     }
 
+    public function monitoringItems(): HasMany
+    {
+        return $this->hasMany(CheckSheetMonitoringItem::class);
+    }
+
+    public function bbmItems(): HasMany
+    {
+        return $this->hasMany(CheckSheetBbmItem::class);
+    }
+
     public function line()
     {
         return $this->belongsTo(Line::class);
@@ -75,7 +95,6 @@ class CheckSheet extends Model
 
     /**
      * Susun ulang nomor Inspection Point per shift: 1, 2, 3, ... tanpa bolong.
-     * Urutan mengikuti nomor lama, lalu id.
      */
     public function susunUlangNomorItem(): void
     {
@@ -96,5 +115,21 @@ class CheckSheet extends Model
                     }
                 });
         });
+    }
+
+    /**
+     * Konsumsi solar (Liter) dari running hours (jam).
+     * - Generator     : Solar (L/jam)   x jam
+     * - Pompa Hydrant : Solar (L/menit) x jam x 60
+    */
+    public function hitungKonsumsiBbm(?float $runningHours, float $solar): ?float
+    {
+        if ($runningHours === null) {
+            return null;
+        }
+
+        $faktor = $this->bbm_kali_60 ? 60 : 1;
+
+        return round($runningHours * $solar * $faktor, 2);
     }
 }

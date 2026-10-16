@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
+import MonitoringSection from '@/Components/MonitoringSection';
 
 // =========================================================
 // ICONS  (UI saja, tidak ada logic)
@@ -345,6 +346,27 @@ const AbnormalityFields = ({ data, setData, errors, withPlaceholder = false }) =
             />
         </Field>
     </>
+);
+
+// =========================================================
+// CHECKBOX KECIL (kolom Plan / Act / centang)
+// =========================================================
+
+const CheckBtn = ({ checked, tone = 'emerald', title, onClick }) => (
+    <button
+        type="button"
+        title={title}
+        onClick={onClick}
+        className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
+            checked
+                ? tone === 'blue'
+                    ? 'border-blue-300 bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-sm hover:from-blue-500 hover:to-indigo-600'
+                    : 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:from-emerald-500 hover:to-teal-600'
+                : 'border-slate-200 bg-slate-50 text-transparent hover:border-blue-300 hover:bg-blue-50'
+        }`}
+    >
+        {checked && <Icon type="check" className="h-3.5 w-3.5" />}
+    </button>
 );
 
 // =========================================================
@@ -864,6 +886,19 @@ export default function Show({
     // Checksheet ini memakai kolom Actual / Selisih / Catatan (KWH)?
     const pakaiActual = Boolean(checkSheet.pakai_actual);
 
+    // Checksheet ini memakai kolom Plan & Act (Generator / Pompa)?
+    const pakaiPlanAct = Boolean(checkSheet.pakai_plan_act);
+
+    // Checksheet ini punya tabel Monitoring Running Hours?
+    const pakaiMonitoring = Boolean(checkSheet.pakai_monitoring);
+
+    // Checksheet ini punya tabel Konsumsi Bahan Bakar (Solar)?
+    const pakaiBbm = Boolean(checkSheet.pakai_bbm);
+
+    // Mode Plan/Act: tiap tanggal punya 2 kolom (Plan | Act), header 2 baris
+    const duaBaris = pakaiPlanAct && !pakaiActual;
+    const barisHeader = duaBaris ? 2 : 1;
+
     // =====================================================
     // STATE
     // =====================================================
@@ -1013,14 +1048,15 @@ export default function Show({
 
     // =====================================================
     // CHECKLIST (langsung, tanpa konfirmasi)
+    // kolom: 'status' = Act / centang biasa, 'plan' = Plan
     // =====================================================
 
-    const toggleChecklist = (item, tanggalLengkap) => {
+    const toggleChecklist = (item, tanggalLengkap, kolom = 'status') => {
         const checklist = item.checklists?.find(
-            (checklist) => checklist.tanggal === tanggalLengkap
+            (c) => String(c.tanggal).substring(0, 10) === tanggalLengkap
         );
 
-        const statusBaru = checklist ? !checklist.status : true;
+        const statusBaru = checklist ? !checklist[kolom] : true;
 
         router.post(
             `/check-sheets/${checkSheet.id}/checklist`,
@@ -1028,6 +1064,7 @@ export default function Show({
                 check_sheet_item_id: item.id,
                 line_id: line?.id ?? null,
                 tanggal: tanggalLengkap,
+                kolom,
                 status: statusBaru,
             },
             {
@@ -1705,6 +1742,8 @@ export default function Show({
                             desc={
                                 pakaiActual
                                     ? 'Isi Actual dan Catatan harian, Selisih dihitung otomatis.'
+                                    : pakaiPlanAct
+                                    ? ''
                                     : 'Kelola titik pemeriksaan dan checklist harian.'
                             }
                             count={`${filteredItems.length} item`}
@@ -1756,6 +1795,25 @@ export default function Show({
                             </div>
                         )}
 
+                        {/* Keterangan cara baca sel (Plan / Act) */}
+                        {/* {duaBaris && (
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-500">
+                                <span className="font-bold text-slate-600">
+                                    Tiap tanggal: kolom Plan | kolom Act
+                                </span>
+
+                                <span>
+                                    <span className="font-bold text-blue-600">Plan</span> =
+                                    centang kalau dijadwalkan di hari itu
+                                </span>
+
+                                <span>
+                                    <span className="font-bold text-emerald-600">Act</span> =
+                                    centang kalau sudah dikerjakan
+                                </span>
+                            </div>
+                        )} */}
+
                         <div className="idx-scroll overflow-x-auto">
                             {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
                             <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
@@ -1763,6 +1821,7 @@ export default function Show({
                                     <tr className="text-white">
                                         {/* No (sticky, lebar dikunci 48px) */}
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`sticky left-0 z-20 w-12 min-w-[48px] max-w-[48px] bg-[#0a1a4d] px-0 text-center ${tableHeadBase}`}
                                         >
                                             No
@@ -1770,30 +1829,35 @@ export default function Show({
 
                                         {/* Inspection Point (sticky, offset 48px = lebar kolom No) */}
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`sticky left-[48px] z-20 min-w-[220px] bg-[#0a1a4d] text-left shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)] ${tableHead}`}
                                         >
                                             Inspection Point
                                         </th>
 
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`min-w-[160px] bg-[#0a1a4d] text-left ${tableHead}`}
                                         >
                                             Condition
                                         </th>
 
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`min-w-[170px] bg-[#0a1a4d] text-left ${tableHead}`}
                                         >
                                             Method
                                         </th>
 
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`w-20 bg-[#0a1a4d] text-center ${tableHead}`}
                                         >
                                             Shift
                                         </th>
 
                                         <th
+                                            rowSpan={barisHeader}
                                             className={`w-24 bg-[#0a1a4d] text-center ${tableHead}`}
                                         >
                                             Aksi
@@ -1812,9 +1876,12 @@ export default function Show({
                                             return (
                                                 <th
                                                     key={tanggalLengkap || index}
+                                                    colSpan={duaBaris ? 2 : 1}
                                                     className={`${
                                                         pakaiActual
                                                             ? 'min-w-[108px]'
+                                                            : duaBaris
+                                                            ? ''
                                                             : 'w-10 min-w-10'
                                                     } border-r border-white/10 bg-[#0a1a4d] px-1 py-3 text-center text-[11px] font-bold`}
                                                 >
@@ -1825,13 +1892,38 @@ export default function Show({
                                             );
                                         })}
                                     </tr>
+
+                                    {/* Baris header kedua: Plan | Act per tanggal */}
+                                    {duaBaris && (
+                                        <tr className="text-white">
+                                            {tanggal.map((itemTanggal, index) => {
+                                                const key =
+                                                    getTanggalLengkap(
+                                                        itemTanggal,
+                                                        bulan,
+                                                        tahun
+                                                    ) || index;
+
+                                                return (
+                                                    <React.Fragment key={key}>
+                                                        <th className="w-10 min-w-[40px] border-r border-white/10 bg-[#13307a] px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-blue-200">
+                                                            Plan
+                                                        </th>
+                                                        <th className="w-10 min-w-[40px] border-r border-white/10 bg-[#13307a] px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-emerald-200">
+                                                            Act
+                                                        </th>
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </tr>
+                                    )}
                                 </thead>
 
                                 <tbody>
                                     {filteredItems.length === 0 ? (
                                         <tr>
                                             <td
-                                                colSpan={6 + tanggal.length}
+                                                colSpan={6 + tanggal.length * (duaBaris ? 2 : 1)}
                                                 className="px-6 py-12 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
@@ -1939,6 +2031,72 @@ export default function Show({
                                                             );
                                                         }
 
+                                                        // ---------- MODE PLAN / ACT: 2 kolom, masing-masing checkbox ----------
+                                                        if (pakaiPlanAct) {
+                                                            const cl = getChecklist(
+                                                                item,
+                                                                tanggalLengkap
+                                                            );
+                                                            const plan = Boolean(cl?.plan);
+                                                            const act = Boolean(cl?.status);
+
+                                                            return (
+                                                                <React.Fragment
+                                                                    key={tanggalLengkap || idx}
+                                                                >
+                                                                    <td
+                                                                        className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                            plan
+                                                                                ? 'bg-blue-50/70'
+                                                                                : ''
+                                                                        }`}
+                                                                    >
+                                                                        <CheckBtn
+                                                                            checked={plan}
+                                                                            tone="blue"
+                                                                            title={
+                                                                                plan
+                                                                                    ? 'Batalkan Plan'
+                                                                                    : 'Tandai Plan'
+                                                                            }
+                                                                            onClick={() =>
+                                                                                toggleChecklist(
+                                                                                    item,
+                                                                                    tanggalLengkap,
+                                                                                    'plan'
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </td>
+
+                                                                    <td
+                                                                        className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                            act
+                                                                                ? 'bg-emerald-50/70'
+                                                                                : ''
+                                                                        }`}
+                                                                    >
+                                                                        <CheckBtn
+                                                                            checked={act}
+                                                                            tone="emerald"
+                                                                            title={
+                                                                                act
+                                                                                    ? 'Batalkan Act'
+                                                                                    : 'Tandai Act'
+                                                                            }
+                                                                            onClick={() =>
+                                                                                toggleChecklist(
+                                                                                    item,
+                                                                                    tanggalLengkap,
+                                                                                    'status'
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </td>
+                                                                </React.Fragment>
+                                                            );
+                                                        }
+
                                                         // ---------- MODE BIASA: centang ----------
                                                         const checklist = getChecklist(
                                                             item,
@@ -1956,8 +2114,9 @@ export default function Show({
                                                                     checked ? 'bg-emerald-50/70' : ''
                                                                 }`}
                                                             >
-                                                                <button
-                                                                    type="button"
+                                                                <CheckBtn
+                                                                    checked={checked}
+                                                                    tone="emerald"
                                                                     title={
                                                                         checked
                                                                             ? 'Klik untuk membatalkan'
@@ -1969,19 +2128,7 @@ export default function Show({
                                                                             tanggalLengkap
                                                                         )
                                                                     }
-                                                                    className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
-                                                                        checked
-                                                                            ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:-translate-y-0.5 hover:from-emerald-500 hover:to-teal-600'
-                                                                            : 'border-slate-200 bg-slate-50 text-transparent hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
-                                                                    }`}
-                                                                >
-                                                                    {checked && (
-                                                                        <Icon
-                                                                            type="check"
-                                                                            className="h-3.5 w-3.5"
-                                                                        />
-                                                                    )}
-                                                                </button>
+                                                                />
                                                             </td>
                                                         );
                                                     })}
@@ -1994,6 +2141,18 @@ export default function Show({
                         </div>
                     </section>
 
+                    {/* MONITORING RUNNING HOURS + KONSUMSI BAHAN BAKAR */}
+                    {pakaiMonitoring && (
+                        <MonitoringSection
+                            checkSheet={checkSheet}
+                            bulan={bulan}
+                            tahun={tahun}
+                            namaBulan={namaBulan[bulan - 1]}
+                            pakaiBbm={pakaiBbm}
+                            notify={notify}
+                        />
+                    )}
+
                     {/* ABNORMALITY (per bulan & tahun yang dipilih) */}
                     <section
                         style={{ animationDelay: '200ms' }}
@@ -2002,7 +2161,7 @@ export default function Show({
                         <SectionHead
                             tone="amber"
                             title={`Abnormality ${namaBulan[bulan - 1]} ${tahun}${line ? ' · ' + line.nama_line : ''}`}
-                            desc="Catat abnormality, countermeasure, status, dan PIC."
+                            // desc="Catat abnormality, countermeasure, status, dan PIC."
                             count={`${checkSheet.abnormalities?.length ?? 0} data`}
                             action={
                                 <button

@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\CheckSheetImportController;
+use App\Http\Controllers\CheckSheetMonitoringController;
+use App\Http\Controllers\CheckSheetBbmController;
+
 
 Route::get('/', [
     PreventifMesinController::class,
@@ -57,6 +60,22 @@ Route::middleware('auth')->group(function () {
         CheckSheetController::class,
         'barcodes'
     ])->name('check-sheets.barcodes');
+
+    Route::prefix('check-sheets/{checkSheet}')->group(function () {
+        // Tabel Monitoring Running Hours
+        Route::post('monitoring-items', [CheckSheetMonitoringController::class, 'storeItem']);
+        Route::put('monitoring-items/{item}', [CheckSheetMonitoringController::class, 'updateItem']);
+        Route::delete('monitoring-items/{item}', [CheckSheetMonitoringController::class, 'destroyItem']);
+        Route::post('monitoring/{item}/running', [CheckSheetMonitoringController::class, 'storeRunning']);
+        Route::post('monitoring/{item}/foto', [CheckSheetMonitoringController::class, 'storeFoto']);
+        Route::delete('monitoring/{item}/foto', [CheckSheetMonitoringController::class, 'destroyFoto']);
+
+        // Tabel Monitoring Konsumsi Bahan Bakar (data sendiri)
+        Route::post('bbm-items', [CheckSheetBbmController::class, 'storeItem']);
+        Route::put('bbm-items/{item}', [CheckSheetBbmController::class, 'updateItem']);
+        Route::delete('bbm-items/{item}', [CheckSheetBbmController::class, 'destroyItem']);
+        Route::post('bbm/{item}/running', [CheckSheetBbmController::class, 'storeRunning']);
+    });
 
     Route::resource('/check-sheets', CheckSheetController::class);
 

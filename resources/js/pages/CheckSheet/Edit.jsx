@@ -186,6 +186,10 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
         nomor_dokumen: checkSheet.nomor_dokumen ?? '',
         nama_checksheet: checkSheet.nama_checksheet ?? '',
         pakai_actual: Boolean(checkSheet.pakai_actual),
+        pakai_plan_act: Boolean(checkSheet.pakai_plan_act),
+        pakai_monitoring: Boolean(checkSheet.pakai_monitoring),
+        pakai_bbm: Boolean(checkSheet.pakai_bbm),
+        bbm_kali_60: Boolean(checkSheet.bbm_kali_60),
     });
 
     // Mesin yang tampil hanya milik divisi yang sedang dipilih
@@ -203,6 +207,16 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
             ...data,
             divisi_id: value,
             line_id: '',
+        });
+    };
+
+    // Monitoring dimatikan -> opsi BBM ikut dimatikan
+    const gantiMonitoring = (value) => {
+        setData({
+            ...data,
+            pakai_monitoring: value,
+            pakai_bbm: value ? data.pakai_bbm : false,
+            bbm_kali_60: value ? data.bbm_kali_60 : false,
         });
     };
 
@@ -394,6 +408,52 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
                             onChange={(value) => setData('pakai_actual', value)}
                             error={errors.pakai_actual}
                         />
+
+                        {/* OPSI: Plan & Act (Generator / Pompa) */}
+                        <CheckboxField
+                            label="Pakai kolom Plan & Act"
+                            hint="Centang untuk check sheet Generator / Pompa. Tiap tanggal berisi dua kotak: P (Plan) dan A (Act). Data lama tidak terhapus kalau opsi ini dimatikan lagi."
+                            checked={data.pakai_plan_act}
+                            onChange={(value) => setData('pakai_plan_act', value)}
+                            error={errors.pakai_plan_act}
+                        />
+
+                        {/* OPSI: Monitoring Running Hours */}
+                        <CheckboxField
+                            label="Pakai Monitoring Running Hours"
+                            hint="Menambah tabel foto per minggu (Week 1-5) dan Actual Running (jam) di bawah daftar item. Data monitoring tidak terhapus kalau opsi ini dimatikan lagi."
+                            checked={data.pakai_monitoring}
+                            onChange={gantiMonitoring}
+                            error={errors.pakai_monitoring}
+                        />
+
+                        {/* OPSI: Konsumsi Bahan Bakar (hanya kalau monitoring aktif) */}
+                        {data.pakai_monitoring && (
+                            <CheckboxField
+                                label="Pakai Monitoring Konsumsi Bahan Bakar (Solar)"
+                                hint="Tabel konsumsi solar dihitung dari Running Hours."
+                                checked={data.pakai_bbm}
+                                onChange={(value) =>
+                                    setData({
+                                        ...data,
+                                        pakai_bbm: value,
+                                        bbm_kali_60: value ? data.bbm_kali_60 : false,
+                                    })
+                                }
+                                error={errors.pakai_bbm}
+                            />
+                        )}
+
+                        {/* OPSI: jenis rumus konsumsi (hanya kalau BBM aktif) */}
+                        {data.pakai_monitoring && data.pakai_bbm && (
+                            <CheckboxField
+                                label="Rumus × 60 (Solar dalam L/menit) — Pompa Hydrant"
+                                hint="Tidak dicentang (Generator): Konsumsi = Solar (L/jam) × Running Hours. Dicentang (Pompa Hydrant): Konsumsi = Solar (L/menit) × Running Hours × 60."
+                                checked={data.bbm_kali_60}
+                                onChange={(value) => setData('bbm_kali_60', value)}
+                                error={errors.bbm_kali_60}
+                            />
+                        )}
 
                         {/* TOMBOL */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">

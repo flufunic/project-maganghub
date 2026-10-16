@@ -7,21 +7,26 @@ use App\Models\Line;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
-class CheckSheetExport implements FromArray, WithEvents
+class CheckSheetExport implements FromArray, WithEvents, WithTitle
 {
     protected $checkSheetId;
     protected $bulan;
     protected $tahun;
     protected ?int $lineId;
 
-    // Mode KWH: tiap tanggal = 3 kolom (Act, Sel, Catatan). Mode biasa: 1 kolom (centang).
+    // Mode KWH    : tiap tanggal = 3 kolom (Act, Sel, Catatan).
+    // Mode Plan/Act: tiap tanggal = 2 kolom (Plan, Act).
+    // Mode biasa  : tiap tanggal = 1 kolom (centang).
     protected bool $pakaiActual = false;
+    protected bool $pakaiPlanAct = false;
+    protected bool $adaSubHeader = false; // header tabel 2 baris (KWH atau Plan/Act)
     protected int $perTanggal = 1;
 
     protected int $lastColumnNumber;
@@ -55,7 +60,14 @@ class CheckSheetExport implements FromArray, WithEvents
         $this->pakaiActual = (bool) CheckSheet::whereKey($checkSheetId)
             ->value('pakai_actual');
 
-        $this->perTanggal = $this->pakaiActual ? 3 : 1;
+        $this->pakaiPlanAct = (bool) CheckSheet::whereKey($checkSheetId)
+            ->value('pakai_plan_act');
+
+        $this->perTanggal = $this->pakaiActual
+            ? 3
+            : ($this->pakaiPlanAct ? 2 : 1);
+
+        $this->adaSubHeader = $this->pakaiActual || $this->pakaiPlanAct;
 
         $jumlahHari = cal_days_in_month(
             CAL_GREGORIAN,
@@ -64,7 +76,7 @@ class CheckSheetExport implements FromArray, WithEvents
         );
 
         // A-D = informasi item
-        // E dst = tanggal (1 kolom per tanggal, atau 3 kolom di mode KWH)
+        // E dst = tanggal (1, 2, atau 3 kolom per tanggal)
         $this->lastColumnNumber = 4 + ($jumlahHari * $this->perTanggal);
         $this->lastColumn = $this->columnLetter(
             $this->lastColumnNumber
@@ -72,8 +84,16 @@ class CheckSheetExport implements FromArray, WithEvents
     }
 
     /**
+     * Nama sheet (dipakai saat digabung dengan sheet Monitoring).
+     */
+    public function title(): string
+    {
+        return 'Check Sheet';
+    }
+
+    /**
      * Nomor kolom untuk tanggal $hari.
-     * $sub: 0 = Act (atau centang), 1 = Sel, 2 = Catatan.
+     * $sub: 0 = Act / Plan / centang, 1 = Sel / Act, 2 = Catatan.
      */
     private function dayColumn(int $hari, int $sub = 0): int
     {
@@ -192,7 +212,7 @@ class CheckSheetExport implements FromArray, WithEvents
 
         $rows[] = $this->makeMainHeader($jumlahHari);
 
-        if ($this->pakaiActual) {
+        if ($this->adaSubHeader) {
             $rows[] = $this->makeSubHeader($jumlahHari);
         }
 
@@ -232,7 +252,7 @@ class CheckSheetExport implements FromArray, WithEvents
 
         $rows[] = $this->makeMainHeader($jumlahHari);
 
-        if ($this->pakaiActual) {
+        if ($this->adaSubHeader) {
             $rows[] = $this->makeSubHeader($jumlahHari);
         }
 
@@ -288,7 +308,8 @@ class CheckSheetExport implements FromArray, WithEvents
 
     /**
      * Header tabel Shift A dan Shift B.
-     * Mode KWH: angka tanggal ditaruh di kolom pertama, lalu di-merge 3 kolom.
+     * Mode KWH / Plan-Act: angka tanggal ditaruh di kolom pertama,
+     * lalu di-merge selebar jumlah kolom per tanggal.
      */
     private function makeMainHeader(int $jumlahHari): array
     {
@@ -302,8 +323,7 @@ class CheckSheetExport implements FromArray, WithEvents
         for ($hari = 1; $hari <= $jumlahHari; $hari++) {
             $row[] = $hari;
 
-            if ($this->pakaiActual) {
-                $row[] = '';
+            for ($i = 1; $i < $this->perTanggal; $i++) {
                 $row[] = '';
             }
         }
@@ -312,16 +332,23 @@ class CheckSheetExport implements FromArray, WithEvents
     }
 
     /**
-     * Baris header kedua (khusus KWH): Act / Sel / Catatan per tanggal.
+     * Baris header kedua:
+     * - KWH       : Act / Sel / Catatan per tanggal.
+     * - Plan/Act  : Plan / Act per tanggal.
      */
     private function makeSubHeader(int $jumlahHari): array
     {
         $row = ['', '', '', ''];
 
         for ($hari = 1; $hari <= $jumlahHari; $hari++) {
-            $row[] = 'Act';
-            $row[] = 'Sel';
-            $row[] = 'Catatan';
+            if ($this->pakaiActual) {
+                $row[] = 'Act';
+                $row[] = 'Sel';
+                $row[] = 'Catatan';
+            } else {
+                $row[] = 'Plan';
+                $row[] = 'Act';
+            }
         }
 
         return $this->makeRow($row);
@@ -418,6 +445,32 @@ class CheckSheetExport implements FromArray, WithEvents
                     $this->redCells[] =
                         $this->columnLetter($this->dayColumn($hari, 1)) . $rowNumber;
                 }
+            }
+
+            return $this->makeRow($row);
+        }
+
+        /*
+         * MODE PLAN / ACT: dua kolom per tanggal
+         */
+        if ($this->pakaiPlanAct) {
+            for ($hari = 1; $hari <= $jumlahHari; $hari++) {
+                $tanggal = Carbon::create(
+                    $this->tahun,
+                    $this->bulan,
+                    $hari
+                );
+
+                $c = $item->checklists->first(
+                    function ($checklist) use ($tanggal) {
+                        return $checklist->tanggal
+                            && Carbon::parse($checklist->tanggal)
+                                ->isSameDay($tanggal);
+                    }
+                );
+
+                $row[] = ($c && (bool) $c->plan) ? '✓' : '';
+                $row[] = ($c && (bool) $c->status) ? '✓' : '';
             }
 
             return $this->makeRow($row);
@@ -535,8 +588,8 @@ class CheckSheetExport implements FromArray, WithEvents
 
                 $highestRow = $sheet->getHighestRow();
 
-                // jumlah baris header tabel (2 di mode KWH, 1 di mode biasa)
-                $headerSpan = $this->pakaiActual ? 2 : 1;
+                // jumlah baris header tabel (2 di mode KWH / Plan-Act, 1 di mode biasa)
+                $headerSpan = $this->adaSubHeader ? 2 : 1;
 
                 /*
                 |--------------------------------------------------------------------------
@@ -556,13 +609,13 @@ class CheckSheetExport implements FromArray, WithEvents
                     "A1:{$this->lastColumn}{$highestRow}"
                 )->getFont()->setName('Calibri');
 
-                // Judul rata tengah. Di mode KWH, merge dibatasi (lihat $judulAkhir)
-                // supaya posisi tengahnya tetap ada di layar pertama.
+                // Judul rata tengah. Di mode lebar (KWH / Plan-Act), merge dibatasi
+                // (lihat $judulAkhir) supaya posisi tengahnya tetap ada di layar pertama.
                 $alignJudul = Alignment::HORIZONTAL_CENTER;
 
-                // Merge judul tidak perlu selebar seluruh tabel di mode KWH
+                // Merge judul tidak perlu selebar seluruh tabel di mode lebar
                 // (bisa 90+ kolom). Batasi sampai kolom ke-22 supaya tetap tampil.
-                $judulAkhir = $this->pakaiActual
+                $judulAkhir = $this->adaSubHeader
                     ? $this->columnLetter(min($this->lastColumnNumber, 22))
                     : $this->lastColumn;
 
@@ -585,7 +638,7 @@ class CheckSheetExport implements FromArray, WithEvents
                 )->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => $this->pakaiActual ? 26 : 18,
+                        'size' => $this->adaSubHeader ? 26 : 18,
                         'color' => ['rgb' => '000000'],
                     ],
 
@@ -600,7 +653,7 @@ class CheckSheetExport implements FromArray, WithEvents
                 )->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => $this->pakaiActual ? 15 : 11,
+                        'size' => $this->adaSubHeader ? 15 : 11,
                         'color' => ['rgb' => '000000'],
                     ],
 
@@ -610,8 +663,8 @@ class CheckSheetExport implements FromArray, WithEvents
                     ],
                 ]);
 
-                $sheet->getRowDimension(1)->setRowHeight($this->pakaiActual ? 44 : 32);
-                $sheet->getRowDimension(2)->setRowHeight($this->pakaiActual ? 28 : 22);
+                $sheet->getRowDimension(1)->setRowHeight($this->adaSubHeader ? 44 : 32);
+                $sheet->getRowDimension(2)->setRowHeight($this->adaSubHeader ? 28 : 22);
 
                 /*
                 |--------------------------------------------------------------------------
@@ -624,7 +677,7 @@ class CheckSheetExport implements FromArray, WithEvents
                 $sheet->getStyle("A3:{$judulAkhir}3")->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'size' => $this->pakaiActual ? 13 : 10,
+                        'size' => $this->adaSubHeader ? 13 : 10,
                         'color' => ['rgb' => '000000'],
                     ],
                     'alignment' => [
@@ -634,7 +687,7 @@ class CheckSheetExport implements FromArray, WithEvents
                     ],
                 ]);
 
-                $sheet->getRowDimension(3)->setRowHeight($this->pakaiActual ? 30 : 28);
+                $sheet->getRowDimension(3)->setRowHeight($this->adaSubHeader ? 30 : 28);
 
                 /*
                 |--------------------------------------------------------------------------
@@ -729,7 +782,7 @@ class CheckSheetExport implements FromArray, WithEvents
 
                     $sheet->getRowDimension($row)->setRowHeight(30);
 
-                    if ($this->pakaiActual) {
+                    if ($this->adaSubHeader) {
                         $sheet->getRowDimension($rowEnd)->setRowHeight(20);
 
                         // No, Inspection Point, Condition, Method: gabung 2 baris header
@@ -768,10 +821,10 @@ class CheckSheetExport implements FromArray, WithEvents
                             $hari
                         );
 
-                        // Mode KWH: tanggal digabung selebar 3 kolom
-                        if ($this->pakaiActual) {
+                        // Mode KWH / Plan-Act: tanggal digabung selebar 2-3 kolom
+                        if ($this->adaSubHeader) {
                             $columnAkhir = $this->columnLetter(
-                                $this->dayColumn($hari, 2)
+                                $this->dayColumn($hari, $this->perTanggal - 1)
                             );
 
                             $sheet->mergeCells(
@@ -995,13 +1048,16 @@ class CheckSheetExport implements FromArray, WithEvents
                                 ->setWidth($lebar[$sub]);
                         }
                     } else {
-                        $letter = $this->columnLetter(
-                            $this->dayColumn($hari, 0)
-                        );
+                        // Plan, Act (2 kolom) atau centang (1 kolom)
+                        for ($sub = 0; $sub < $this->perTanggal; $sub++) {
+                            $letter = $this->columnLetter(
+                                $this->dayColumn($hari, $sub)
+                            );
 
-                        $sheet->getColumnDimension($letter)
-                            ->setVisible(true)
-                            ->setWidth(4.2);
+                            $sheet->getColumnDimension($letter)
+                                ->setVisible(true)
+                                ->setWidth($this->pakaiPlanAct ? 5.5 : 4.2);
+                        }
                     }
                 }
 
@@ -1124,7 +1180,7 @@ class CheckSheetExport implements FromArray, WithEvents
         );
 
         /*
-         * ✓ dibuat lebih jelas (mode biasa) / angka (mode KWH).
+         * ✓ dibuat lebih jelas (mode biasa / Plan-Act) / angka (mode KWH).
          */
         $sheet->getStyle(
             "E{$startRow}:{$this->lastColumn}{$endRow}"
@@ -1184,7 +1240,7 @@ class CheckSheetExport implements FromArray, WithEvents
                 continue;
             }
 
-            // semua kolom milik tanggal ini (1 atau 3 kolom)
+            // semua kolom milik tanggal ini (1, 2, atau 3 kolom)
             for ($sub = 0; $sub < $this->perTanggal; $sub++) {
 
                 $column = $this->columnLetter(

@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\CheckSheetWorkbookExport;
 
 class CheckSheetController extends Controller
 {
@@ -141,7 +142,7 @@ class CheckSheetController extends Controller
      * Divisi yang punya barcode per mesin (Utility / Saidan) WAJIB memilih mesin,
      * dan mesin itu harus milik divisinya. Divisi lain (Headrest) selalu NULL.
      */
-    private function tentukanLineId(int $divisiId, $lineId): ?int
+   private function tentukanLineId(int $divisiId, int|string|null $lineId): ?int
     {
         $adaPerMesin = Line::where('divisi_id', $divisiId)
             ->where('per_mesin', true)
@@ -195,11 +196,15 @@ class CheckSheetController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'divisi_id'       => ['required', 'exists:divisis,id'],
-            'line_id'         => ['nullable', 'exists:lines,id'],
-            'nomor_dokumen'   => ['required', 'string', 'max:255'],
-            'nama_checksheet' => ['required', 'string', 'max:255'],
-            'pakai_actual'    => ['nullable', 'boolean'],
+            'divisi_id'        => ['required', 'exists:divisis,id'],
+            'line_id'          => ['nullable', 'exists:lines,id'],
+            'nomor_dokumen'    => ['required', 'string', 'max:255'],
+            'nama_checksheet'  => ['required', 'string', 'max:255'],
+            'pakai_actual'     => ['nullable', 'boolean'],
+            'pakai_plan_act'   => ['nullable', 'boolean'],
+            'pakai_monitoring' => ['nullable', 'boolean'],
+            'pakai_bbm'        => ['nullable', 'boolean'],
+            'bbm_kali_60' => ['nullable', 'boolean'],
         ]);
 
         $lineId = $this->tentukanLineId(
@@ -208,11 +213,16 @@ class CheckSheetController extends Controller
         );
 
         CheckSheet::create([
-            'divisi_id'       => $validated['divisi_id'],
-            'line_id'         => $lineId,
-            'nomor_dokumen'   => $validated['nomor_dokumen'],
-            'nama_checksheet' => $validated['nama_checksheet'],
-            'pakai_actual'    => $request->boolean('pakai_actual'),
+            'divisi_id'        => $validated['divisi_id'],
+            'line_id'          => $lineId,
+            'nomor_dokumen'    => $validated['nomor_dokumen'],
+            'nama_checksheet'  => $validated['nama_checksheet'],
+            'pakai_actual'     => $request->boolean('pakai_actual'),
+            'pakai_plan_act'   => $request->boolean('pakai_plan_act'),
+            'pakai_monitoring' => $request->boolean('pakai_monitoring'),
+            // BBM hanya masuk akal kalau monitoring aktif
+            'pakai_bbm'        => $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm'),
+            'bbm_kali_60' => $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60'),
         ]);
 
         $line = $lineId
@@ -221,6 +231,7 @@ class CheckSheetController extends Controller
 
         return $this->kembaliKeDaftar($line, 'Check Sheet berhasil ditambahkan.');
     }
+
 
     public function edit(CheckSheet $checkSheet)
     {
@@ -235,11 +246,14 @@ class CheckSheetController extends Controller
     public function update(Request $request, CheckSheet $checkSheet)
     {
         $validated = $request->validate([
-            'divisi_id'       => ['required', 'exists:divisis,id'],
-            'line_id'         => ['nullable', 'exists:lines,id'],
-            'nomor_dokumen'   => ['required', 'string', 'max:255'],
-            'nama_checksheet' => ['required', 'string', 'max:255'],
-            'pakai_actual'    => ['nullable', 'boolean'],
+            'divisi_id'        => ['required', 'exists:divisis,id'],
+            'line_id'          => ['nullable', 'exists:lines,id'],
+            'nomor_dokumen'    => ['required', 'string', 'max:255'],
+            'nama_checksheet'  => ['required', 'string', 'max:255'],
+            'pakai_actual'     => ['nullable', 'boolean'],
+            'pakai_plan_act'   => ['nullable', 'boolean'],
+            'pakai_monitoring' => ['nullable', 'boolean'],
+            'pakai_bbm'        => ['nullable', 'boolean'],
         ]);
 
         // check sheet milik mesin tidak boleh pindah divisi
@@ -253,7 +267,12 @@ class CheckSheetController extends Controller
         );
 
         // checkbox yang tidak dicentang = false (bukan "tidak diubah")
-        $validated['pakai_actual'] = $request->boolean('pakai_actual');
+        $validated['pakai_actual']     = $request->boolean('pakai_actual');
+        $validated['pakai_plan_act']   = $request->boolean('pakai_plan_act');
+        $validated['pakai_monitoring'] = $request->boolean('pakai_monitoring');
+        $validated['pakai_bbm']        = $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm');
+        $validated['bbm_kali_60'] = $request->boolean('pakai_bbm')
+        && $request->boolean('bbm_kali_60');
 
         $checkSheet->update($validated);
 
@@ -323,6 +342,22 @@ class CheckSheetController extends Controller
                     ])
                     ->orderBy('tanggal')
                     ->orderBy('id');
+            },
+            'monitoringItems' => function ($query) {
+                $query->orderBy('no')->orderBy('id');
+            },
+
+            // hanya data bulan & tahun yang dilihat
+            'monitoringItems.weeks' => function ($query) use ($bulan, $tahun) {
+                $query->where('bulan', $bulan)->where('tahun', $tahun);
+            },
+
+            // item BBM + running hours-nya sendiri (bulan & tahun yang dilihat)
+            'bbmItems' => function ($query) {
+                $query->orderBy('no')->orderBy('id');
+            },
+            'bbmItems.weeks' => function ($query) use ($bulan, $tahun) {
+                $query->where('bulan', $bulan)->where('tahun', $tahun);
             },
         ]);
 
@@ -443,21 +478,24 @@ class CheckSheetController extends Controller
             'check_sheet_item_id' => ['required', 'exists:check_sheet_items,id'],
             'line_id' => ['nullable', 'integer'],
             'tanggal' => ['required', 'date'],
-            'status' => ['required', 'boolean'],
+            'status'  => ['required', 'boolean'],
+            // kolom mana yang diubah: Act (status) atau Plan
+            'kolom'   => ['nullable', 'in:status,plan'],
         ]);
 
         $item = $checkSheet->items()
             ->where('id', $validated['check_sheet_item_id'])
             ->firstOrFail();
 
-        $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+        $line  = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+        $kolom = $validated['kolom'] ?? 'status';
 
         $item->checklists()->updateOrCreate(
             [
                 'line_id' => $line?->id,
                 'tanggal' => $validated['tanggal'],
             ],
-            ['status' => $validated['status']]
+            [$kolom => $validated['status']]
         );
 
         return back();
@@ -606,7 +644,7 @@ class CheckSheetController extends Controller
             . '-' . $bulan . '-' . $tahun . '.xlsx';
 
         return Excel::download(
-            new \App\Exports\CheckSheetExport(
+            new CheckSheetWorkbookExport(
                 $checkSheet->id,
                 $bulan,
                 $tahun,

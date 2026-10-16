@@ -12,6 +12,7 @@ class CheckSheetChecklist extends Model
         'line_id',
         'tanggal',
         'status',
+        'plan',
         'actual',
         'selisih',
         'catatan',
@@ -21,6 +22,7 @@ class CheckSheetChecklist extends Model
         return [
             'tanggal' => 'date:Y-m-d',
             'status' => 'boolean',
+            'plan'    => 'boolean',
         ];
     }
 
