@@ -1,16 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Sidebar from '@/Components/Sidebar';
 
 const READER_ID = 'barcode-reader';
+// QR berisi "http://server/s/KODE" atau langsung "KODE"
+const extractKode = (text) => {
+    const match = String(text).match(/\/s\/([^/?#\s]+)/);
+    return match ? decodeURIComponent(match[1]) : String(text).trim();
+};
 
-export default function Scan() {
+export default function Scan({ notifikasi = [] }) {
+    const { errors } = usePage().props;
+
     const [showSidebar, setShowSidebar] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
     const [cameraError, setCameraError] = useState('');
     const [scanError, setScanError] = useState('');
     const [manualKode, setManualKode] = useState('');
     const [processing, setProcessing] = useState(false);
+
+    // jumlah notifikasi (nanti dikirim dari controller)
+    const totalNotif = notifikasi.length;
 
     // kunci supaya 1 barcode tidak terkirim berkali-kali
     const lockRef = useRef(false);
@@ -63,7 +74,7 @@ export default function Scan() {
             .start(
                 { facingMode: 'environment' }, // kamera belakang
                 { fps: 10, qrbox: { width: 240, height: 240 } },
-                (decodedText) => submitKode(decodedText.trim()),
+                (decodedText) => submitKode(extractKode(decodedText)),
                 () => {} // error per-frame (belum ada barcode), abaikan
             )
             .then(() => {
@@ -75,7 +86,8 @@ export default function Scan() {
 
                 if (!window.isSecureContext) {
                     setCameraError(
-                        'Kamera hanya bisa dipakai lewat HTTPS (atau localhost). Buka aplikasi lewat alamat https://.'
+                        'Kamera di halaman ini tidak aktif karena alamat bukan HTTPS. ' +
+                        'Scan barcode pakai aplikasi Kamera bawaan HP, atau ketik kode di bawah.'
                     );
                 } else if (/Permission|NotAllowed/i.test(text)) {
                     setCameraError(
@@ -99,18 +111,76 @@ export default function Scan() {
             <Head title="Scan Barcode Check Sheet" />
 
             <div className="relative flex min-h-screen flex-col bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]">
-                <header className="border-b border-white/15 bg-[#030a26]/45 px-4 py-3 backdrop-blur-2xl">
-                    <div className="mx-auto flex max-w-md items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setShowSidebar(true)}
-                            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white"
-                        >
-                            ☰
-                        </button>
-                        <h1 className="text-base font-bold text-white">
-                            Check Sheet Prediktif
-                        </h1>
+                {/* HEADER: hamburger kiri, lonceng kanan */}
+                <header className="relative z-40 border-b border-white/15 bg-[#030a26]/45 px-4 py-3 backdrop-blur-2xl sm:px-6">
+                    <div className="flex w-full items-center justify-between gap-3">
+                        {/* KIRI */}
+                        <div className="flex min-w-0 items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowSidebar(true)}
+                                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
+                                title="Menu"
+                            >
+                                ☰
+                            </button>
+                            <h1 className="truncate text-base font-bold text-white">
+                                Check Sheet Prediktif
+                            </h1>
+                        </div>
+
+                        {/* KANAN: LONCENG */}
+                        <div className="relative shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                title="Notifikasi"
+                                className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/20 transition-all duration-200 ${
+                                    totalNotif > 0
+                                        ? 'bg-white/20 text-white hover:bg-white/30'
+                                        : 'bg-white/10 text-white/80 hover:bg-white/15 hover:text-white'
+                                }`}
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                >
+                                    <path d="M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5" />
+                                    <path d="M10 20h4" />
+                                </svg>
+
+                                {totalNotif > 0 && (
+                                    <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0a2260] bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-extrabold text-white shadow-md">
+                                        {totalNotif > 99 ? '99+' : totalNotif}
+                                    </span>
+                                )}
+                            </button>
+
+                            {showNotifications && (
+                                <div className="absolute right-0 top-12 z-[80] w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30">
+                                    <div className="border-b border-slate-100 px-4 py-3">
+                                        <h3 className="text-sm font-bold text-slate-800">
+                                            Notifikasi
+                                        </h3>
+                                    </div>
+
+                                    <div className="flex flex-col items-center px-6 py-8 text-center">
+                                        <p className="text-sm font-bold text-slate-700">
+                                            Semua aman ✨
+                                        </p>
+                                        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                                            Belum ada notifikasi.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </header>
 
@@ -146,6 +216,12 @@ export default function Scan() {
                             {scanError && (
                                 <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">
                                     {scanError}
+                                </p>
+                            )}
+
+                            {errors?.kode && !scanError && (
+                                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">
+                                    {errors.kode}
                                 </p>
                             )}
 

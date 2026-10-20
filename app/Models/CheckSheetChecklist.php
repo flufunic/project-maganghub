@@ -16,6 +16,7 @@ class CheckSheetChecklist extends Model
         'actual',
         'selisih',
         'catatan',
+        'catatan_plan',
     ];
     protected function casts(): array
     {

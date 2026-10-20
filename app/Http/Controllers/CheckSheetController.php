@@ -25,6 +25,7 @@ class CheckSheetController extends Controller
         return Inertia::render('CheckSheet/Scan');
     }
 
+    // Dipakai form manual & scanner di web (POST)
     public function resolve(Request $request)
     {
         $data = $request->validate([
@@ -39,7 +40,36 @@ class CheckSheetController extends Controller
             ]);
         }
 
+        $this->bukaAkses($line);
+
         return redirect()->route('check-sheets.line', $line->kode);
+    }
+
+    // Dipakai kamera bawaan HP (GET, QR berisi URL /s/{kode})
+    public function unlock(string $kode)
+    {
+        $line = Line::where('kode', strtoupper(trim($kode)))->first();
+
+        if (! $line) {
+            return redirect()->route('check-sheets.index')
+                ->withErrors(['kode' => 'Barcode tidak dikenali.']);
+        }
+
+        $this->bukaAkses($line);
+
+        return redirect()->route('check-sheets.line', $line->kode);
+    }
+
+    // Izin akses mesin ini berlaku 8 jam (1 shift)
+    private function bukaAkses(Line $line): void
+    {
+        $akses = session('line_akses', []);
+        $akses[$line->kode] = now()->addHours(8)->timestamp;
+
+        session([
+            'line_akses' => $akses,
+            'last_line'  => $line->kode,
+        ]);
     }
 
     // Daftar check sheet dari barcode yang di-scan
@@ -478,9 +508,10 @@ class CheckSheetController extends Controller
             'check_sheet_item_id' => ['required', 'exists:check_sheet_items,id'],
             'line_id' => ['nullable', 'integer'],
             'tanggal' => ['required', 'date'],
-            'status'  => ['required', 'boolean'],
+            'status'  => ['nullable', 'boolean'],
             // kolom mana yang diubah: Act (status) atau Plan
             'kolom'   => ['nullable', 'in:status,plan'],
+            'catatan' => ['nullable', 'string', 'max:255'],
         ]);
 
         $item = $checkSheet->items()
@@ -490,12 +521,23 @@ class CheckSheetController extends Controller
         $line  = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
         $kolom = $validated['kolom'] ?? 'status';
 
+        $values = [];
+
+        if (array_key_exists('status', $validated) && $validated['status'] !== null) {
+            $values[$kolom] = $validated['status'];
+        }
+
+        // has() supaya catatan bisa dikosongkan (null) tanpa mengubah centang
+        if ($request->has('catatan')) {
+            $values[$kolom === 'plan' ? 'catatan_plan' : 'catatan'] = $validated['catatan'] ?? null;
+        }
+
         $item->checklists()->updateOrCreate(
             [
                 'line_id' => $line?->id,
                 'tanggal' => $validated['tanggal'],
             ],
-            [$kolom => $validated['status']]
+            $values
         );
 
         return back();

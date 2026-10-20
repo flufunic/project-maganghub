@@ -44,7 +44,11 @@ export default function Barcodes({ lines = [] }) {
                             </p>
 
                             <div className="bg-white p-2">
-                                <QRCodeSVG value={line.kode} size={160} level="M" />
+                                <QRCodeSVG
+                                    value={`${window.location.origin}/s/${encodeURIComponent(line.kode)}`}
+                                    size={160}
+                                    level="M"
+                                />
                             </div>
 
                             <p className="mt-2 font-mono text-[10px] text-slate-500">

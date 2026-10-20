@@ -370,6 +370,26 @@ const CheckBtn = ({ checked, tone = 'emerald', title, onClick }) => (
 );
 
 // =========================================================
+// TOMBOL CATATAN (icon 📝, titik merah kalau sudah ada catatan)
+// =========================================================
+
+const CatatanBtn = ({ ada, onClick }) => (
+    <button
+        type="button"
+        onClick={onClick}
+        title={ada ? 'Lihat / ubah catatan' : 'Tambah catatan'}
+        className={`relative mx-auto cursor-pointer text-sm leading-none transition hover:scale-110 ${
+            ada ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+        }`}
+    >
+        📝
+        {ada && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+        )}
+    </button>
+);
+
+// =========================================================
 // SEL ACTUAL / SELISIH / CATATAN  (khusus checksheet KWH)
 // ---------------------------------------------------------
 // nilai = {
@@ -593,6 +613,105 @@ const ConfirmDialog = ({ dialog, onCancel }) => {
                         }`}
                     >
                         {dialog.confirmLabel ?? 'Ya'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// =========================================================
+// MODAL CATATAN CHECKLIST (mode Plan/Act & mode biasa)
+// =========================================================
+
+const CatatanModal = ({
+    target,
+    value,
+    onChange,
+    onClose,
+    onSave,
+    saving,
+    namaBulan,
+    bulan,
+    tahun,
+}) => {
+    if (!target) {
+        return null;
+    }
+
+    const hari = Number(String(target.tanggal).substring(8, 10));
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
+            <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
+                <div className="border-b border-slate-100 px-6 py-5">
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 shadow-sm">
+                                📝
+                            </div>
+
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">
+                                    {target.judul ?? 'Catatan Checklist'}
+                                </h2>
+
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {hari} {namaBulan[bulan - 1]} {tahun}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        {target.label}
+                    </p>
+                </div>
+
+                <div className="px-6 py-5">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Catatan
+                    </label>
+
+                    <textarea
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        rows="5"
+                        maxLength={255}
+                        autoFocus
+                        placeholder="Tulis catatan untuk checklist ini..."
+                        className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                    />
+
+                    <p className="mt-1 text-right text-[11px] text-slate-400">
+                        {value.length}/255
+                    </p>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onSave}
+                        disabled={saving}
+                        className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {saving ? 'Menyimpan...' : 'Simpan Catatan'}
                     </button>
                 </div>
             </div>
@@ -919,6 +1038,11 @@ export default function Show({
     // Toast: { type: 'success' | 'error', message }
     const [toast, setToast] = useState(null);
 
+    // Catatan checklist (mode Plan/Act & biasa)
+    const [catatanTarget, setCatatanTarget] = useState(null); // { item, tanggal, label }
+    const [catatanText, setCatatanText] = useState('');
+    const [savingCatatan, setSavingCatatan] = useState(false);
+
     const notify = (message, type = 'success') => setToast({ type, message });
 
     // Toast dari flash backend
@@ -1047,6 +1171,77 @@ export default function Show({
     };
 
     // =====================================================
+    // HELPERS
+    // (didefinisikan di atas supaya bisa dipakai handler di bawahnya)
+    // =====================================================
+
+    const formatTanggal = (value) => {
+        if (!value) return '-';
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return date.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const getStatusClass = (status) => {
+        if (status === 'Closed') {
+            return 'text-emerald-700';
+        }
+
+        if (status === 'Progress') {
+            return 'text-amber-700';
+        }
+
+        return 'text-red-700';
+    };
+
+    const getStatusDot = (status) => {
+        if (status === 'Closed') {
+            return 'bg-emerald-500';
+        }
+
+        if (status === 'Progress') {
+            return 'bg-amber-500';
+        }
+
+        return 'bg-red-500';
+    };
+
+    const getTanggalValue = (itemTanggal) => {
+        if (itemTanggal && typeof itemTanggal === 'object') {
+            return itemTanggal.tanggal;
+        }
+
+        return itemTanggal;
+    };
+
+    const getTanggalLengkap = (itemTanggal, bulan, tahun) => {
+        if (itemTanggal && typeof itemTanggal === 'object') {
+            return itemTanggal.tanggal_lengkap;
+        }
+
+        return `${tahun}-${String(bulan).padStart(2, '0')}-${String(
+            itemTanggal
+        ).padStart(2, '0')}`;
+    };
+
+    const getChecklist = (item, tanggalLengkap) => {
+        return item.checklists?.find((checklist) => {
+            const tanggalChecklist = String(checklist.tanggal).substring(0, 10);
+
+            return tanggalChecklist === tanggalLengkap;
+        });
+    };
+
+    // =====================================================
     // CHECKLIST (langsung, tanpa konfirmasi)
     // kolom: 'status' = Act / centang biasa, 'plan' = Plan
     // =====================================================
@@ -1069,6 +1264,70 @@ export default function Show({
             },
             {
                 preserveScroll: true,
+            }
+        );
+    };
+
+    // =====================================================
+    // CATATAN CHECKLIST (mode Plan/Act & biasa)
+    // =====================================================
+
+    const bukaCatatan = (item, tanggalLengkap, kolom = 'status') => {
+        const cl = getChecklist(item, tanggalLengkap);
+
+        // Plan punya catatan sendiri (catatan_plan), Act / centang biasa pakai catatan
+        const field = kolom === 'plan' ? 'catatan_plan' : 'catatan';
+
+        setCatatanTarget({
+            item,
+            tanggal: tanggalLengkap,
+            kolom,
+            label: item.inspection_point,
+            judul:
+                kolom === 'plan'
+                    ? 'Catatan Plan'
+                    : duaBaris
+                    ? 'Catatan Act'
+                    : 'Catatan Checklist',
+        });
+        setCatatanText(cl?.[field] ?? '');
+    };
+
+    const tutupCatatan = () => {
+        setCatatanTarget(null);
+        setCatatanText('');
+        setSavingCatatan(false);
+    };
+
+    const simpanCatatan = () => {
+        if (!catatanTarget) {
+            return;
+        }
+
+        const { item, tanggal: tgl, kolom } = catatanTarget;
+        const cl = getChecklist(item, tgl);
+        const teks = catatanText.trim();
+
+        router.post(
+            `/check-sheets/${checkSheet.id}/checklist`,
+            {
+                check_sheet_item_id: item.id,
+                line_id: line?.id ?? null,
+                tanggal: tgl,
+                kolom,
+                status: Boolean(cl?.[kolom]), // centang tidak berubah
+                catatan: teks === '' ? null : teks,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSavingCatatan(true),
+                onFinish: () => setSavingCatatan(false),
+                onSuccess: () => {
+                    tutupCatatan();
+                    notify('Catatan berhasil disimpan.');
+                },
+                onError: () =>
+                    notify('Catatan gagal disimpan. Periksa kembali isian kamu.', 'error'),
             }
         );
     };
@@ -1419,76 +1678,6 @@ export default function Show({
         });
     };
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
-
-    const formatTanggal = (value) => {
-        if (!value) return '-';
-
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) {
-            return value;
-        }
-
-        return date.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
-    };
-
-    const getStatusClass = (status) => {
-        if (status === 'Closed') {
-            return 'text-emerald-700';
-        }
-
-        if (status === 'Progress') {
-            return 'text-amber-700';
-        }
-
-        return 'text-red-700';
-    };
-
-    const getStatusDot = (status) => {
-        if (status === 'Closed') {
-            return 'bg-emerald-500';
-        }
-
-        if (status === 'Progress') {
-            return 'bg-amber-500';
-        }
-
-        return 'bg-red-500';
-    };
-
-    const getTanggalValue = (itemTanggal) => {
-        if (itemTanggal && typeof itemTanggal === 'object') {
-            return itemTanggal.tanggal;
-        }
-
-        return itemTanggal;
-    };
-
-    const getTanggalLengkap = (itemTanggal, bulan, tahun) => {
-        if (itemTanggal && typeof itemTanggal === 'object') {
-            return itemTanggal.tanggal_lengkap;
-        }
-
-        return `${tahun}-${String(bulan).padStart(2, '0')}-${String(
-            itemTanggal
-        ).padStart(2, '0')}`;
-    };
-
-    const getChecklist = (item, tanggalLengkap) => {
-        return item.checklists?.find((checklist) => {
-            const tanggalChecklist = String(checklist.tanggal).substring(0, 10);
-
-            return tanggalChecklist === tanggalLengkap;
-        });
-    };
-
     return (
         <>
             <Head title={`${checkSheet.nama_checksheet} - Check Sheet`} />
@@ -1743,8 +1932,8 @@ export default function Show({
                                 pakaiActual
                                     ? 'Isi Actual dan Catatan harian, Selisih dihitung otomatis.'
                                     : pakaiPlanAct
-                                    ? ''
-                                    : 'Kelola titik pemeriksaan dan checklist harian.'
+                                    ? 'Centang Plan / Act, klik 📝 untuk menambah catatan.'
+                                    : 'Kelola titik pemeriksaan, checklist harian, dan catatan (📝).'
                             }
                             count={`${filteredItems.length} item`}
                             action={
@@ -1795,24 +1984,20 @@ export default function Show({
                             </div>
                         )}
 
-                        {/* Keterangan cara baca sel (Plan / Act) */}
-                        {/* {duaBaris && (
+                        {/* Keterangan icon catatan (mode Plan/Act & biasa) */}
+                        {!pakaiActual && (
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-500">
-                                <span className="font-bold text-slate-600">
-                                    Tiap tanggal: kolom Plan | kolom Act
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span>📝</span>
+                                    Klik untuk menambah / melihat catatan
                                 </span>
 
-                                <span>
-                                    <span className="font-bold text-blue-600">Plan</span> =
-                                    centang kalau dijadwalkan di hari itu
-                                </span>
-
-                                <span>
-                                    <span className="font-bold text-emerald-600">Act</span> =
-                                    centang kalau sudah dikerjakan
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="relative inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+                                    Titik merah = sudah ada catatan
                                 </span>
                             </div>
-                        )} */}
+                        )}
 
                         <div className="idx-scroll overflow-x-auto">
                             {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
@@ -2051,7 +2236,8 @@ export default function Show({
                                                                                 : ''
                                                                         }`}
                                                                     >
-                                                                        <CheckBtn
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <CheckBtn
                                                                             checked={plan}
                                                                             tone="blue"
                                                                             title={
@@ -2067,6 +2253,22 @@ export default function Show({
                                                                                 )
                                                                             }
                                                                         />
+
+                                                                            <CatatanBtn
+                                                                                ada={Boolean(
+                                                                                    String(
+                                                                                        cl?.catatan_plan ?? ''
+                                                                                    ).trim()
+                                                                                )}
+                                                                                onClick={() =>
+                                                                                    bukaCatatan(
+                                                                                        item,
+                                                                                        tanggalLengkap,
+                                                                                        'plan'
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
                                                                     </td>
 
                                                                     <td
@@ -2076,28 +2278,45 @@ export default function Show({
                                                                                 : ''
                                                                         }`}
                                                                     >
-                                                                        <CheckBtn
-                                                                            checked={act}
-                                                                            tone="emerald"
-                                                                            title={
-                                                                                act
-                                                                                    ? 'Batalkan Act'
-                                                                                    : 'Tandai Act'
-                                                                            }
-                                                                            onClick={() =>
-                                                                                toggleChecklist(
-                                                                                    item,
-                                                                                    tanggalLengkap,
-                                                                                    'status'
-                                                                                )
-                                                                            }
-                                                                        />
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <CheckBtn
+                                                                                checked={act}
+                                                                                tone="emerald"
+                                                                                title={
+                                                                                    act
+                                                                                        ? 'Batalkan Act'
+                                                                                        : 'Tandai Act'
+                                                                                }
+                                                                                onClick={() =>
+                                                                                    toggleChecklist(
+                                                                                        item,
+                                                                                        tanggalLengkap,
+                                                                                        'status'
+                                                                                    )
+                                                                                }
+                                                                            />
+
+                                                                            <CatatanBtn
+                                                                                ada={Boolean(
+                                                                                    String(
+                                                                                        cl?.catatan ?? ''
+                                                                                    ).trim()
+                                                                                )}
+                                                                                onClick={() =>
+                                                                                    bukaCatatan(
+                                                                                        item,
+                                                                                        tanggalLengkap,
+                                                                                        'status'
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
                                                                     </td>
                                                                 </React.Fragment>
                                                             );
                                                         }
 
-                                                        // ---------- MODE BIASA: centang ----------
+                                                        // ---------- MODE BIASA: centang + catatan ----------
                                                         const checklist = getChecklist(
                                                             item,
                                                             tanggalLengkap
@@ -2114,21 +2333,37 @@ export default function Show({
                                                                     checked ? 'bg-emerald-50/70' : ''
                                                                 }`}
                                                             >
-                                                                <CheckBtn
-                                                                    checked={checked}
-                                                                    tone="emerald"
-                                                                    title={
-                                                                        checked
-                                                                            ? 'Klik untuk membatalkan'
-                                                                            : 'Klik untuk menandai selesai'
-                                                                    }
-                                                                    onClick={() =>
-                                                                        toggleChecklist(
-                                                                            item,
-                                                                            tanggalLengkap
-                                                                        )
-                                                                    }
-                                                                />
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    <CheckBtn
+                                                                        checked={checked}
+                                                                        tone="emerald"
+                                                                        title={
+                                                                            checked
+                                                                                ? 'Klik untuk membatalkan'
+                                                                                : 'Klik untuk menandai selesai'
+                                                                        }
+                                                                        onClick={() =>
+                                                                            toggleChecklist(
+                                                                                item,
+                                                                                tanggalLengkap
+                                                                            )
+                                                                        }
+                                                                    />
+
+                                                                    <CatatanBtn
+                                                                        ada={Boolean(
+                                                                            String(
+                                                                                checklist?.catatan ?? ''
+                                                                            ).trim()
+                                                                        )}
+                                                                        onClick={() =>
+                                                                            bukaCatatan(
+                                                                                item,
+                                                                                tanggalLengkap
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             </td>
                                                         );
                                                     })}
@@ -2491,6 +2726,19 @@ export default function Show({
                     </form>
                 </Modal>
             )}
+
+            {/* MODAL - CATATAN CHECKLIST */}
+            <CatatanModal
+                target={catatanTarget}
+                value={catatanText}
+                onChange={setCatatanText}
+                onClose={tutupCatatan}
+                onSave={simpanCatatan}
+                saving={savingCatatan}
+                namaBulan={namaBulan}
+                bulan={bulan}
+                tahun={tahun}
+            />
 
             {/* DIALOG KONFIRMASI (simpan / edit / hapus) */}
             <ConfirmDialog

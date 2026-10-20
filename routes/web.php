@@ -77,6 +77,10 @@ Route::middleware('auth')->group(function () {
         Route::post('bbm/{item}/running', [CheckSheetBbmController::class, 'storeRunning']);
     });
 
+    // Kamera bawaan HP membuka URL ini
+    Route::get('/s/{kode}', [CheckSheetController::class, 'unlock'])
+        ->name('check-sheets.unlock');
+
     Route::resource('/check-sheets', CheckSheetController::class);
 
     Route::post('/check-sheets/{checkSheet}/items', [

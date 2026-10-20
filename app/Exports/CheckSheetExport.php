@@ -42,6 +42,13 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     protected int $shiftBStartRow = 0;
     protected int $shiftBEndRow = 0;
 
+    // Bagian "CATATAN CHECKLIST" (mode Plan/Act & mode biasa).
+    // Kalau tidak ada catatan sama sekali, semuanya tetap 0 dan bagian ini tidak dibuat.
+    protected int $catatanTitleRow = 0;
+    protected int $catatanHeaderRow = 0;
+    protected int $catatanStartRow = 0;
+    protected int $catatanEndRow = 0;
+
     protected int $abnormalityTitleRow = 0;
     protected int $abnormalityHeaderRow = 0;
     protected int $abnormalityStartRow = 0;
@@ -49,6 +56,17 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
     // Sel Selisih yang perlu diberi warna merah (diisi saat array() dibuat)
     protected array $redCells = [];
+
+    // Catatan checklist yang terkumpul saat baris item dibuat
+    // [ ['hari','shift','no','item','kolom','catatan','sub'], ... ]
+    protected array $catatanList = [];
+
+    // Hasil urut $catatanList (dipakai lagi saat styling)
+    protected array $catatanSorted = [];
+
+    // Sel centang yang diberi komentar Excel (segitiga merah di pojok sel)
+    // [ ['cell' => 'F12', 'text' => '...'], ... ]
+    protected array $noteCells = [];
 
     public function __construct($checkSheetId, $bulan, $tahun, $lineId = null)
     {
@@ -101,11 +119,24 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     }
 
     /**
+     * Kolom paling kanan untuk sel yang di-merge pada bagian judul / catatan.
+     * Dibatasi sampai kolom ke-22 supaya tetap terlihat di layar pertama
+     * (di mode lebar tabel bisa 90+ kolom).
+     */
+    private function mergeAkhirColumn(): string
+    {
+        return $this->columnLetter(min($this->lastColumnNumber, 22));
+    }
+
+    /**
      * Membuat seluruh isi Excel sebagai array.
      */
     public function array(): array
     {
         $this->redCells = [];
+        $this->catatanList = [];
+        $this->catatanSorted = [];
+        $this->noteCells = [];
 
         // Rentang tanggal bulan yang diexport
         $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->startOfMonth();
@@ -278,6 +309,61 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
         /*
         |--------------------------------------------------------------------------
+        | CATATAN CHECKLIST (mode Plan/Act & mode biasa)
+        | Mode KWH tidak dipakai karena sudah punya kolom Catatan sendiri.
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $this->pakaiActual && count($this->catatanList) > 0) {
+            $this->catatanSorted = collect($this->catatanList)
+                ->sortBy([
+                    ['hari', 'asc'],
+                    ['shift', 'asc'],
+                    ['no', 'asc'],
+                    ['sub', 'asc'],
+                ])
+                ->values()
+                ->all();
+
+            $this->catatanTitleRow = count($rows) + 1;
+
+            $rows[] = $this->makeRow([
+                'CATATAN CHECKLIST',
+            ]);
+
+            $this->catatanHeaderRow = count($rows) + 1;
+
+            $rows[] = $this->makeRow([
+                'No',
+                'Inspection Point',
+                'Tanggal',
+                'Shift / Kolom',
+                'Catatan',
+            ]);
+
+            $this->catatanStartRow = count($rows) + 1;
+
+            foreach ($this->catatanSorted as $index => $n) {
+                $rows[] = $this->makeRow([
+                    $index + 1,
+                    $n['item'],
+                    Carbon::create($this->tahun, $this->bulan, $n['hari'])->format('d/m/Y'),
+                    'Shift ' . $n['shift'] . ' · ' . $n['kolom'],
+                    $n['catatan'],
+                ]);
+            }
+
+            $this->catatanEndRow = count($rows);
+
+            /*
+            | JARAK
+            */
+
+            $rows[] = $this->emptyRow();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | ABNORMALITY (hanya bulan yang diexport)
         |--------------------------------------------------------------------------
         */
@@ -417,6 +503,44 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     }
 
     /**
+     * Simpan satu catatan checklist:
+     * - masuk ke daftar "CATATAN CHECKLIST" di bagian bawah sheet
+     * - sel centangnya diberi komentar Excel (segitiga merah)
+     *
+     * $kolom : 'Plan', 'Act', atau 'Checklist' (mode biasa)
+     * $sub   : 0 = kolom pertama tanggal itu, 1 = kolom kedua (Act di mode Plan/Act)
+     */
+    private function catatNote(
+        $item,
+        int $hari,
+        string $kolom,
+        $teks,
+        int $rowNumber,
+        int $sub
+    ): void {
+        $teks = trim((string) $teks);
+
+        if ($teks === '') {
+            return;
+        }
+
+        $this->catatanList[] = [
+            'hari'    => $hari,
+            'shift'   => (string) $item->shift,
+            'no'      => (int) $item->no,
+            'item'    => (string) $item->inspection_point,
+            'kolom'   => $kolom,
+            'catatan' => $teks,
+            'sub'     => $sub,
+        ];
+
+        $this->noteCells[] = [
+            'cell' => $this->columnLetter($this->dayColumn($hari, $sub)) . $rowNumber,
+            'text' => $kolom === 'Checklist' ? $teks : $kolom . ': ' . $teks,
+        ];
+    }
+
+    /**
      * Data inspection point.
      */
     private function makeItemRow($item, int $jumlahHari, int $rowNumber): array
@@ -452,6 +576,7 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
         /*
          * MODE PLAN / ACT: dua kolom per tanggal
+         * catatan_plan = catatan kolom Plan, catatan = catatan kolom Act
          */
         if ($this->pakaiPlanAct) {
             for ($hari = 1; $hari <= $jumlahHari; $hari++) {
@@ -471,6 +596,11 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 $row[] = ($c && (bool) $c->plan) ? '✓' : '';
                 $row[] = ($c && (bool) $c->status) ? '✓' : '';
+
+                if ($c) {
+                    $this->catatNote($item, $hari, 'Plan', $c->catatan_plan ?? null, $rowNumber, 0);
+                    $this->catatNote($item, $hari, 'Act', $c->catatan ?? null, $rowNumber, 1);
+                }
             }
 
             return $this->makeRow($row);
@@ -499,6 +629,10 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                 $row[] = '✓';
             } else {
                 $row[] = '';
+            }
+
+            if ($checklist) {
+                $this->catatNote($item, $hari, 'Checklist', $checklist->catatan ?? null, $rowNumber, 0);
             }
         }
 
@@ -615,9 +749,9 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 // Merge judul tidak perlu selebar seluruh tabel di mode lebar
                 // (bisa 90+ kolom). Batasi sampai kolom ke-22 supaya tetap tampil.
-                $judulAkhir = $this->adaSubHeader
-                    ? $this->columnLetter(min($this->lastColumnNumber, 22))
-                    : $this->lastColumn;
+                // Judul di-merge selebar seluruh tabel (A sampai kolom terakhir)
+                // supaya tepat berada di tengah-tengah tabel.
+                $judulAkhir = $this->lastColumn;
 
                 /*
                 |--------------------------------------------------------------------------
@@ -911,6 +1045,159 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 /*
                 |--------------------------------------------------------------------------
+                | KOMENTAR EXCEL PADA SEL YANG PUNYA CATATAN
+                | (segitiga merah di pojok sel, isi catatan muncul saat kursor diarahkan)
+                |--------------------------------------------------------------------------
+                */
+
+                foreach ($this->noteCells as $note) {
+                    $comment = $sheet->getComment($note['cell']);
+
+                    $comment->setAuthor('Catatan');
+                    $comment->getText()->createTextRun($note['text']);
+                    $comment->setWidth('220pt');
+                    $comment->setHeight('70pt');
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | CATATAN CHECKLIST (daftar di bawah tabel shift)
+                |--------------------------------------------------------------------------
+                */
+
+                $barisCatatan = [];
+
+                if ($this->catatanStartRow > 0) {
+                    $akhirCatatan = $this->mergeAkhirColumn();
+
+                    // Judul
+                    $sheet->mergeCells(
+                        "A{$this->catatanTitleRow}:{$this->lastColumn}{$this->catatanTitleRow}"
+                    );
+
+                    $sheet->getStyle(
+                        "A{$this->catatanTitleRow}:{$this->lastColumn}{$this->catatanTitleRow}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                            'size' => 12,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'E2EFDA',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'outline' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '7F7F7F',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($this->catatanTitleRow)->setRowHeight(24);
+
+                    // Header
+                    $sheet->mergeCells(
+                        "E{$this->catatanHeaderRow}:{$akhirCatatan}{$this->catatanHeaderRow}"
+                    );
+
+                    $sheet->getStyle(
+                        "A{$this->catatanHeaderRow}:{$akhirCatatan}{$this->catatanHeaderRow}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                            'wrapText' => true,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'EDEDED',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'allBorders' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '808080',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($this->catatanHeaderRow)->setRowHeight(22);
+
+                    // Data
+                    for ($r = $this->catatanStartRow; $r <= $this->catatanEndRow; $r++) {
+                        $sheet->mergeCells("E{$r}:{$akhirCatatan}{$r}");
+
+                        $n = $this->catatanSorted[$r - $this->catatanStartRow] ?? null;
+
+                        // merge tidak auto-tinggi, jadi tinggi baris dihitung dari panjang teks
+                        $barisTeks = $n ? (int) ceil(mb_strlen($n['catatan']) / 70) : 1;
+                        $barisItem = $n ? (int) ceil(mb_strlen($n['item']) / 30) : 1;
+
+                        $sheet->getRowDimension($r)->setRowHeight(
+                            max(22, max($barisTeks, $barisItem, 1) * 15)
+                        );
+
+                        $barisCatatan[] = $r;
+                    }
+
+                    $sheet->getStyle(
+                        "A{$this->catatanStartRow}:{$akhirCatatan}{$this->catatanEndRow}"
+                    )->applyFromArray([
+                        'alignment' => [
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                            'wrapText' => true,
+                        ],
+
+                        'borders' => [
+                            'allBorders' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => 'BFBFBF',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    // No, Tanggal, Shift / Kolom rata tengah
+                    foreach (['A', 'C', 'D'] as $col) {
+                        $sheet->getStyle(
+                            "{$col}{$this->catatanStartRow}:{$col}{$this->catatanEndRow}"
+                        )->getAlignment()->setHorizontal(
+                            Alignment::HORIZONTAL_CENTER
+                        );
+                    }
+
+                    // Catatan rata kiri
+                    $sheet->getStyle(
+                        "E{$this->catatanStartRow}:{$akhirCatatan}{$this->catatanEndRow}"
+                    )->getAlignment()->setHorizontal(
+                        Alignment::HORIZONTAL_LEFT
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
                 | ABNORMALITY TITLE
                 |--------------------------------------------------------------------------
                 */
@@ -1076,6 +1363,16 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     $this->abnormalityTitleRow,
                     $this->abnormalityHeaderRow,
                 ];
+
+                if ($this->catatanStartRow > 0) {
+                    $barisKhusus[] = $this->catatanTitleRow;
+                    $barisKhusus[] = $this->catatanHeaderRow;
+
+                    // tinggi baris catatan sudah dihitung sendiri di atas
+                    foreach ($barisCatatan as $r) {
+                        $barisKhusus[] = $r;
+                    }
+                }
 
                 foreach ([
                     $this->shiftAHeaderRow,
