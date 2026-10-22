@@ -13,6 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\CheckSheetWorkbookExport;
+use App\Models\PreventifMesin;
 
 class CheckSheetController extends Controller
 {
@@ -365,7 +366,8 @@ class CheckSheetController extends Controller
 
             // abnormality HANYA milik line ini
             'abnormalities' => function ($query) use ($awalBulan, $akhirBulan, $lineId) {
-                $query->where('line_id', $lineId)
+                $query->with('preventifMesins')
+                    ->where('line_id', $lineId)
                     ->whereBetween('tanggal', [
                         $awalBulan->toDateString(),
                         $akhirBulan->toDateString(),
@@ -406,11 +408,15 @@ class CheckSheetController extends Controller
             'tahun'       => $tahun,
             'tanggal'     => $tanggal,
             'line'        => $line,
-            // Actual terakhir SEBELUM tanggal 1 bulan ini, supaya selisih
-            // tanggal 1 menyambung ke bulan lalu (khusus checksheet KWH)
             'prevActuals' => $checkSheet->pakai_actual
                 ? $this->actualSebelumBulan($checkSheet, $awalBulan, $lineId)
                 : (object) [],
+
+            // [BARU] pilihan item preventif untuk form abnormality
+            'preventifOptions' => PreventifMesin::where('is_hidden', false)
+                ->orderBy('divisi')
+                ->orderBy('no_item')
+                ->get(['no', 'divisi', 'no_item', 'item_preventif']),
         ]);
     }
 
@@ -585,26 +591,51 @@ class CheckSheetController extends Controller
     // ABNORMALITY (per line)
     // =====================================================
 
+        // =====================================================
+    // ABNORMALITY (per line)
+    // =====================================================
+
+    /**
+     * Aturan validasi bersama (add & edit).
+     * preventif_mesin_ids = BOLEH LEBIH DARI SATU item preventif.
+     */
+    private function aturanAbnormality(): array
+    {
+        return [
+            'preventif_mesin_ids'   => ['nullable', 'array'],
+            'preventif_mesin_ids.*' => ['integer', 'distinct', 'exists:preventif_mesins,no'],
+            'tanggal'               => ['required', 'date'],
+            'abnormality'           => ['required', 'string'],
+            'countermeasure'        => ['nullable', 'string'],
+            'status'                => ['required', 'string', 'max:255'],
+            'pic'                   => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
     public function storeAbnormality(Request $request, CheckSheet $checkSheet)
     {
-        $validated = $request->validate([
-            'line_id' => ['nullable', 'integer'],
-            'tanggal' => ['required', 'date'],
-            'abnormality' => ['required', 'string'],
-            'countermeasure' => ['nullable', 'string'],
-            'status' => ['required', 'string', 'max:255'],
-            'pic' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $request->validate(
+            $this->aturanAbnormality() + [
+                'line_id' => ['nullable', 'integer'],
+            ]
+        );
 
         $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
 
-        unset($validated['line_id']);
+        $preventifIds = collect($validated['preventif_mesin_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
-        $checkSheet->abnormalities()->create($validated + [
+        unset($validated['line_id'], $validated['preventif_mesin_ids']);
+
+        $abnormality = $checkSheet->abnormalities()->create($validated + [
             'line_id' => $line?->id,
         ]);
 
-        // Arahkan ke bulan sesuai tanggal abnormality, supaya langsung terlihat
+        $abnormality->preventifMesins()->sync($preventifIds);
+
         return $this->redirectKePeriode($checkSheet, $validated['tanggal'], $line?->id)
             ->with('success', 'Abnormality berhasil ditambahkan.');
     }
@@ -614,21 +645,25 @@ class CheckSheetController extends Controller
         CheckSheet $checkSheet,
         int $abnormality
     ) {
-        $validated = $request->validate([
-            'tanggal' => ['required', 'date'],
-            'abnormality' => ['required', 'string'],
-            'countermeasure' => ['nullable', 'string'],
-            'status' => ['required', 'string', 'max:255'],
-            'pic' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $request->validate($this->aturanAbnormality());
 
         $checkSheetAbnormality = $checkSheet->abnormalities()
             ->where('id', $abnormality)
             ->firstOrFail();
 
+        $preventifIds = collect($validated['preventif_mesin_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        unset($validated['preventif_mesin_ids']);
+
         $checkSheetAbnormality->update($validated);
 
-        // line tidak berubah saat edit
+        // sync: yang tidak dicentang lagi otomatis dilepas
+        $checkSheetAbnormality->preventifMesins()->sync($preventifIds);
+
         return $this->redirectKePeriode(
             $checkSheet,
             $validated['tanggal'],
@@ -642,11 +677,11 @@ class CheckSheetController extends Controller
             ->where('id', $abnormality)
             ->firstOrFail();
 
+        // soft delete: otomatis tidak lagi muncul di notifikasi preventif
         $checkSheetAbnormality->delete();
 
         return back()->with('success', 'Abnormality berhasil dihapus.');
     }
-
     // =====================================================
     // LAIN-LAIN
     // =====================================================

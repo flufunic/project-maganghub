@@ -95,7 +95,7 @@ const glassCard =
 const selectClass =
     'h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
-/* Label kecil + kontrol (tanpa ikon dekoratif) */
+/* Label kecil + kontrol */
 function Field({ label, children }) {
     return (
         <label className="flex flex-col gap-1">
@@ -122,13 +122,40 @@ const months = [
     'Desember',
 ];
 
+/* Warna & teks per jenis notifikasi jadwal / abnormality */
+const NOTIF_STYLE = {
+    abnormality: {
+        bar: 'bg-red-400',
+        icon: 'bg-red-50 text-red-600',
+        teks: 'text-red-600',
+        judul: 'Perlu Pengecekan Lebih Lanjut',
+        label: 'Abnormality',
+        iconType: 'alert',
+    },
+    terlambat: {
+        bar: 'bg-amber-400',
+        icon: 'bg-amber-50 text-amber-600',
+        teks: 'text-amber-600',
+        judul: 'Pengecekan Belum Dilakukan',
+        label: 'Perlu perhatian',
+        iconType: 'alert',
+    },
+    besok: {
+        bar: 'bg-blue-400',
+        icon: 'bg-blue-50 text-blue-600',
+        teks: 'text-blue-600',
+        judul: 'Pengecekan Besok',
+        label: 'Besok',
+        iconType: 'schedule',
+    },
+};
+
 export default function Index({
     preventifMesins,
     flash,
     bulan,
     tahun,
     status,
-    // Total mengikuti filter status. Backend mengirim ketiganya (lihat catatan).
     totalDotAll = 0,
     totalHotAll = 0,
     totalDotAct = 0,
@@ -184,14 +211,10 @@ export default function Index({
     const [selectedChecklist, setSelectedChecklist] = useState(null);
     const [catatan, setCatatan] = useState('');
 
-    // Dialog konfirmasi umum (edit, hapus, simpan bulanan, dll)
-    // bentuk: { title, message, confirmLabel, tone, onConfirm }
+    // Dialog konfirmasi umum: { title, message, confirmLabel, tone, onConfirm }
     const [confirmDialog, setConfirmDialog] = useState(null);
 
-    // [BARU] Fokus dari klik notifikasi
-    // highlight      : { no, day } baris + tanggal yang sedang disorot
-    // searching      : sedang mencari data ke halaman lain
-    // warningMessage : toast peringatan jika data tidak ditemukan di semua halaman
+    // Fokus dari klik notifikasi
     const [highlight, setHighlight] = useState(null);
     const [searching, setSearching] = useState(false);
     const [warningMessage, setWarningMessage] = useState('');
@@ -243,7 +266,6 @@ export default function Index({
         return () => clearTimeout(timer);
     }, [showSuccess]);
 
-    // Auto-hide toast peringatan
     useEffect(() => {
         if (!warningMessage) {
             return;
@@ -271,9 +293,6 @@ export default function Index({
         );
     };
 
-    // =========================
-    // AMBIL DATA CHECKLIST
-    // =========================
     const getChecklist = (preventif, day) => {
         const tanggalChecklist = getTanggalChecklist(day);
 
@@ -284,11 +303,7 @@ export default function Index({
         });
     };
 
-    // =========================
-    // STATUS DATA
-    // ACT = ada checklist yang dicentang di bulan yang sedang
-    // ditampilkan, TIDAK harus di tanggal Plan.
-    // =========================
+    // ACT = ada checklist yang dicentang di bulan yang sedang ditampilkan
     const getStatus = (preventif) => {
         const prefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
@@ -447,11 +462,10 @@ export default function Index({
         );
     };
 
-    // Simpan -> konfirmasi dulu
     const saveBulanan = () => {
         setConfirmDialog({
             title: 'Simpan perubahan?',
-            message: `Apakah kamu yakin ingin menyimpan data ini?`,
+            message: 'Apakah kamu yakin ingin menyimpan data ini?',
             confirmLabel: 'Ya, Simpan',
             tone: 'blue',
             onConfirm: () => {
@@ -461,7 +475,6 @@ export default function Index({
         });
     };
 
-    // Kosongkan -> konfirmasi dulu
     const resetBulanan = () => {
         setConfirmDialog({
             title: 'Kosongkan data bulan ini?',
@@ -519,12 +532,9 @@ export default function Index({
     };
 
     // =========================
-    // [BARU] FOKUS KE DATA DARI NOTIFIKASI
+    // FOKUS KE DATA DARI NOTIFIKASI
     // Otomatis pindah bulan/tahun + mencari ke semua halaman pagination
     // =========================
-
-    // Cari baris pada sekumpulan data.
-    // Prioritas: notif.no (id baris) -> fallback no_item + divisi.
     const findRowIn = (data, target) => {
         return (data ?? []).find((item) => {
             if (target.no !== null && target.no !== undefined) {
@@ -538,7 +548,6 @@ export default function Index({
         });
     };
 
-    // Kunjungi 1 halaman tertentu dan kembalikan props barunya
     const visitPage = (month, year, nextStatus, pageNumber) => {
         return new Promise((resolve) => {
             router.get(
@@ -561,7 +570,6 @@ export default function Index({
         });
     };
 
-    // Klik notifikasi jadwal
     const handleNotifClick = async (notif) => {
         setShowNotifications(false);
 
@@ -639,7 +647,6 @@ export default function Index({
         setSearching(false);
 
         if (found) {
-            // beri waktu React merender halaman baru
             setTimeout(() => setHighlight({ no: found.no, day }), 150);
         } else {
             setWarningMessage(
@@ -673,6 +680,15 @@ export default function Index({
             clearTimeout(clearTimer);
         };
     }, [highlight]);
+
+    // =========================
+    // HITUNG NOTIFIKASI
+    // =========================
+    const jumlahAbnormality = notifikasi.filter(
+        (item) => item.tipe === 'abnormality'
+    ).length;
+
+    const jumlahJadwal = notifikasi.length - jumlahAbnormality;
 
     const totalNotif = notifikasi.length + jumlahPengirimanDitolak;
 
@@ -742,7 +758,7 @@ export default function Index({
                 }
             `}</style>
 
-           <div className="relative flex min-h-screen flex-col overflow-x-hidden">
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden">
                 {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
@@ -753,7 +769,7 @@ export default function Index({
                 </div>
 
                 {/* =====================================================
-                    HEADER (RINGKAS)
+                    HEADER
                 ====================================================== */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
                     <div className="mx-auto w-full max-w-[1800px] px-4 py-2.5 sm:px-6">
@@ -808,7 +824,7 @@ export default function Index({
                                     </button>
 
                                     {/* =================================================
-                                        DROPDOWN NOTIFIKASI (flat / tidak seperti tombol)
+                                        DROPDOWN NOTIFIKASI
                                     ================================================== */}
                                     {showNotifications && (
                                         <div className="absolute right-0 top-12 z-[80] w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30">
@@ -831,7 +847,14 @@ export default function Index({
                                                 </div>
 
                                                 {totalNotif > 0 && (
-                                                    <div className="flex items-center gap-3 text-[11px] font-semibold">
+                                                    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-[11px] font-semibold">
+                                                        {jumlahAbnormality > 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-red-500">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                                                {jumlahAbnormality} abnormality
+                                                            </span>
+                                                        )}
+
                                                         {jumlahPengirimanDitolak > 0 && (
                                                             <span className="inline-flex items-center gap-1 text-red-500">
                                                                 <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
@@ -839,10 +862,10 @@ export default function Index({
                                                             </span>
                                                         )}
 
-                                                        {notifikasi.length > 0 && (
+                                                        {jumlahJadwal > 0 && (
                                                             <span className="inline-flex items-center gap-1 text-amber-600">
                                                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                                                {notifikasi.length} jadwal
+                                                                {jumlahJadwal} jadwal
                                                             </span>
                                                         )}
                                                     </div>
@@ -896,92 +919,107 @@ export default function Index({
                                                         </div>
                                                     ))}
 
-                                                {/* NOTIFIKASI JADWAL (BISA DIKLIK) */}
-                                                {notifikasi.length > 0 &&
-                                                    notifikasi.map((notif, index) => {
-                                                        const terlambat = notif.tipe === 'terlambat';
+                                                {/* NOTIFIKASI ABNORMALITY + JADWAL (BISA DIKLIK) */}
+                                                {notifikasi.map((notif, index) => {
+                                                    const abnormal = notif.tipe === 'abnormality';
+                                                    const gaya =
+                                                        NOTIF_STYLE[notif.tipe] ?? NOTIF_STYLE.besok;
 
-                                                        return (
-                                                            <div
-                                                                key={`${notif.tanggal}-${notif.no_item}-${index}`}
-                                                                role="button"
-                                                                tabIndex={0}
-                                                                title="Klik untuk melihat data"
-                                                                onClick={() => handleNotifClick(notif)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                                        e.preventDefault();
-                                                                        handleNotifClick(notif);
-                                                                    }
-                                                                }}
-                                                                className="group/notif relative cursor-pointer border-b border-slate-100 bg-white px-4 py-3 pl-5 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50"
-                                                            >
+                                                    return (
+                                                        <div
+                                                            key={`${notif.tipe}-${notif.tanggal}-${notif.no_item}-${index}`}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            title="Klik untuk melihat data"
+                                                            onClick={() => handleNotifClick(notif)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                                    e.preventDefault();
+                                                                    handleNotifClick(notif);
+                                                                }
+                                                            }}
+                                                            className="group/notif relative cursor-pointer border-b border-slate-100 bg-white px-4 py-3 pl-5 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50"
+                                                        >
+                                                            <span
+                                                                className={`absolute left-0 top-0 h-full w-1 ${gaya.bar}`}
+                                                            />
+
+                                                            <div className="flex items-start gap-3">
                                                                 <span
-                                                                    className={`absolute left-0 top-0 h-full w-1 ${
-                                                                        terlambat
-                                                                            ? 'bg-amber-400'
-                                                                            : 'bg-blue-400'
-                                                                    }`}
-                                                                />
+                                                                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${gaya.icon}`}
+                                                                >
+                                                                    <Icon
+                                                                        type={gaya.iconType}
+                                                                        className="h-4 w-4"
+                                                                    />
+                                                                </span>
 
-                                                                <div className="flex items-start gap-3">
-                                                                    <span
-                                                                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                                                            terlambat
-                                                                                ? 'bg-amber-50 text-amber-600'
-                                                                                : 'bg-blue-50 text-blue-600'
-                                                                        }`}
-                                                                    >
-                                                                        <Icon
-                                                                            type={terlambat ? 'alert' : 'schedule'}
-                                                                            className="h-4 w-4"
-                                                                        />
-                                                                    </span>
-
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="flex items-baseline justify-between gap-2">
-                                                                            <p className="text-xs font-bold text-slate-800">
-                                                                                {terlambat
-                                                                                    ? 'Pengecekan Belum Dilakukan'
-                                                                                    : 'Pengecekan Besok'}
-                                                                            </p>
-
-                                                                            <span className="shrink-0 text-[10px] font-semibold text-slate-400">
-                                                                                {notif.divisi}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                                                                            {notif.pesan}
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-baseline justify-between gap-2">
+                                                                        <p className="text-xs font-bold text-slate-800">
+                                                                            {gaya.judul}
                                                                         </p>
 
-                                                                        <div className="mt-1.5 flex items-center justify-between text-[11px]">
-                                                                            <span className="font-medium text-slate-400">
-                                                                                No. {notif.no_item}
-                                                                                <span className="mx-1.5 text-slate-300">·</span>
-                                                                                <span
-                                                                                    className={`font-semibold ${
-                                                                                        terlambat
-                                                                                            ? 'text-amber-600'
-                                                                                            : 'text-blue-600'
-                                                                                    }`}
-                                                                                >
-                                                                                    {terlambat
-                                                                                        ? 'Perlu perhatian'
-                                                                                        : 'Besok'}
-                                                                                </span>
-                                                                            </span>
+                                                                        <span className="shrink-0 text-[10px] font-semibold text-slate-400">
+                                                                            {notif.divisi}
+                                                                        </span>
+                                                                    </div>
 
-                                                                            <Icon
-                                                                                type="arrow"
-                                                                                className="h-3.5 w-3.5 text-slate-300 transition-all duration-200 group-hover/notif:translate-x-0.5 group-hover/notif:text-blue-500"
-                                                                            />
-                                                                        </div>
+                                                                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                                                                        {notif.pesan}
+                                                                    </p>
+
+                                                                    {abnormal && (
+                                                                        <>
+                                                                            <p className="mt-2 border-l-2 border-red-200 pl-2.5 text-[11px] leading-relaxed text-slate-600">
+                                                                                <span className="font-bold text-red-500">
+                                                                                    Item:
+                                                                                </span>{' '}
+                                                                                {notif.item_preventif}
+                                                                                <br />
+                                                                                <span className="font-bold text-red-500">
+                                                                                    Abnormality:
+                                                                                </span>{' '}
+                                                                                {notif.abnormality}
+                                                                            </p>
+
+                                                                            {notif.url && (
+                                                                                <Link
+                                                                                    href={notif.url}
+                                                                                    onClick={(e) =>
+                                                                                        e.stopPropagation()
+                                                                                    }
+                                                                                    className="mt-1.5 inline-block text-[11px] font-semibold text-blue-600 hover:underline"
+                                                                                >
+                                                                                    Buka checksheet →
+                                                                                </Link>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+
+                                                                    <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                                                                        <span className="font-medium text-slate-400">
+                                                                            No. {notif.no_item}
+                                                                            <span className="mx-1.5 text-slate-300">
+                                                                                ·
+                                                                            </span>
+                                                                            <span
+                                                                                className={`font-semibold ${gaya.teks}`}
+                                                                            >
+                                                                                {gaya.label}
+                                                                            </span>
+                                                                        </span>
+
+                                                                        <Icon
+                                                                            type="arrow"
+                                                                            className="h-3.5 w-3.5 text-slate-300 transition-all duration-200 group-hover/notif:translate-x-0.5 group-hover/notif:text-blue-500"
+                                                                        />
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        );
-                                                    })}
+                                                        </div>
+                                                    );
+                                                })}
 
                                                 {/* EMPTY STATE */}
                                                 {notifikasi.length === 0 &&
@@ -1022,7 +1060,7 @@ export default function Index({
                     MAIN
                 ====================================================== */}
                 <main className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-4 sm:px-6">
-                    {/* TOOLBAR (RINGKAS) */}
+                    {/* TOOLBAR */}
                     <div
                         className={`idx-rise mb-3 overflow-hidden rounded-2xl ${glassCard}`}
                     >
@@ -1037,6 +1075,12 @@ export default function Index({
                                     <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-600">
                                         {preventifMesins.total} data
                                     </span>
+
+                                    {jumlahAbnormality > 0 && (
+                                        <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-600">
+                                            {jumlahAbnormality} abnormality terbuka
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* LEGENDA */}
@@ -1062,7 +1106,7 @@ export default function Index({
                                 </div>
                             </div>
 
-                            {/* RIGHT - FILTER SEDERHANA */}
+                            {/* RIGHT - FILTER */}
                             <div className="flex flex-wrap items-end gap-2">
                                 <Field label="Status">
                                     <select
@@ -1188,7 +1232,6 @@ export default function Index({
                                             </th>
                                         ))}
 
-                                        {/* STATUS */}
                                         <th
                                             rowSpan="2"
                                             className="border-b border-r border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
@@ -1196,7 +1239,6 @@ export default function Index({
                                             Status
                                         </th>
 
-                                        {/* BULAN */}
                                         <th
                                             colSpan={jumlahHari}
                                             className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-2 text-center"
@@ -1207,7 +1249,6 @@ export default function Index({
                                             </span>
                                         </th>
 
-                                        {/* AKSI */}
                                         <th
                                             rowSpan="2"
                                             className="border-b border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
@@ -1247,6 +1288,9 @@ export default function Index({
                                                     const rowHighlighted =
                                                         highlight?.no === preventif.no;
 
+                                                    const adaAbnormality =
+                                                        (preventif.abnormalitas_terbuka?.length ?? 0) > 0;
+
                                                     return (
                                                         <tr
                                                             key={preventif.no}
@@ -1254,6 +1298,8 @@ export default function Index({
                                                             className={`group transition-colors duration-500 ${
                                                                 rowHighlighted
                                                                     ? 'bg-amber-100/70'
+                                                                    : adaAbnormality
+                                                                    ? 'bg-red-50/40 hover:bg-red-50/70'
                                                                     : 'hover:bg-blue-50/50'
                                                             }`}
                                                         >
@@ -1286,6 +1332,45 @@ export default function Index({
                                                                                 Khusus bulan ini
                                                                             </span>
                                                                         )}
+
+                                                                    {/* ABNORMALITY DARI CHECKSHEET */}
+                                                                    {adaAbnormality && (
+                                                                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2">
+                                                                            <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-600">
+                                                                                <Icon
+                                                                                    type="alert"
+                                                                                    className="h-3.5 w-3.5"
+                                                                                />
+                                                                                Perlu pengecekan lebih lanjut
+                                                                            </p>
+
+                                                                            <ul className="mt-1 space-y-1.5">
+                                                                                {preventif.abnormalitas_terbuka.map(
+                                                                                    (a) => (
+                                                                                        <li
+                                                                                            key={a.id}
+                                                                                            className="text-[11px] leading-relaxed text-slate-600"
+                                                                                        >
+                                                                                            <span className="font-semibold text-slate-700">
+                                                                                                {a.tanggal_format}
+                                                                                            </span>
+                                                                                            {a.mesin
+                                                                                                ? ` · ${a.mesin}`
+                                                                                                : ''}
+                                                                                            {' — '}
+                                                                                            {a.abnormality}{' '}
+                                                                                            <Link
+                                                                                                href={a.url}
+                                                                                                className="font-semibold text-blue-600 hover:underline"
+                                                                                            >
+                                                                                                Lihat checksheet
+                                                                                            </Link>
+                                                                                        </li>
+                                                                                    )
+                                                                                )}
+                                                                            </ul>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </td>
 
@@ -1464,7 +1549,6 @@ export default function Index({
 
                                             {/* TOTAL */}
                                             <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
-                                                {/* LABEL */}
                                                 <td
                                                     colSpan={6}
                                                     className="border-r border-white/10 px-4 py-3 text-center"
@@ -1480,7 +1564,6 @@ export default function Index({
                                                     </div>
                                                 </td>
 
-                                                {/* TOTAL DOT (ikut filter status) */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
                                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
@@ -1493,7 +1576,6 @@ export default function Index({
                                                     </div>
                                                 </td>
 
-                                                {/* TOTAL HOT (ikut filter status) */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center justify-center">
                                                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
@@ -1506,7 +1588,6 @@ export default function Index({
                                                     </div>
                                                 </td>
 
-                                                {/* LABEL KIRIM */}
                                                 <td className="border-r border-white/10 px-4 py-3 text-center">
                                                     <span className="text-[10px] font-bold uppercase tracking-wider text-blue-100">
                                                         Kirim
@@ -1668,9 +1749,7 @@ export default function Index({
                 </footer>
             </div>
 
-            {/* =====================================================
-                SUCCESS TOAST
-            ====================================================== */}
+            {/* SUCCESS TOAST */}
             {showSuccess && (
                 <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
                     <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
@@ -1697,9 +1776,7 @@ export default function Index({
                 </div>
             )}
 
-            {/* =====================================================
-                [BARU] TOAST MENCARI DATA
-            ====================================================== */}
+            {/* TOAST MENCARI DATA */}
             {searching && (
                 <div className="fixed right-5 top-5 z-[100] flex items-center gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-2xl shadow-slate-950/40">
                     <span className="idx-spin h-5 w-5 rounded-full border-2 border-blue-200 border-t-blue-600" />
@@ -1710,9 +1787,7 @@ export default function Index({
                 </div>
             )}
 
-            {/* =====================================================
-                WARNING TOAST (data tidak ditemukan di semua halaman)
-            ====================================================== */}
+            {/* WARNING TOAST */}
             {warningMessage && (
                 <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
                     <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
@@ -1741,13 +1816,10 @@ export default function Index({
                 </div>
             )}
 
-            {/* =====================================================
-                MODAL EDIT BULANAN
-            ====================================================== */}
+            {/* MODAL EDIT BULANAN */}
             {showBulanan && selectedBulanan && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
                     <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-                        {/* HEADER */}
                         <div className="border-b border-slate-100 px-6 py-5">
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
@@ -1777,32 +1849,10 @@ export default function Index({
                                     ×
                                 </button>
                             </div>
-
-                            {/* <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                                {selectedBulanan.item_preventif}
-                            </p> */}
                         </div>
 
-                        {/* FORM */}
                         <div className="px-6 py-5">
                             <div className="mb-4">
-                                {/* <label className="mb-2 block text-sm font-semibold text-slate-700">
-                                    Item Preventif
-                                </label>
-
-                                <textarea
-                                    rows="3"
-                                    value={formBulanan.item_preventif}
-                                    onChange={(e) =>
-                                        setFormBulanan({
-                                            ...formBulanan,
-                                            item_preventif: e.target.value,
-                                        })
-                                    }
-                                    placeholder="Isi jika pekerjaan bulan ini berbeda"
-                                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-50"
-                                /> */}
-
                                 <p className="mt-1.5 text-xs text-slate-400">
                                     Nama item master:{' '}
                                     <span className="font-medium text-slate-500">
@@ -1846,8 +1896,6 @@ export default function Index({
                             </p>
                         </div>
 
-
-                        {/* FOOTER */}
                         <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
                             <button
                                 type="button"
@@ -1866,14 +1914,11 @@ export default function Index({
                                 {savingBulanan ? 'Menyimpan...' : 'Simpan'}
                             </button>
                         </div>
-
                     </div>
                 </div>
             )}
 
-            {/* =====================================================
-                MODAL CATATAN
-            ====================================================== */}
+            {/* MODAL CATATAN */}
             {showCatatan && selectedChecklist && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
                     <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
@@ -1945,9 +1990,7 @@ export default function Index({
                 </div>
             )}
 
-            {/* =====================================================
-                DIALOG KONFIRMASI (hapus, simpan bulanan, dll)
-            ====================================================== */}
+            {/* DIALOG KONFIRMASI */}
             <ConfirmModal
                 open={Boolean(confirmDialog)}
                 title={confirmDialog?.title}

@@ -37,6 +37,10 @@ const ICON_SHEET = [
     'M8 4.5h8A2.5 2.5 0 0118.5 7v13A2.5 2.5 0 0116 22.5H8A2.5 2.5 0 015.5 20V7A2.5 2.5 0 018 4.5z',
     'M9 2.5h6M9 9h6M9 12.5h6M9 16h4',
 ];
+const ICON_GEAR = [
+    'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+    'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+];
 const ICON_LOGIN = [
     'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15',
     'M12 12h7.5m0 0l-3-3m3 3l-3 3',
@@ -79,6 +83,18 @@ const getDivisiWarna = (divisi, index) =>
     WARNA_DIVISI[divisi] ?? WARNA_CADANGAN[index % WARNA_CADANGAN.length];
 
 const getDivisiColor = (divisi, index) => getDivisiWarna(divisi, index).bg;
+
+const getDivisiGradient = (divisi, index) => {
+    const gradients = {
+        Sewing: 'linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #c2410c 100%)',
+        Headrest: 'linear-gradient(180deg, #e9d5ff 0%, #c084fc 55%, #9333ea 100%)',
+        Utility: 'linear-gradient(180deg, #60a5fa 0%, #1e3a8a 100%)',
+        Saidan: 'linear-gradient(180deg, #bbf7d0 0%, #86efac 55%, #4ade80 100%)',
+        Lainnya: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%)',
+    };
+
+    return gradients[divisi] ?? `linear-gradient(180deg, ${getDivisiColor(divisi, index)} 0%, ${getDivisiColor(divisi, index)} 100%)`;
+};
 
 /* ------------------------------------------------------------------
 | STYLE TOKENS
@@ -262,6 +278,7 @@ export default function Welcome({
 
     const [pageLoaded, setPageLoaded] = useState(false);
     const [chartAnimated, setChartAnimated] = useState(false);
+    const [chartAnimationKey, setChartAnimationKey] = useState(0);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeSlide, setActiveSlide] = useState('annual');
     const [slideDuration, setSlideDuration] = useState(10);
@@ -287,14 +304,19 @@ export default function Welcome({
         return () => clearTimeout(timer);
     }, [autoRunning, activeSlide, slideDuration]);
 
+    // Setiap slide berganti, reset status animasi dan remount grafik.
+    // Dengan begitu animasi diputar ulang pada setiap interval slideshow,
+    // bukan hanya ketika halaman pertama kali dibuka.
+    useEffect(() => {
+        setChartAnimated(false);
+        setChartAnimationKey((key) => key + 1);
+        const chartTimer = setTimeout(() => setChartAnimated(true), 140);
+        return () => clearTimeout(chartTimer);
+    }, [activeSlide]);
+
     useEffect(() => {
         const timer = setTimeout(() => setPageLoaded(true), 100);
-        const chartTimer = setTimeout(() => setChartAnimated(true), 350);
-
-        return () => {
-            clearTimeout(timer);
-            clearTimeout(chartTimer);
-        };
+        return () => clearTimeout(timer);
     }, []);
 
     /* ---------------- FILTER ---------------- */
@@ -432,6 +454,13 @@ export default function Welcome({
             active: true,
         },
         {
+            href: '/overhaul-dashboard',
+            title: 'Dashboard Overhaul',
+            subtitle: 'Monitoring Overhaul SC2',
+            icon: ICON_GEAR,
+            active: false,
+        },
+        {
             href: '/check-sheets',
             title: 'Dashboard Check Sheet',
             subtitle: 'Monitoring Check Sheet',
@@ -505,6 +534,38 @@ export default function Welcome({
                     from { transform: scaleX(0); }
                     to { transform: scaleX(1); }
                 }
+                @keyframes chartEntrance {
+                    from { opacity: 0; transform: translateY(14px) scale(0.99); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes chartLineDraw {
+                    from { stroke-dashoffset: 1000; }
+                    to { stroke-dashoffset: 0; }
+                }
+                @keyframes chartBarRise {
+                    from { transform: scaleY(0); opacity: 0.25; }
+                    to { transform: scaleY(1); opacity: 1; }
+                }
+                @keyframes chartLabelReveal {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+                .dashboard-chart-enter {
+                    animation: chartEntrance 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+                    transform-origin: center bottom;
+                }
+                .dashboard-plan-line {
+                    stroke-dasharray: 1000;
+                    transition: stroke-dashoffset 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease;
+                }
+                .dashboard-chart-bar {
+                    transform-box: fill-box;
+                    transform-origin: center bottom;
+                }
+                .dashboard-chart-label {
+                    animation: chartLabelReveal 450ms ease-out both;
+                }
 
                 .dashboard-gradient {
                     background-size: 250% 250%;
@@ -523,9 +584,13 @@ export default function Welcome({
                 @media (prefers-reduced-motion: reduce) {
                     .dashboard-gradient,
                     .dashboard-float,
-                    .dashboard-float-reverse { animation: none !important; }
+                    .dashboard-float-reverse,
+                    .dashboard-chart-enter,
+                    .dashboard-chart-label { animation: none !important; }
+                    .dashboard-plan-line { transition: none !important; stroke-dashoffset: 0 !important; }
+                    .dashboard-chart-bar { transform: none !important; }
                 }
-                    
+
                 /* Memunculkan kursor tangan pada pilihan bulan dan tahun */
                 select#mulai_bulan,
                 select#mulai_tahun,
@@ -545,7 +610,6 @@ export default function Welcome({
                 select#bulanan_tahun option {
                     cursor: pointer;
                 }
-
             `}</style>
 
             <div className="relative min-h-screen overflow-x-hidden text-slate-900">
@@ -790,7 +854,7 @@ export default function Welcome({
                         <div>
                             {/* ========== PERIOD REPORT ========== */}
                             {activeSlide === 'annual' && (
-                                <section className="min-w-0 overflow-hidden">
+                                <section key={`annual-chart-${chartAnimationKey}`} className="min-w-0 overflow-hidden">
                                     <div className="border-b border-slate-200/70 bg-gradient-to-r from-blue-50/80 via-white/40 to-white/40 px-4 py-2.5 sm:px-5">
                                         <SectionTitle
                                             icon={ICON_CHART}
@@ -899,14 +963,14 @@ export default function Welcome({
                                         <div className={`px-3 pb-2 pt-3 sm:px-4 ${SLIDE_BODY_H}`}>
                                             <div className="dashboard-scrollbar overflow-x-auto pb-1">
                                                 <div
-                                                    className="relative h-[320px] sm:h-[340px]"
+                                                    className="dashboard-chart-enter relative h-[330px] sm:h-[350px]"
                                                     style={{
                                                         minWidth: `${Math.max(600, annualReport.length * 65)}px`,
                                                     }}
                                                 >
                                                     <div className="absolute inset-0 flex">
                                                         {/* Y AXIS */}
-                                                        <div className="flex w-9 shrink-0 flex-col justify-between pb-[40px] pr-1.5 pt-6 text-right text-[9px] font-medium text-slate-500">
+                                                        <div className="flex w-11 shrink-0 flex-col justify-between pb-[40px] pr-2 pt-6 text-right text-[10px] font-semibold tabular-nums text-slate-500">
                                                             {[4, 3, 2, 1, 0].map((value) => (
                                                                 <span key={value}>
                                                                     {Math.round((maxAnnualChartValue * value) / 4)}
@@ -920,7 +984,7 @@ export default function Welcome({
                                                                 {[0, 1, 2, 3, 4].map((line) => (
                                                                     <div
                                                                         key={line}
-                                                                        className="border-t border-dashed border-slate-300/80"
+                                                                        className="border-t border-dashed border-slate-300/70"
                                                                     />
                                                                 ))}
                                                             </div>
@@ -941,6 +1005,10 @@ export default function Welcome({
                                                                                 item.act_per_divisi?.[divisi] || 0
                                                                             ),
                                                                             color: getDivisiColor(
+                                                                                divisi,
+                                                                                divisiIndex
+                                                                            ),
+                                                                            gradient: getDivisiGradient(
                                                                                 divisi,
                                                                                 divisiIndex
                                                                             ),
@@ -966,7 +1034,7 @@ export default function Welcome({
                                                                         >
                                                                             {act > 0 && (
                                                                                 <div
-                                                                                    className="relative flex w-[34px] flex-col-reverse transition-all duration-700 ease-out"
+                                                                                    className="relative flex w-[38px] flex-col-reverse rounded-t-lg transition-all duration-700 ease-out hover:brightness-105"
                                                                                     style={{
                                                                                         height: chartAnimated
                                                                                             ? `${Math.max(actHeight, 3)}%`
@@ -982,13 +1050,14 @@ export default function Welcome({
                                                                                             <div
                                                                                                 key={segment.divisi}
                                                                                                 title={`${segment.divisi}: ${segment.value}`}
-                                                                                                className={`relative flex min-h-0 items-center justify-center border-t border-white/40 first:border-t-0 ${
+                                                                                                className={`group relative flex min-h-0 items-center justify-center border-t border-white/45 first:border-t-0 ${
                                                                                                     isTop ? 'rounded-t-lg' : ''
                                                                                                 }`}
                                                                                                 style={{
                                                                                                     flexGrow: segment.value,
                                                                                                     flexBasis: 0,
-                                                                                                    backgroundColor: segment.color,
+                                                                                                    background: segment.gradient,
+                                                                                                    boxShadow: isTop ? '0 5px 12px rgba(15, 23, 42, 0.12)' : 'none',
                                                                                                 }}
                                                                                             >
                                                                                                 <span
@@ -1033,23 +1102,52 @@ export default function Welcome({
                                                                         viewBox="0 0 100 100"
                                                                         preserveAspectRatio="none"
                                                                     >
+                                                                        <defs>
+                                                                            <linearGradient id="annualPlanGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                                                <stop offset="0%" stopColor="#fbbf24" />
+                                                                                <stop offset="48%" stopColor="#f97316" />
+                                                                                <stop offset="100%" stopColor="#ea580c" />
+                                                                            </linearGradient>
+                                                                            <filter id="annualPlanGlow" x="-20%" y="-30%" width="140%" height="160%">
+                                                                                <feGaussianBlur stdDeviation="1.8" result="blur" />
+                                                                                <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.96 0 1 0 0 0.48 0 0 1 0 0.05 0 0 0 0.42 0" result="glow" />
+                                                                                <feMerge>
+                                                                                    <feMergeNode in="glow" />
+                                                                                    <feMergeNode in="SourceGraphic" />
+                                                                                </feMerge>
+                                                                            </filter>
+                                                                        </defs>
                                                                         <polyline
                                                                             points={annualPlanLine}
                                                                             fill="none"
-                                                                            stroke="#f59e0b"
-                                                                            strokeWidth="2.5"
+                                                                            stroke="#fbbf24"
+                                                                            strokeWidth="7"
+                                                                            opacity={chartAnimated ? 0.18 : 0}
                                                                             vectorEffect="non-scaling-stroke"
                                                                             strokeLinecap="round"
                                                                             strokeLinejoin="round"
-                                                                            className="transition-opacity duration-500"
-                                                                            style={{ opacity: chartAnimated ? 1 : 0 }}
+                                                                        />
+                                                                        <polyline
+                                                                            points={annualPlanLine}
+                                                                            fill="none"
+                                                                            stroke="url(#annualPlanGradient)"
+                                                                            strokeWidth="3"
+                                                                            vectorEffect="non-scaling-stroke"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            filter="url(#annualPlanGlow)"
+                                                                            className="dashboard-plan-line"
+                                                                            style={{
+                                                                                opacity: chartAnimated ? 1 : 0,
+                                                                                strokeDashoffset: chartAnimated ? 0 : 1000,
+                                                                            }}
                                                                         />
                                                                     </svg>
 
                                                                     {annualPlanPoints.map((point, index) => (
                                                                         <span
                                                                             key={`plan-dot-${index}`}
-                                                                            className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-amber-500 bg-white shadow-[0_2px_8px_rgba(245,158,11,0.5)] transition-all duration-500"
+                                                                            className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-orange-500 bg-white shadow-[0_2px_10px_rgba(249,115,22,0.45)] transition-all duration-500"
                                                                             style={{
                                                                                 left: `${point.x}%`,
                                                                                 top: `${point.y}%`,
@@ -1071,7 +1169,7 @@ export default function Welcome({
                                                                         return (
                                                                             <span
                                                                                 key={`plan-label-${item.tahun}-${item.bulan}`}
-                                                                                className="absolute whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-amber-600 shadow-sm transition-all duration-500"
+                                                                                className="absolute whitespace-nowrap rounded-md border border-orange-100 bg-white/95 px-1.5 py-0.5 text-[11px] font-extrabold text-orange-600 shadow-[0_3px_10px_rgba(249,115,22,0.12)] transition-all duration-500"
                                                                                 style={{
                                                                                     left: `${point.x}%`,
                                                                                     top: `calc(${point.y}% - 32px)`,
@@ -1122,7 +1220,7 @@ export default function Welcome({
                                                         label: `ACT ${divisi}`,
                                                         color: getDivisiColor(divisi, index),
                                                     })),
-                                                    { label: 'Plan', line: true },
+                                                    { label: 'Plan', line: true, borderClass: 'border-orange-500', dotClass: 'bg-orange-500' },
                                                 ]}
                                             />
                                         </div>
@@ -1137,7 +1235,7 @@ export default function Welcome({
 
                             {/* ========== MONTHLY REPORT ========== */}
                             {activeSlide === 'monthly' && (
-                                <section className="min-w-0 overflow-hidden">
+                                <section key={`monthly-chart-${chartAnimationKey}`} className="min-w-0 overflow-hidden">
                                     <div className="border-b border-slate-200/70 bg-gradient-to-r from-indigo-50/80 via-white/40 to-white/40 px-4 py-2.5 sm:px-5">
                                         <SectionTitle
                                             icon={ICON_CALENDAR}
@@ -1221,7 +1319,7 @@ export default function Welcome({
                                                     <div className="min-h-[260px] flex-1 px-4 pb-1 pt-3">
                                                         <div className="dashboard-scrollbar h-full overflow-x-auto">
                                                             <div
-                                                                className="relative h-full min-h-[240px]"
+                                                                className="dashboard-chart-enter relative h-full min-h-[240px]"
                                                                 style={{
                                                                     minWidth: `${Math.max(
                                                                         600,

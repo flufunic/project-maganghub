@@ -12,6 +12,8 @@ use Inertia\Inertia;
 use App\Http\Controllers\CheckSheetImportController;
 use App\Http\Controllers\CheckSheetMonitoringController;
 use App\Http\Controllers\CheckSheetBbmController;
+use App\Http\Controllers\OverhaulSc2Controller;
+
 
 
 Route::get('/', [
@@ -37,6 +39,9 @@ Route::post('/logout', function (Request $request) {
 
     return Inertia::location('/');
 })->name('logout');
+
+Route::get('/overhaul-dashboard', [OverhaulSc2Controller::class, 'dashboard'])
+    ->name('overhaul-sc2.dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/preventif-mesin/export', [
@@ -155,6 +160,12 @@ Route::middleware('auth')->group(function () {
         '/check-sheets/{checkSheet}/import',
         [CheckSheetImportController::class, 'store']
     )->name('check-sheets.import.store');
+
+    Route::get('/overhaul-sc2', [OverhaulSc2Controller::class, 'index']);
+    Route::post('/overhaul-sc2', [OverhaulSc2Controller::class, 'store']);
+    Route::put('/overhaul-sc2/{overhaulMesin}', [OverhaulSc2Controller::class, 'update']);
+    Route::delete('/overhaul-sc2/{overhaulMesin}', [OverhaulSc2Controller::class, 'destroy']);
+    Route::post('/overhaul-sc2/{overhaulMesin}/schedule', [OverhaulSc2Controller::class, 'saveSchedule']);
 
 });
 
