@@ -101,7 +101,7 @@ const MENUS = [
         active: true, // halaman ini
     },
     {
-        href: '/check-sheets',
+        href: '/check-sheet-dashboard',
         title: 'Dashboard Check Sheet',
         subtitle: 'Monitoring Check Sheet',
         icon: ICON_SHEET,
@@ -116,7 +116,7 @@ const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
 const selectClass =
-    'h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'h-8 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm outline-none transition-all hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
 
 const MONTHS_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -125,7 +125,6 @@ const MONTHS_SHORT = [
 
 const COLOR_ACT = '#f97316'; // orange-500
 const COLOR_PLAN = '#2563eb'; // blue-600
-const COLOR_PLAN_LIGHT = '#38bdf8'; // sky-400
 
 /* ------------------------------------------------------------------
 | SKALA SUMBU Y
@@ -153,7 +152,7 @@ function niceScale(maxValue, ticks = 5) {
 
 /* ------------------------------------------------------------------
 | GRAFIK TAHUNAN
-| Act  = batang (hijau)
+| Act  = batang (oranye)
 | Plan = garis + titik (biru)
 ------------------------------------------------------------------ */
 function YearlyChart({ data }) {
@@ -216,22 +215,15 @@ function YearlyChart({ data }) {
                 aria-label="Grafik overhaul per bulan: Act sebagai batang, Plan sebagai garis"
             >
                 <defs>
-                    {/* Gradasi batang: oranye terang di atas, lebih pekat di bawah */}
                     <linearGradient id="actGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#fed7aa" />
                         <stop offset="35%" stopColor="#fb923c" />
                         <stop offset="100%" stopColor="#ea580c" />
                     </linearGradient>
-                    {/* Gradasi garis Plan: biru muda ke biru tua */}
                     <linearGradient id="planGradient" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="#38bdf8" />
                         <stop offset="50%" stopColor="#3b82f6" />
                         <stop offset="100%" stopColor="#4338ca" />
-                    </linearGradient>
-                    <linearGradient id="actLegendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fed7aa" />
-                        <stop offset="45%" stopColor="#fb923c" />
-                        <stop offset="100%" stopColor="#ea580c" />
                     </linearGradient>
                     <filter id="planGlow" x="-20%" y="-40%" width="140%" height="180%">
                         <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -300,7 +292,6 @@ function YearlyChart({ data }) {
                 {/* GARIS PLAN */}
                 {!kosong && (
                     <>
-                        {/* Lapisan tipis di bawah garis untuk efek glow yang lembut */}
                         <polyline
                             points={linePoints}
                             fill="none"
@@ -407,37 +398,6 @@ function YearlyChart({ data }) {
 }
 
 /* ------------------------------------------------------------------
-| KARTU RINGKASAN
------------------------------------------------------------------- */
-function StatCard({ label, value, hint, tone = 'blue' }) {
-    const tones = {
-        blue: 'text-blue-600 bg-blue-50',
-        emerald: 'text-emerald-600 bg-emerald-50',
-        violet: 'text-violet-600 bg-violet-50',
-    };
-
-    return (
-        <div className={`rounded-2xl p-4 ${glassCard}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {label}
-            </p>
-
-            <p className="mt-1.5 text-3xl font-extrabold tracking-tight text-slate-900">
-                {value}
-            </p>
-
-            {hint && (
-                <span
-                    className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones[tone]}`}
-                >
-                    {hint}
-                </span>
-            )}
-        </div>
-    );
-}
-
-/* ------------------------------------------------------------------
 | HALAMAN
 ------------------------------------------------------------------ */
 export default function Dashboard({
@@ -459,7 +419,7 @@ export default function Dashboard({
         setSelectedYear(year);
 
         router.get(
-            '/overhaul-dashboard', // route publik (sebelumnya salah: /overhaul-sc2/dashboard)
+            '/overhaul-dashboard',
             { tahun: year },
             { preserveState: true, preserveScroll: true, replace: true }
         );
@@ -507,6 +467,9 @@ export default function Dashboard({
                     background: rgba(100,116,139,0.4);
                     border-radius: 999px;
                 }
+
+                select#oh_tahun, select#oh_tahun option { cursor: pointer; }
+
                 @media (prefers-reduced-motion: reduce) {
                     .idx-gradient, .idx-rise, .idx-bar, .idx-plan-line { animation: none !important; }
                 }
@@ -682,12 +645,16 @@ export default function Dashboard({
                 </aside>
 
                 {/* MAIN */}
-                <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-2 sm:px-6">
-                    {/* TOOLBAR */}
-                    <div className={`idx-rise mb-2 overflow-hidden rounded-2xl ${glassCard}`}>
-                        <div className="flex flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-5 sm:px-6">
+                    {/* SATU CARD: judul + filter tahun + grafik */}
+                    <div className={`idx-rise mb-4 overflow-hidden rounded-[28px] ${glassCard}`}>
+                        {/* KONTROL: judul + filter tahun + tombol */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 bg-white/70 px-3 py-2.5 sm:px-4">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                                    Dashboard Analytics
+                                </p>
+                                <h2 className="text-sm font-extrabold text-slate-900">
                                     Overhaul Tahun {selectedYear}
                                 </h2>
                                 <p className="mt-0.5 text-[11px] text-slate-500">
@@ -697,12 +664,15 @@ export default function Dashboard({
                             </div>
 
                             <div className="flex flex-wrap items-end gap-2">
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                <div style={{ width: 90 }}>
+                                    <label
+                                        htmlFor="oh_tahun"
+                                        className="mb-0.5 block text-[9px] font-semibold text-slate-500"
+                                    >
                                         Tahun
-                                    </span>
-
+                                    </label>
                                     <select
+                                        id="oh_tahun"
                                         value={selectedYear}
                                         onChange={(e) => changeYear(Number(e.target.value))}
                                         className={selectClass}
@@ -713,40 +683,40 @@ export default function Dashboard({
                                             </option>
                                         ))}
                                     </select>
-                                </label>
+                                </div>
 
                                 {/* Hanya tampil kalau sudah login (halaman schedule butuh login) */}
                                 {isLoggedIn && (
                                     <Link
                                         href={`/overhaul-sc2?tahun=${selectedYear}`}
-                                        className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                                        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100"
                                     >
-                                        <Icon type="table" className="h-4 w-4" />
+                                        <Icon type="table" className="h-3.5 w-3.5" />
                                         Lihat Schedule
                                     </Link>
                                 )}
                             </div>
                         </div>
 
-                        <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
-                    </div>
+                        <div className="h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-                    {/* GRAFIK */}
-                    <div
-                        style={{ animationDelay: '80ms' }}
-                        className={`idx-rise mb-2 rounded-2xl p-3 sm:p-3.5 ${glassCard}`}
-                    >
-                        <h3 className="mb-0.5 text-sm font-bold text-slate-900">
-                            Plan vs Act per Bulan
-                        </h3>
+                        {/* GRAFIK */}
+                        <div className="px-3 pb-3 pt-3 sm:px-4">
+                            <h3 className="mb-0.5 text-sm font-bold text-slate-900">
+                                Plan vs Act per Bulan
+                            </h3>
 
-                        <YearlyChart key={selectedYear + "-" + bulanan.map((d) => `${d.plan}-${d.act}`).join("-")} data={bulanan} />
+                            <YearlyChart
+                                key={selectedYear + '-' + bulanan.map((d) => `${d.plan}-${d.act}`).join('-')}
+                                data={bulanan}
+                            />
+                        </div>
                     </div>
 
                     {/* TABEL RINCIAN */}
                     <div
                         style={{ animationDelay: '140ms' }}
-                        className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
+                        className={`idx-rise overflow-hidden rounded-[28px] ${glassCard}`}
                     >
                         <div className="idx-scroll overflow-x-auto">
                             <table className="w-full border-separate border-spacing-0 text-sm">
@@ -807,11 +777,9 @@ export default function Dashboard({
                 </main>
 
                 {/* FOOTER */}
-                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
-                    <div className="mx-auto flex max-w-[1400px] items-center justify-center px-6 py-3 text-center">
-                        <p className="text-xs font-medium text-white/70">
-                            © {new Date().getFullYear()} Dashboard Overhaul Mesin SC2
-                        </p>
+                <footer className="mt-auto border-t border-white/20 bg-[#061540]/50 backdrop-blur-2xl">
+                    <div className="mx-auto flex min-h-[60px] max-w-[1600px] items-center justify-center px-5 text-center text-xs font-medium text-white/75 sm:px-6 lg:px-8">
+                        © {new Date().getFullYear()} Emma Sarkilla · Maintenance Monitoring System
                     </div>
                 </footer>
             </div>

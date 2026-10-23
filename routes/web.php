@@ -43,6 +43,10 @@ Route::post('/logout', function (Request $request) {
 Route::get('/overhaul-dashboard', [OverhaulSc2Controller::class, 'dashboard'])
     ->name('overhaul-sc2.dashboard');
 
+// Dashboard Check Sheet (publik, tanpa login)
+Route::get('/check-sheet-dashboard', [CheckSheetController::class, 'dashboard'])
+    ->name('check-sheet.dashboard');
+
 Route::middleware('auth')->group(function () {
     Route::get('/preventif-mesin/export', [
         PreventifMesinController::class,

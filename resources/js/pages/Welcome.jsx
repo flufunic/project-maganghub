@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { printLaporanBulanan, printLaporanTahunan } from './monthlyPdf';
 
 /* ------------------------------------------------------------------
 | ICON
@@ -55,6 +56,7 @@ const ICON_EMPTY =
     'M9 17v-2m3 2v-6m3 6v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14';
 const ICON_PLAY = 'M8 5.5v13l11-6.5z';
 const ICON_PAUSE = 'M9 5.5v13M15 5.5v13';
+const ICON_DOWNLOAD = 'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4';
 
 /* ------------------------------------------------------------------
 | TINGGI ISI SLIDE (tahunan & bulanan dibuat sama)
@@ -151,6 +153,25 @@ function ActionButton({ tone = 'blue', type = 'button', onClick }) {
     );
 }
 
+function PdfButton({ tone = 'blue', onClick, title }) {
+    const styles =
+        tone === 'indigo'
+            ? 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+            : 'border-blue-200 text-blue-700 hover:bg-blue-50';
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title}
+            className={`flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border bg-white px-3 text-[11px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${styles}`}
+        >
+            <Icon d={ICON_DOWNLOAD} strokeWidth={2} className="h-3.5 w-3.5" />
+            PDF
+        </button>
+    );
+}
+
 function SectionTitle({ icon, tone, tag, title, description, children }) {
     const tones = {
         blue: 'bg-blue-100 text-blue-600',
@@ -233,6 +254,27 @@ function EmptyState({ title, text, className = '' }) {
     );
 }
 
+function TableEmpty({ colSpan, title, text }) {
+    return (
+        <tr>
+            <td colSpan={colSpan} className="px-5 py-14 text-center">
+                <div className="mx-auto flex max-w-sm flex-col items-center">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 shadow-sm">
+                        <Icon
+                            d={ICON_EMPTY}
+                            strokeWidth={2}
+                            className="h-6 w-6 text-slate-400"
+                        />
+                    </div>
+
+                    <p className="text-sm font-semibold text-slate-700">{title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{text}</p>
+                </div>
+            </td>
+        </tr>
+    );
+}
+
 /* ------------------------------------------------------------------
 | HELPER
 ------------------------------------------------------------------ */
@@ -241,6 +283,9 @@ const monthIndex = (year, month) => Number(year) * 12 + Number(month);
 const YEARS = Array.from({ length: 2040 - 2020 + 1 }, (_, i) => 2020 + i);
 
 const DURATION_OPTIONS = [6, 10, 15, 20, 30, 60, 120];
+
+// Maksimal bulan per tabel rincian periode (sama dengan PDF)
+const BULAN_PER_TABEL = 12;
 
 /* ------------------------------------------------------------------
 | PAGE
@@ -256,6 +301,7 @@ export default function Welcome({
     persentaseAct = 0,
     divisiReport = [],
     annualReport = [],
+    annualDetail = [],
     daftarDivisi = [],
     bulanMulai = 1,
     tahunMulai,
@@ -385,6 +431,54 @@ export default function Welcome({
         label,
     }));
 
+    /* ---------------- PDF ---------------- */
+
+    // Pakai prop `bulan` & `tahun` (data yang benar-benar tampil),
+    // bukan state dropdown yang mungkin belum di-"Tampilkan".
+    const downloadMonthlyPdf = () => {
+        printLaporanBulanan({
+            namaBulan: namaBulan[Number(bulan)] || 'Bulan',
+            tahun,
+            divisiReport,
+            detail,
+            totalAct,
+            totalPlan,
+            totalJadwal,
+        });
+    };
+
+    // Periode yang sedang tampil (annualReport), bukan isi dropdown.
+    const downloadAnnualPdf = () => {
+        printLaporanTahunan({ annualReport, daftarDivisi, annualDetail });
+    };
+
+    // Kelompokkan detail per divisi + tandai baris pertama tiap kelompok
+    // (dipakai untuk menggabungkan sel Divisi pada tabel detail)
+    const groupedDetail = (() => {
+        const order = [];
+        const map = {};
+
+        detail.forEach((item) => {
+            const key = item.divisi || '-';
+
+            if (!map[key]) {
+                map[key] = [];
+                order.push(key);
+            }
+
+            map[key].push(item);
+        });
+
+        return order.flatMap((key) =>
+            map[key].map((item, i) => ({
+                ...item,
+                divisi: key,
+                _first: i === 0,
+                _span: map[key].length,
+            }))
+        );
+    })();
+
     /* ---------------- DATA ---------------- */
 
     const maxChartValue = Math.max(
@@ -443,6 +537,65 @@ export default function Welcome({
                   )
               );
 
+    /* ---------------- DATA TABEL PERIODE (sama dengan PDF) ---------------- */
+
+    const periodeAwal = annualReport[0];
+    const periodeAkhir = annualReport[annualReport.length - 1];
+
+    const periodeLabel = periodeAwal
+        ? periodeAwal.bulan === periodeAkhir.bulan &&
+          periodeAwal.tahun === periodeAkhir.tahun
+            ? `${periodeAwal.nama_bulan} ${periodeAwal.tahun}`
+            : `${periodeAwal.nama_bulan} ${periodeAwal.tahun} - ${periodeAkhir.nama_bulan} ${periodeAkhir.tahun}`
+        : '-';
+
+    const annualTotalAct = annualReport.reduce(
+        (sum, item) => sum + Number(item.act || 0),
+        0
+    );
+    const annualTotalPlan = annualReport.reduce(
+        (sum, item) => sum + Number(item.plan || 0),
+        0
+    );
+    const annualTotalPct =
+        annualTotalPlan > 0
+            ? ((annualTotalAct / annualTotalPlan) * 100).toFixed(1)
+            : '0.0';
+
+    // Rincian item sudah diurutkan dari controller (divisi lalu no item).
+    // Tandai baris pertama tiap divisi untuk sel Divisi yang digabung.
+    const groupedAnnualDetail = annualDetail.map((item, i, arr) => {
+        const first = i === 0 || arr[i - 1].divisi !== item.divisi;
+        let span = 0;
+
+        if (first) {
+            for (let j = i; j < arr.length && arr[j].divisi === item.divisi; j++) {
+                span++;
+            }
+        }
+
+        return { ...item, _first: first, _span: span };
+    });
+
+    // Pecah bulan per BULAN_PER_TABEL supaya tabel tetap muat
+    const annualChunks = [];
+
+    for (let i = 0; i < annualReport.length; i += BULAN_PER_TABEL) {
+        annualChunks.push(annualReport.slice(i, i + BULAN_PER_TABEL));
+    }
+
+    const cellClass = (cell) => {
+        if (!cell) return 'text-slate-300';
+
+        const act = Number(cell.act);
+        const jadwal = Number(cell.jadwal);
+
+        if (act >= jadwal) return 'bg-emerald-50 text-emerald-600';
+        if (act === 0) return 'bg-amber-50 text-amber-600';
+
+        return 'bg-blue-50 text-blue-600';
+    };
+
     /* ---------------- SIDEBAR ---------------- */
 
     const menus = [
@@ -461,7 +614,7 @@ export default function Welcome({
             active: false,
         },
         {
-            href: '/check-sheets',
+            href: '/check-sheet-dashboard',
             title: 'Dashboard Check Sheet',
             subtitle: 'Monitoring Check Sheet',
             icon: ICON_SHEET,
@@ -954,6 +1107,12 @@ export default function Welcome({
                                                 </div>
 
                                                 <ActionButton type="submit" />
+
+                                                <PdfButton
+                                                    tone="blue"
+                                                    onClick={downloadAnnualPdf}
+                                                    title="Unduh laporan periode sebagai PDF"
+                                                />
                                             </form>
                                         </SectionTitle>
                                     </div>
@@ -1283,6 +1442,12 @@ export default function Welcome({
                                                 </Field>
 
                                                 <ActionButton type="submit" tone="indigo" />
+
+                                                <PdfButton
+                                                    tone="indigo"
+                                                    onClick={downloadMonthlyPdf}
+                                                    title="Unduh laporan bulanan sebagai PDF"
+                                                />
                                             </form>
                                         </SectionTitle>
                                     </div>
@@ -1572,145 +1737,453 @@ export default function Welcome({
                         </div>
                     </div>
 
-                    {/* ---------------- DETAIL TABLE ---------------- */}
-                    <section
-                        style={{ transitionDelay: '300ms' }}
-                        className={`overflow-hidden rounded-[28px] transition-all duration-700 ease-out ${glassCard} ${enter(
-                            pageLoaded
-                        )}`}
-                    >
-                        <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-100/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
-                            <SectionTitle
-                                icon={ICON_SHEET}
-                                tone="slate"
-                                tag="Detail report"
-                                title="Detail Preventive Maintenance"
-                                description={`Detail jadwal, ACT, dan Plan untuk ${currentMonthName} ${selectedYear}.`}
+                    {/* =====================================================
+                    | BAGIAN BAWAH: ikut tab yang aktif
+                    | Tahunan  -> Ringkasan per Bulan + Rincian Item per Bulan
+                    | Bulanan  -> Detail Preventive Maintenance
+                    ===================================================== */}
+                    {activeSlide === 'annual' ? (
+                        <>
+                            {/* ---------------- RINGKASAN PER BULAN ---------------- */}
+                            <section
+                                style={{ transitionDelay: '300ms' }}
+                                className={`mb-5 overflow-hidden rounded-[28px] transition-all duration-700 ease-out ${glassCard} ${enter(
+                                    pageLoaded
+                                )}`}
                             >
-                                {detail.length > 0 && (
-                                    <p className="text-xs font-medium text-slate-500">
-                                        {detail.length} item preventif
-                                    </p>
-                                )}
-                            </SectionTitle>
-                        </div>
-
-                        <div className="dashboard-scrollbar max-h-[420px] overflow-auto">
-                            <table className="w-full min-w-[900px]">
-                                <thead className="sticky top-0 z-10 bg-slate-50">
-                                    <tr className="border-b border-slate-200/70 bg-slate-50">
-                                        <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
-                                            No
-                                        </th>
-                                        <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500">
-                                            Divisi
-                                        </th>
-                                        <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500">
-                                            Item Preventif
-                                        </th>
-                                        <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
-                                            Jumlah Item
-                                        </th>
-                                        <th className="px-5 py-3.5 text-center text-xs font-semibold text-blue-600">
-                                            Sudah Preventif
-                                        </th>
-                                        <th className="px-5 py-3.5 text-center text-xs font-semibold text-amber-600">
-                                            Belum Preventif
-                                        </th>
-                                    </tr>
-                                </thead>
-
-                                <tbody className="divide-y divide-slate-200/60">
-                                    {detail.length > 0 ? (
-                                        detail.map((item, index) => (
-                                            <tr
-                                                key={`${item.divisi}-${item.no_item}-${index}`}
-                                                style={{
-                                                    transitionDelay: `${Math.min(index * 40, 600)}ms`,
-                                                }}
-                                                className={`group transition-all duration-500 hover:bg-blue-50/70 ${
-                                                    pageLoaded
-                                                        ? 'translate-x-0 opacity-100'
-                                                        : '-translate-x-4 opacity-0'
-                                                }`}
-                                            >
-                                                <td className="px-5 py-3.5 text-center text-sm font-semibold text-slate-400">
-                                                    {index + 1}
-                                                </td>
-
-                                                <td className="px-5 py-3.5">
-                                                    <span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 transition-all group-hover:bg-white group-hover:shadow-sm">
-                                                        {item.divisi || '-'}
-                                                    </span>
-                                                </td>
-
-                                                <td className="px-5 py-3.5 text-sm font-medium text-slate-700">
-                                                    {item.item_preventif || '-'}
-                                                </td>
-
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">
-                                                        {item.total_jadwal}
-                                                    </span>
-                                                </td>
-
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-600">
-                                                        {item.act}
-                                                    </span>
-                                                </td>
-
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-600">
-                                                        {item.plan}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="6" className="px-5 py-14 text-center">
-                                                <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 shadow-sm">
-                                                        <Icon
-                                                            d={ICON_EMPTY}
-                                                            strokeWidth={2}
-                                                            className="h-6 w-6 text-slate-400"
-                                                        />
-                                                    </div>
-
-                                                    <p className="text-sm font-semibold text-slate-700">
-                                                        Tidak ada jadwal preventif
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        Tidak ditemukan data pada bulan yang dipilih.
-                                                    </p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {detail.length > 0 && (
-                            <div className="border-t border-slate-200/70 bg-slate-50/70 px-5 py-3.5 sm:px-6">
-                                <div className="flex flex-col gap-2 text-xs font-medium text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                                    <span>
-                                        Menampilkan{' '}
-                                        <span className="font-bold text-slate-700">{detail.length}</span>{' '}
-                                        item preventif
-                                    </span>
-
-                                    <span>
-                                        Total{' '}
-                                        <span className="font-bold text-slate-700">{totalJadwal}</span>{' '}
-                                        jadwal
-                                    </span>
+                                <div className="border-b border-slate-200/70 bg-gradient-to-r from-blue-50/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
+                                    <SectionTitle
+                                        icon={ICON_CALENDAR}
+                                        tone="blue"
+                                        tag="Summary report"
+                                        title="Ringkasan per Bulan"
+                                        description={`Total jadwal (Plan), ACT, dan persentase ACT untuk ${periodeLabel}.`}
+                                    >
+                                        {annualReport.length > 0 && (
+                                            <p className="text-xs font-medium text-slate-500">
+                                                {annualReport.length} bulan
+                                            </p>
+                                        )}
+                                    </SectionTitle>
                                 </div>
+
+                                <div className="dashboard-scrollbar max-h-[420px] overflow-auto">
+                                    <table className="w-full min-w-[700px]">
+                                        <thead className="sticky top-0 z-10 bg-slate-50">
+                                            <tr className="border-b border-slate-200/70 bg-slate-50">
+                                                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500">
+                                                    Bulan
+                                                </th>
+                                                <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
+                                                    Total Jadwal (Plan)
+                                                </th>
+                                                <th className="px-5 py-3.5 text-center text-xs font-semibold text-blue-600">
+                                                    ACT
+                                                </th>
+                                                <th className="px-5 py-3.5 text-center text-xs font-semibold text-amber-600">
+                                                    Belum Preventif
+                                                </th>
+                                                <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
+                                                    % ACT
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-200/60">
+                                            {annualReport.length > 0 ? (
+                                                annualReport.map((item) => {
+                                                    const act = Number(item.act || 0);
+                                                    const plan = Number(item.plan || 0);
+                                                    const pct =
+                                                        plan > 0
+                                                            ? ((act / plan) * 100).toFixed(1)
+                                                            : '0.0';
+
+                                                    return (
+                                                        <tr
+                                                            key={`sum-${item.tahun}-${item.bulan}`}
+                                                            className="transition-colors hover:bg-blue-50/70"
+                                                        >
+                                                            <td className="px-5 py-3 text-sm font-semibold text-slate-700">
+                                                                {item.nama_bulan} {item.tahun}
+                                                            </td>
+
+                                                            <td className="px-5 py-3 text-center">
+                                                                <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">
+                                                                    {plan}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="px-5 py-3 text-center">
+                                                                <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-600">
+                                                                    {act}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="px-5 py-3 text-center">
+                                                                <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-600">
+                                                                    {Math.max(plan - act, 0)}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="px-5 py-3 text-center text-sm font-bold text-slate-700">
+                                                                {pct}%
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            ) : (
+                                                <TableEmpty
+                                                    colSpan={5}
+                                                    title="Tidak ada data pada periode ini"
+                                                    text="Tidak ditemukan jadwal preventif pada periode yang dipilih."
+                                                />
+                                            )}
+                                        </tbody>
+
+                                        {annualReport.length > 0 && (
+                                            <tfoot className="sticky bottom-0 bg-slate-100">
+                                                <tr className="border-t-2 border-slate-300">
+                                                    <td className="px-5 py-3 text-sm font-extrabold text-slate-800">
+                                                        Total
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center text-sm font-extrabold text-slate-800">
+                                                        {annualTotalPlan}
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center text-sm font-extrabold text-blue-600">
+                                                        {annualTotalAct}
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center text-sm font-extrabold text-amber-600">
+                                                        {Math.max(annualTotalPlan - annualTotalAct, 0)}
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center text-sm font-extrabold text-slate-800">
+                                                        {annualTotalPct}%
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        )}
+                                    </table>
+                                </div>
+                            </section>
+
+                            {/* ---------------- RINCIAN ITEM PER BULAN ---------------- */}
+                            <section
+                                style={{ transitionDelay: '400ms' }}
+                                className={`overflow-hidden rounded-[28px] transition-all duration-700 ease-out ${glassCard} ${enter(
+                                    pageLoaded
+                                )}`}
+                            >
+                                <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-100/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
+                                    <SectionTitle
+                                        icon={ICON_SHEET}
+                                        tone="slate"
+                                        tag="Detail report"
+                                        title="Rincian Item per Bulan"
+                                        description={`ACT / Jadwal setiap item preventif untuk ${periodeLabel}.`}
+                                    >
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold">
+                                            <span className="flex items-center gap-1.5 text-slate-500">
+                                                <span className="h-2.5 w-2.5 rounded bg-emerald-400" />
+                                                Selesai semua
+                                            </span>
+                                            <span className="flex items-center gap-1.5 text-slate-500">
+                                                <span className="h-2.5 w-2.5 rounded bg-blue-400" />
+                                                Sebagian
+                                            </span>
+                                            <span className="flex items-center gap-1.5 text-slate-500">
+                                                <span className="h-2.5 w-2.5 rounded bg-amber-400" />
+                                                Belum
+                                            </span>
+                                        </div>
+                                    </SectionTitle>
+                                </div>
+
+                                <div className="dashboard-scrollbar max-h-[520px] overflow-auto">
+                                    {groupedAnnualDetail.length > 0 ? (
+                                        annualChunks.map((bulanList, chunkIndex) => {
+                                            const isLastChunk =
+                                                chunkIndex === annualChunks.length - 1;
+
+                                            return (
+                                                <table
+                                                    key={`annual-detail-${chunkIndex}`}
+                                                    className={`w-full ${
+                                                        chunkIndex > 0
+                                                            ? 'border-t-4 border-slate-200'
+                                                            : ''
+                                                    }`}
+                                                    style={{
+                                                        minWidth: `${
+                                                            380 +
+                                                            bulanList.length * 66 +
+                                                            (isLastChunk ? 80 : 0)
+                                                        }px`,
+                                                    }}
+                                                >
+                                                    <thead className="sticky top-0 z-10 bg-slate-50">
+                                                        <tr className="border-b border-slate-200/70 bg-slate-50">
+                                                            <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500">
+                                                                No
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">
+                                                                Divisi
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">
+                                                                Item Preventif
+                                                            </th>
+
+                                                            {bulanList.map((b) => (
+                                                                <th
+                                                                    key={`head-${b.tahun}-${b.bulan}`}
+                                                                    className="px-1.5 py-3 text-center text-xs font-semibold text-slate-500"
+                                                                >
+                                                                    {String(b.nama_bulan || '').slice(0, 3)}
+                                                                    <span className="block text-[9px] font-semibold text-slate-400">
+                                                                        {b.tahun}
+                                                                    </span>
+                                                                </th>
+                                                            ))}
+
+                                                            {isLastChunk && (
+                                                                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">
+                                                                    Total
+                                                                </th>
+                                                            )}
+                                                        </tr>
+                                                    </thead>
+
+                                                    <tbody className="divide-y divide-slate-200/60">
+                                                        {groupedAnnualDetail.map((item, index) => (
+                                                            <tr
+                                                                key={`${item.divisi}-${item.no_item}-${index}`}
+                                                                className={`transition-colors hover:bg-blue-50/70 ${
+                                                                    item._first
+                                                                        ? 'border-t-2 border-slate-200'
+                                                                        : ''
+                                                                }`}
+                                                            >
+                                                                <td className="px-4 py-3 text-center text-sm font-semibold text-slate-400">
+                                                                    {index + 1}
+                                                                </td>
+
+                                                                {item._first && (
+                                                                    <td
+                                                                        rowSpan={item._span}
+                                                                        className="border-r border-blue-100 bg-blue-50/60 px-4 py-3 align-middle"
+                                                                    >
+                                                                        <span className="inline-flex rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-blue-800 shadow-sm">
+                                                                            {item.divisi}
+                                                                        </span>
+                                                                    </td>
+                                                                )}
+
+                                                                <td className="px-4 py-3 text-sm font-medium text-slate-700">
+                                                                    {item.item_preventif || '-'}
+                                                                </td>
+
+                                                                {bulanList.map((b) => {
+                                                                    const cell =
+                                                                        item.bulan?.[`${b.tahun}-${b.bulan}`];
+
+                                                                    return (
+                                                                        <td
+                                                                            key={`cell-${b.tahun}-${b.bulan}`}
+                                                                            className="px-1 py-2 text-center"
+                                                                        >
+                                                                            <span
+                                                                                className={`inline-flex min-w-[46px] items-center justify-center rounded-lg px-1.5 py-1 text-xs font-bold ${cellClass(
+                                                                                    cell
+                                                                                )}`}
+                                                                            >
+                                                                                {cell
+                                                                                    ? `${cell.act}/${cell.jadwal}`
+                                                                                    : '-'}
+                                                                            </span>
+                                                                        </td>
+                                                                    );
+                                                                })}
+
+                                                                {isLastChunk && (
+                                                                    <td className="px-4 py-3 text-center text-sm font-extrabold text-slate-800">
+                                                                        {item.total_act}/{item.total_jadwal}
+                                                                    </td>
+                                                                )}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            );
+                                        })
+                                    ) : (
+                                        <table className="w-full">
+                                            <tbody>
+                                                <TableEmpty
+                                                    colSpan={4}
+                                                    title="Tidak ada rincian item"
+                                                    text="Tidak ditemukan item preventif pada periode yang dipilih."
+                                                />
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+
+                                {groupedAnnualDetail.length > 0 && (
+                                    <div className="border-t border-slate-200/70 bg-slate-50/70 px-5 py-3.5 sm:px-6">
+                                        <div className="flex flex-col gap-2 text-xs font-medium text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                                            <span>
+                                                Menampilkan{' '}
+                                                <span className="font-bold text-slate-700">
+                                                    {groupedAnnualDetail.length}
+                                                </span>{' '}
+                                                item preventif
+                                            </span>
+
+                                            <span>
+                                                Total{' '}
+                                                <span className="font-bold text-slate-700">
+                                                    {annualTotalPlan}
+                                                </span>{' '}
+                                                jadwal pada{' '}
+                                                <span className="font-bold text-slate-700">
+                                                    {annualReport.length}
+                                                </span>{' '}
+                                                bulan
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </section>
+                        </>
+                    ) : (
+                        /* ---------------- DETAIL TABLE (BULANAN) ---------------- */
+                        <section
+                            style={{ transitionDelay: '300ms' }}
+                            className={`overflow-hidden rounded-[28px] transition-all duration-700 ease-out ${glassCard} ${enter(
+                                pageLoaded
+                            )}`}
+                        >
+                            <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-100/80 via-white/40 to-white/40 px-5 py-4 sm:px-6">
+                                <SectionTitle
+                                    icon={ICON_SHEET}
+                                    tone="slate"
+                                    tag="Detail report"
+                                    title="Detail Preventive Maintenance"
+                                    description={`Detail jadwal, ACT, dan Plan untuk ${currentMonthName} ${selectedYear}.`}
+                                >
+                                    {detail.length > 0 && (
+                                        <p className="text-xs font-medium text-slate-500">
+                                            {detail.length} item preventif
+                                        </p>
+                                    )}
+                                </SectionTitle>
                             </div>
-                        )}
-                    </section>
+
+                            <div className="dashboard-scrollbar max-h-[420px] overflow-auto">
+                                <table className="w-full min-w-[900px]">
+                                    <thead className="sticky top-0 z-10 bg-slate-50">
+                                        <tr className="border-b border-slate-200/70 bg-slate-50">
+                                            <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
+                                                No
+                                            </th>
+                                            <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500">
+                                                Divisi
+                                            </th>
+                                            <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500">
+                                                Item Preventif
+                                            </th>
+                                            <th className="px-5 py-3.5 text-center text-xs font-semibold text-slate-500">
+                                                Jumlah Item
+                                            </th>
+                                            <th className="px-5 py-3.5 text-center text-xs font-semibold text-blue-600">
+                                                Sudah Preventif
+                                            </th>
+                                            <th className="px-5 py-3.5 text-center text-xs font-semibold text-amber-600">
+                                                Belum Preventif
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="divide-y divide-slate-200/60">
+                                        {groupedDetail.length > 0 ? (
+                                            groupedDetail.map((item, index) => (
+                                                <tr
+                                                    key={`${item.divisi}-${item.no_item}-${index}`}
+                                                    style={{
+                                                        transitionDelay: `${Math.min(index * 40, 600)}ms`,
+                                                    }}
+                                                    className={`group transition-opacity duration-500 hover:bg-blue-50/70 ${
+                                                        item._first ? 'border-t-2 border-slate-200' : ''
+                                                    } ${pageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                                >
+                                                    <td className="px-5 py-3.5 text-center text-sm font-semibold text-slate-400">
+                                                        {index + 1}
+                                                    </td>
+
+                                                    {/* Divisi digabung (rowSpan) untuk baris berurutan yang sama */}
+                                                    {item._first && (
+                                                        <td
+                                                            rowSpan={item._span}
+                                                            className="border-r border-blue-100 bg-blue-50/60 px-5 py-3.5 align-middle"
+                                                        >
+                                                            <span className="inline-flex rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-blue-800 shadow-sm">
+                                                                {item.divisi}
+                                                            </span>
+                                                        </td>
+                                                    )}
+
+                                                    <td className="px-5 py-3.5 text-sm font-medium text-slate-700">
+                                                        {item.item_preventif || '-'}
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5 text-center">
+                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">
+                                                            {item.total_jadwal}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5 text-center">
+                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-600">
+                                                            {item.act}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5 text-center">
+                                                        <span className="inline-flex min-w-[44px] items-center justify-center rounded-xl bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-600">
+                                                            {item.plan}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <TableEmpty
+                                                colSpan={6}
+                                                title="Tidak ada jadwal preventif"
+                                                text="Tidak ditemukan data pada bulan yang dipilih."
+                                            />
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {detail.length > 0 && (
+                                <div className="border-t border-slate-200/70 bg-slate-50/70 px-5 py-3.5 sm:px-6">
+                                    <div className="flex flex-col gap-2 text-xs font-medium text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                                        <span>
+                                            Menampilkan{' '}
+                                            <span className="font-bold text-slate-700">{detail.length}</span>{' '}
+                                            item preventif
+                                        </span>
+
+                                        <span>
+                                            Total{' '}
+                                            <span className="font-bold text-slate-700">{totalJadwal}</span>{' '}
+                                            jadwal
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </main>
 
                 {/* FOOTER */}

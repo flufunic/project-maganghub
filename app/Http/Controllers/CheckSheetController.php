@@ -7,6 +7,7 @@ use App\Models\Divisi;
 use App\Models\Line;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -17,6 +18,170 @@ use App\Models\PreventifMesin;
 
 class CheckSheetController extends Controller
 {
+    // Divisi yang ditampilkan di grafik dashboard
+    // (harus sama persis dengan divisis.nama_divisi)
+    private const DASHBOARD_DIVISI = ['Headrest', 'Saidan', 'Utility'];
+
+    private const DASHBOARD_BULAN = [
+        1  => 'Jan', 2  => 'Feb', 3  => 'Mar', 4  => 'Apr',
+        5  => 'Mei', 6  => 'Jun', 7  => 'Jul', 8  => 'Agu',
+        9  => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+    ];
+
+    // =====================================================
+    // DASHBOARD CHECK SHEET (tahunan, Januari - Desember)
+    // Route publik: GET /check-sheet-dashboard
+    //
+    // 3 grafik per divisi (Headrest, Saidan, Utility):
+    //   1. Jumlah centang   = checklist yang sudah diisi (status = 1)
+    //   2. Persentase isi   = centang / (item x hari x line) x 100
+    //   3. Jumlah abnormality yang tercatat
+    // =====================================================
+
+    public function dashboard(Request $request): Response
+    {
+        $tahun = (int) ($request->tahun ?: now()->year);
+        $tahun = max(2020, min(2040, $tahun));
+
+        $awal  = "{$tahun}-01-01";
+        $akhir = "{$tahun}-12-31";
+
+        $divisiList = self::DASHBOARD_DIVISI;
+
+        // ---------- 1. JUMLAH CENTANG ----------
+        $centangRows = DB::table('check_sheet_checklists as c')
+            ->join('check_sheet_items as i', 'i.id', '=', 'c.check_sheet_item_id')
+            ->join('check_sheets as s', 's.id', '=', 'i.check_sheet_id')
+            ->join('divisis as d', 'd.id', '=', 's.divisi_id')
+            ->whereNull('i.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->where('c.status', 1)
+            ->whereBetween('c.tanggal', [$awal, $akhir])
+            ->whereIn('d.nama_divisi', $divisiList)
+            ->selectRaw('MONTH(c.tanggal) as bulan, d.nama_divisi as divisi, COUNT(*) as jumlah')
+            ->groupBy(DB::raw('MONTH(c.tanggal)'), 'd.nama_divisi')
+            ->get();
+
+        // ---------- 3. JUMLAH ABNORMALITY ----------
+        $abnormalRows = DB::table('check_sheet_abnormalities as a')
+            ->join('check_sheets as s', 's.id', '=', 'a.check_sheet_id')
+            ->join('divisis as d', 'd.id', '=', 's.divisi_id')
+            ->whereNull('a.deleted_at')
+            ->whereNull('s.deleted_at')
+            ->whereBetween('a.tanggal', [$awal, $akhir])
+            ->whereIn('d.nama_divisi', $divisiList)
+            ->selectRaw('MONTH(a.tanggal) as bulan, d.nama_divisi as divisi, COUNT(*) as jumlah')
+            ->groupBy(DB::raw('MONTH(a.tanggal)'), 'd.nama_divisi')
+            ->get();
+
+        // ---------- 2. TARGET ISI (untuk persentase) ----------
+        // Target per hari per divisi = jumlah item x jumlah line yang memakai check sheet itu.
+        // - Check sheet milik mesin (line_id terisi)  -> 1 line
+        // - Check sheet divisi (Headrest)             -> semua line divisi yang bukan per mesin
+        $jumlahLineDivisi = DB::table('lines')
+            ->where('per_mesin', false)
+            ->selectRaw('divisi_id, COUNT(*) as jumlah')
+            ->groupBy('divisi_id')
+            ->pluck('jumlah', 'divisi_id');
+
+        $sheets = DB::table('check_sheets as s')
+            ->join('divisis as d', 'd.id', '=', 's.divisi_id')
+            ->leftJoin('check_sheet_items as i', function ($join) {
+                $join->on('i.check_sheet_id', '=', 's.id')->whereNull('i.deleted_at');
+            })
+            ->whereNull('s.deleted_at')
+            ->whereIn('d.nama_divisi', $divisiList)
+            ->selectRaw('s.id, s.divisi_id, s.line_id, d.nama_divisi as divisi, COUNT(i.id) as jumlah_item')
+            ->groupBy('s.id', 's.divisi_id', 's.line_id', 'd.nama_divisi')
+            ->get();
+
+        $targetPerHari = array_fill_keys($divisiList, 0);
+
+        foreach ($sheets as $sheet) {
+            $line = $sheet->line_id
+                ? 1
+                : max(1, (int) ($jumlahLineDivisi[$sheet->divisi_id] ?? 1));
+
+            $targetPerHari[$sheet->divisi] += (int) $sheet->jumlah_item * $line;
+        }
+
+        // ---------- SUSUN 12 BULAN ----------
+        $laporan = [];
+
+        foreach (self::DASHBOARD_BULAN as $no => $nama) {
+            $laporan[$no] = [
+                'bulan'       => $no,
+                'nama_bulan'  => $nama,
+                'centang'     => array_fill_keys($divisiList, 0),
+                'persen'      => array_fill_keys($divisiList, null),
+                'abnormality' => array_fill_keys($divisiList, 0),
+            ];
+        }
+
+        $total = [];
+
+        foreach ($divisiList as $divisi) {
+            $total[$divisi] = [
+                'centang'     => 0,
+                'target'      => 0,
+                'persen'      => null,
+                'abnormality' => 0,
+            ];
+        }
+
+        foreach ($centangRows as $row) {
+            $laporan[(int) $row->bulan]['centang'][$row->divisi] = (int) $row->jumlah;
+            $total[$row->divisi]['centang'] += (int) $row->jumlah;
+        }
+
+        foreach ($abnormalRows as $row) {
+            $laporan[(int) $row->bulan]['abnormality'][$row->divisi] = (int) $row->jumlah;
+            $total[$row->divisi]['abnormality'] += (int) $row->jumlah;
+        }
+
+        // Hari yang dihitung: bulan lampau penuh, bulan berjalan sampai hari ini,
+        // bulan yang belum datang = 0 (persen kosong).
+        $hariIni = now();
+
+        foreach ($laporan as $no => $bulanData) {
+            $tanggalAwal = Carbon::create($tahun, $no, 1);
+
+            if ($tanggalAwal->isAfter($hariIni)) {
+                $hari = 0;
+            } elseif ($tanggalAwal->isSameMonth($hariIni)) {
+                $hari = $hariIni->day;
+            } else {
+                $hari = $tanggalAwal->daysInMonth;
+            }
+
+            foreach ($divisiList as $divisi) {
+                $target = $targetPerHari[$divisi] * $hari;
+
+                if ($target > 0) {
+                    $persen = min(100, round($bulanData['centang'][$divisi] / $target * 100, 1));
+                    $laporan[$no]['persen'][$divisi] = $persen;
+                    $total[$divisi]['target'] += $target;
+                }
+            }
+        }
+
+        foreach ($divisiList as $divisi) {
+            if ($total[$divisi]['target'] > 0) {
+                $total[$divisi]['persen'] = min(
+                    100,
+                    round($total[$divisi]['centang'] / $total[$divisi]['target'] * 100, 1)
+                );
+            }
+        }
+
+        return Inertia::render('CheckSheet/Dashboard', [
+            'tahun'   => $tahun,
+            'divisi'  => $divisiList,
+            'laporan' => array_values($laporan),
+            'total'   => $total,
+        ]);
+    }
+
     // =====================================================
     // SCAN BARCODE
     // =====================================================
@@ -173,7 +338,7 @@ class CheckSheetController extends Controller
      * Divisi yang punya barcode per mesin (Utility / Saidan) WAJIB memilih mesin,
      * dan mesin itu harus milik divisinya. Divisi lain (Headrest) selalu NULL.
      */
-   private function tentukanLineId(int $divisiId, int|string|null $lineId): ?int
+    private function tentukanLineId(int $divisiId, int|string|null $lineId): ?int
     {
         $adaPerMesin = Line::where('divisi_id', $divisiId)
             ->where('per_mesin', true)
@@ -235,7 +400,7 @@ class CheckSheetController extends Controller
             'pakai_plan_act'   => ['nullable', 'boolean'],
             'pakai_monitoring' => ['nullable', 'boolean'],
             'pakai_bbm'        => ['nullable', 'boolean'],
-            'bbm_kali_60' => ['nullable', 'boolean'],
+            'bbm_kali_60'      => ['nullable', 'boolean'],
         ]);
 
         $lineId = $this->tentukanLineId(
@@ -253,7 +418,7 @@ class CheckSheetController extends Controller
             'pakai_monitoring' => $request->boolean('pakai_monitoring'),
             // BBM hanya masuk akal kalau monitoring aktif
             'pakai_bbm'        => $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm'),
-            'bbm_kali_60' => $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60'),
+            'bbm_kali_60'      => $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60'),
         ]);
 
         $line = $lineId
@@ -262,7 +427,6 @@ class CheckSheetController extends Controller
 
         return $this->kembaliKeDaftar($line, 'Check Sheet berhasil ditambahkan.');
     }
-
 
     public function edit(CheckSheet $checkSheet)
     {
@@ -302,8 +466,7 @@ class CheckSheetController extends Controller
         $validated['pakai_plan_act']   = $request->boolean('pakai_plan_act');
         $validated['pakai_monitoring'] = $request->boolean('pakai_monitoring');
         $validated['pakai_bbm']        = $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm');
-        $validated['bbm_kali_60'] = $request->boolean('pakai_bbm')
-        && $request->boolean('bbm_kali_60');
+        $validated['bbm_kali_60']      = $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60');
 
         $checkSheet->update($validated);
 
@@ -412,7 +575,7 @@ class CheckSheetController extends Controller
                 ? $this->actualSebelumBulan($checkSheet, $awalBulan, $lineId)
                 : (object) [],
 
-            // [BARU] pilihan item preventif untuk form abnormality
+            // pilihan item preventif untuk form abnormality
             'preventifOptions' => PreventifMesin::where('is_hidden', false)
                 ->orderBy('divisi')
                 ->orderBy('no_item')
@@ -591,10 +754,6 @@ class CheckSheetController extends Controller
     // ABNORMALITY (per line)
     // =====================================================
 
-        // =====================================================
-    // ABNORMALITY (per line)
-    // =====================================================
-
     /**
      * Aturan validasi bersama (add & edit).
      * preventif_mesin_ids = BOLEH LEBIH DARI SATU item preventif.
@@ -682,6 +841,7 @@ class CheckSheetController extends Controller
 
         return back()->with('success', 'Abnormality berhasil dihapus.');
     }
+
     // =====================================================
     // LAIN-LAIN
     // =====================================================

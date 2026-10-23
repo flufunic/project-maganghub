@@ -185,6 +185,9 @@ class PreventifMesinController extends Controller
         // Plan = line kuning (total jadwal, tidak berkurang saat ACT)
         $annualReport = [];
 
+        // Rincian per item per bulan (untuk PDF tahunan / periode)
+        $annualDetail = [];
+
         $checklistPerItem = [];
 
         foreach ($preventifMesins as $preventif) {
@@ -216,6 +219,8 @@ class PreventifMesinController extends Controller
 
                 $divisi = $preventif->divisi ?: 'Lainnya';
 
+                $actItemBulanIni = 0;
+
                 foreach ($tanggalPlanTahunan as $tanggal) {
                     $checklist = $checklistByDate->get($tanggal);
 
@@ -224,8 +229,31 @@ class PreventifMesinController extends Controller
                     if ($checklist && (bool) $checklist->status === true) {
                         $totalActTahunan++;
                         $actPerDivisi[$divisi]++;
+                        $actItemBulanIni++;
                     }
                 }
+
+                // Simpan rincian item ini untuk bulan yang sedang diproses
+                $kodeItem = $preventif->no;
+
+                if (!isset($annualDetail[$kodeItem])) {
+                    $annualDetail[$kodeItem] = [
+                        'divisi' => $divisi,
+                        'no_item' => $preventif->no_item,
+                        'item_preventif' => $preventif->item_preventif,
+                        'bulan' => [],
+                        'total_jadwal' => 0,
+                        'total_act' => 0,
+                    ];
+                }
+
+                $annualDetail[$kodeItem]['bulan'][$tahunLaporan . '-' . $bulanLaporan] = [
+                    'jadwal' => count($tanggalPlanTahunan),
+                    'act' => $actItemBulanIni,
+                ];
+
+                $annualDetail[$kodeItem]['total_jadwal'] += count($tanggalPlanTahunan);
+                $annualDetail[$kodeItem]['total_act'] += $actItemBulanIni;
             }
 
             $annualReport[] = [
@@ -237,6 +265,16 @@ class PreventifMesinController extends Controller
                 'act_per_divisi' => $actPerDivisi,
             ];
         }
+
+        // Urutkan rincian: urutan divisi dulu, lalu nomor item
+        $urutanDivisi = array_flip($daftarDivisi);
+
+        $annualDetail = array_values($annualDetail);
+
+        usort($annualDetail, function ($a, $b) use ($urutanDivisi) {
+            return [$urutanDivisi[$a['divisi']] ?? 99, (int) $a['no_item']]
+                <=> [$urutanDivisi[$b['divisi']] ?? 99, (int) $b['no_item']];
+        });
 
         return Inertia::render('Welcome', [
             'bulan' => $bulan,
@@ -254,6 +292,7 @@ class PreventifMesinController extends Controller
             'divisiReport' => array_values($divisiReport),
 
             'annualReport' => $annualReport,
+            'annualDetail' => $annualDetail,
             'daftarDivisi' => $daftarDivisi,
 
             'bulanMulai' => $bulanMulai,
@@ -960,9 +999,12 @@ class PreventifMesinController extends Controller
      * Simpan daftar perubahan sebagai revisi di setiap pengiriman.
      * Pengiriman berstatus "diperiksa" otomatis kembali ke "menunggu"
      * (diatur di PreventifPengiriman::catatRevisi).
+     *
+     * @param  iterable<int, PreventifPengiriman>  $pengirimans
+     * @param  array<int, array{jenis: string, keterangan: string, lama: ?string, baru: ?string}>  $perubahan
      */
     private function catatRevisi(
-        $pengirimans,
+        iterable $pengirimans,
         PreventifMesin $preventifMesin,
         string $namaItem,
         array $perubahan,
@@ -1004,7 +1046,7 @@ class PreventifMesinController extends Controller
     /**
      * Rapikan teks: trim, string kosong dianggap null.
      */
-    private function bersihkanTeks($teks): ?string
+    private function bersihkanTeks(mixed $teks): ?string
     {
         $teks = trim((string) $teks);
 
@@ -1014,7 +1056,7 @@ class PreventifMesinController extends Controller
     /**
      * Format angka jam: 2.50 => "2.5", 3.00 => "3", null => null
      */
-    private function formatAngka($nilai): ?string
+    private function formatAngka(mixed $nilai): ?string
     {
         if ($nilai === null || $nilai === '') {
             return null;
