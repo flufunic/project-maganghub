@@ -237,11 +237,11 @@ export default function Index({
                             {/* JUDUL */}
                             <div>
                                 <h1 className="text-lg font-bold tracking-tight text-white">
-                                    Dashboard 
+                                    Schedule Preventif 
                                 </h1>
 
                                 <p className="hidden text-xs text-white/65 sm:block">
-                                    Sistem Schedule Preventif
+                                    Approval dan Monitoring Harian
                                 </p>
                             </div>
                         </div>

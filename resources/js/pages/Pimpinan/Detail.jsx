@@ -123,6 +123,7 @@ export default function Detail({
     const [showTolakModal, setShowTolakModal] = useState(false);
     const [alasanPenolakan, setAlasanPenolakan] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPeriksaModal, setShowPeriksaModal] = useState(false);
 
     // Item yang revisinya sedang dibuka di pop up
     const [revisiItem, setRevisiItem] = useState(null);
@@ -190,14 +191,26 @@ export default function Detail({
         return Boolean(checklist && checklist.status);
     };
 
+    // tombol "Tandai Sudah Diperiksa" -> buka modal
     const handlePeriksa = () => {
-        if (!window.confirm('Apakah data ini sudah diperiksa?')) {
-            return;
-        }
-
-        router.post(`/pimpinan/pengiriman/${pengiriman.id}/periksa`);
+        setShowPeriksaModal(true);
     };
 
+    // tombol "Ya, Sudah Diperiksa" di dalam modal
+    const konfirmasiPeriksa = () => {
+        setIsSubmitting(true);
+
+        router.post(
+            `/pimpinan/pengiriman/${pengiriman.id}/periksa`,
+            {},
+            {
+                onFinish: () => {
+                    setIsSubmitting(false);
+                    setShowPeriksaModal(false);
+                },
+            }
+        );
+    };
     // Data untuk pop up revisi
     const revisiList = revisiItem?.revisis ?? [];
     const revisiBaruItem = revisiList.filter((rev) => rev.baru).length;
@@ -720,6 +733,80 @@ export default function Detail({
                                 className="cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
                             >
                                 Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =========================
+                MODAL KONFIRMASI PERIKSA
+            ========================= */}
+            {showPeriksaModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md"
+                    onClick={() => !isSubmitting && setShowPeriksaModal(false)}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="absolute left-0 right-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-400" />
+
+                        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-white px-6 pb-5 pt-8">
+                            <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-emerald-100/60" />
+
+                            <div className="relative flex justify-center">
+                                <div className="relative">
+                                    <div className="absolute inset-0 rounded-2xl bg-emerald-200 blur-xl" />
+
+                                    <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-300/50">
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth={2.2}
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className="h-7 w-7"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="relative mt-4 text-center">
+                                <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                                    Tandai Sudah Diperiksa?
+                                </h3>
+
+                                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
+                                    Data preventif ini akan ditandai sudah diperiksa dan statusnya tidak bisa diubah lagi.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 border-t border-slate-100 bg-white px-6 py-5">
+                            <button
+                                type="button"
+                                onClick={() => setShowPeriksaModal(false)}
+                                disabled={isSubmitting}
+                                className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Batal
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={konfirmasiPeriksa}
+                                disabled={isSubmitting}
+                                className="flex-1 cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isSubmitting ? 'Memproses...' : 'Ya, Sudah Diperiksa'}
                             </button>
                         </div>
                     </div>

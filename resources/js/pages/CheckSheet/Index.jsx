@@ -1,6 +1,7 @@
 import Sidebar from '@/Components/Sidebar';
 import React, { useEffect, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import NotifPengiriman from '@/Components/NotifPengiriman';
 
 /* ------------------------------------------------------------------
 | ICON
@@ -8,6 +9,8 @@ import { Head, Link, router } from '@inertiajs/react';
 const ICONS = {
     plus: { sw: 2, paths: ['M12 5v14M5 12h14'] },
     menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
+    send: { sw: 2, paths: ['M22 2 11 13', 'm22 2-7 20-4-9-9-4Z'] },
+    history: { sw: 1.8, paths: ['M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'] },
     clipboard: {
         rect: { x: 5, y: 4, width: 14, height: 17, rx: 2 },
         paths: ['M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4'],
@@ -71,15 +74,56 @@ const getNamaDivisi = (checkSheet) => checkSheet.divisi?.nama_divisi || '-';
 // Kunci penyimpanan pesan toast dari halaman Create / Edit
 const TOAST_KEY = 'checksheet_toast';
 
+/* ------------------------------------------------------------------
+| MINGGU BERJALAN (Senin - Minggu), dihitung di browser
+------------------------------------------------------------------ */
+const pad = (n) => String(n).padStart(2, '0');
+
+const formatYmd = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+const hitungMingguIni = () => {
+    const senin = new Date();
+    senin.setHours(0, 0, 0, 0);
+    // getDay(): 0 = Minggu. Geser supaya Senin = 0.
+    senin.setDate(senin.getDate() - ((senin.getDay() + 6) % 7));
+
+    const minggu = new Date(senin);
+    minggu.setDate(senin.getDate() + 6);
+
+    const pendek = { day: 'numeric', month: 'short' };
+
+    return {
+        mulai: formatYmd(senin),
+        label: `${senin.toLocaleDateString('id-ID', pendek)} – ${minggu.toLocaleDateString(
+            'id-ID',
+            { ...pendek, year: 'numeric' }
+        )}`,
+    };
+};
+
 export default function Index({ checkSheets = [], line, flash }) {
+    const { auth, errors } = usePage().props;
+
+    // Tombol kirim hanya untuk admin. Kalau data role tidak tersedia di
+    // props bersama, tombol tetap tampil dan server yang menolak non-admin.
+    const role = auth?.user?.role;
+    const bolehKirim = !role || role === 'admin';
+
     const [showSidebar, setShowSidebar] = useState(false);
     const [selectedCheckSheet, setSelectedCheckSheet] = useState(null);
     const [deleting, setDeleting] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
+
+    // Toast: { type: 'success' | 'error', message }
+    const [toast, setToast] = useState(null);
+
+    // Kirim mingguan
+    const [showKirim, setShowKirim] = useState(false);
+    const [sending, setSending] = useState(false);
+    const mingguIni = hitungMingguIni();
 
     // =========================
-    // SUCCESS TOAST (dari flash backend)
+    // TOAST (dari flash backend / pesan Create-Edit)
     // =========================
     useEffect(() => {
         let pesan = null;
@@ -96,22 +140,26 @@ export default function Index({ checkSheets = [], line, flash }) {
         pesan = pesan || flash?.success;
 
         if (pesan) {
-            setSuccessMessage(pesan);
-            setShowSuccess(true);
+            setToast({ type: 'success', message: pesan });
         }
     }, [flash]);
 
+    // Pesan gagal dari pengiriman (contoh: "Minggu ini sudah dikirim.")
     useEffect(() => {
-        if (!showSuccess) {
+        if (errors?.pengiriman) {
+            setToast({ type: 'error', message: errors.pengiriman });
+        }
+    }, [errors]);
+
+    useEffect(() => {
+        if (!toast) {
             return;
         }
 
-        const timer = setTimeout(() => {
-            setShowSuccess(false);
-        }, 4000);
+        const timer = setTimeout(() => setToast(null), 5000);
 
         return () => clearTimeout(timer);
-    }, [showSuccess]);
+    }, [toast]);
 
     /* URUTKAN DIVISI A-Z, DATA LAMA KE BARU */
     const sortedCheckSheets = [...checkSheets].sort(
@@ -150,11 +198,31 @@ export default function Index({ checkSheets = [], line, flash }) {
             preserveScroll: true,
             onSuccess: () => {
                 setSelectedCheckSheet(null);
-                setSuccessMessage('Check Sheet berhasil dihapus.');
-                setShowSuccess(true);
+                setToast({
+                    type: 'success',
+                    message: 'Check Sheet berhasil dihapus.',
+                });
             },
             onFinish: () => setDeleting(false),
         });
+    };
+
+    /* KIRIM CHECK SHEET MINGGU INI KE PIMPINAN */
+    const handleKirim = () => {
+        if (sending) return;
+
+        router.post(
+            '/check-sheet-pengiriman',
+            { minggu_mulai: mingguIni.mulai },
+            {
+                preserveScroll: true,
+                onStart: () => setSending(true),
+                onFinish: () => {
+                    setSending(false);
+                    setShowKirim(false);
+                },
+            }
+        );
     };
 
     // Aksi di pojok kanan (sticky), kolom Nama mengambil sisa ruang
@@ -249,17 +317,23 @@ export default function Index({ checkSheets = [], line, flash }) {
                                     {line?.divisi?.nama_divisi} · {line?.nama_line}
                                 </p>
                             </div>
+
+                            {bolehKirim && (
+                                <div className="ml-auto">
+                                    <NotifPengiriman />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </header>
 
                 {/* MAIN */}
                 <main className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-4 sm:px-6">
-                    {/* TOOLBAR (SATU BARIS, KECIL) */}
+                    {/* TOOLBAR */}
                     <div
                         className={`idx-rise mb-3 overflow-hidden rounded-2xl ${glassCard}`}
                     >
-                        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
                             <div className="flex min-w-0 items-baseline gap-2">
                                 <h2 className="truncate text-sm font-bold tracking-tight text-slate-900">
                                     {line?.divisi?.nama_divisi} — {line?.nama_line}
@@ -269,7 +343,29 @@ export default function Index({ checkSheets = [], line, flash }) {
                                 </span>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {bolehKirim && (
+                                    <>
+                                        <Link
+                                            href="/check-sheet-pengiriman/riwayat"
+                                            title="Lihat riwayat pengiriman ke pimpinan"
+                                            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                                        >
+                                            <Icon type="history" className="h-3.5 w-3.5" />
+                                            Riwayat Kirim
+                                        </Link>
+
+                                        <Link
+                                            href="/check-sheet-pengiriman"
+                                            title="Kirim rekap check sheet ke pimpinan"
+                                            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 px-3 text-xs font-bold text-white shadow-sm transition hover:from-emerald-600 hover:to-green-700"
+                                        >
+                                            <Icon type="send" className="h-3.5 w-3.5" />
+                                            Kirim ke Pimpinan
+                                        </Link>
+                                    </>
+                                )}
+
                                 <Link
                                     href="/check-sheets"
                                     className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
@@ -296,7 +392,6 @@ export default function Index({ checkSheets = [], line, flash }) {
                         className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
                     >
                         <div className="idx-scroll max-h-[calc(100vh-250px)] min-h-[260px] overflow-auto">
-                            {/* Tanpa min-width besar: di layar normal tidak ada scroll samping */}
                             <table className="w-full border-separate border-spacing-0 text-sm">
                                 <thead>
                                     <tr>
@@ -344,7 +439,7 @@ export default function Index({ checkSheets = [], line, flash }) {
                                                         {checkSheet.nomor_dokumen}
                                                     </td>
 
-                                                    {/* NAMA CHECK SHEET (teks turun ke bawah kalau panjang) */}
+                                                    {/* NAMA CHECK SHEET */}
                                                     <td className="whitespace-normal break-words border-b border-slate-200 px-4 py-2.5 text-sm font-medium leading-snug text-slate-700">
                                                         {checkSheet.nama_checksheet}
                                                     </td>
@@ -424,6 +519,82 @@ export default function Index({ checkSheets = [], line, flash }) {
                         )}
                     </div>
                 </main>
+
+                {/* MODAL KONFIRMASI KIRIM MINGGUAN */}
+                {showKirim && (
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                        onMouseDown={(e) => {
+                            if (e.target === e.currentTarget && !sending) {
+                                setShowKirim(false);
+                            }
+                        }}
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl shadow-slate-950/30"
+                        >
+                            <div className="px-5 pb-4 pt-5">
+                                <div className="flex items-start gap-3">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                                        <Icon type="send" className="h-5 w-5" />
+                                    </span>
+
+                                    <div className="min-w-0">
+                                        <h2 className="text-base font-bold text-slate-900">
+                                            Kirim ke pimpinan?
+                                        </h2>
+                                        <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                                            Rekap semua check sheet dan abnormality untuk
+                                            minggu berikut akan dikirim untuk diperiksa.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+                                    <p className="text-[11px] font-semibold text-slate-400">
+                                        Minggu (Senin – Minggu)
+                                    </p>
+                                    <p className="mt-0.5 text-sm font-semibold text-slate-800">
+                                        {mingguIni.label}
+                                    </p>
+                                </div>
+
+                                <p className="mt-3 text-xs text-slate-400">
+                                    Untuk minggu lain, buka Riwayat Kirim.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                                <button
+                                    type="button"
+                                    disabled={sending}
+                                    onClick={() => setShowKirim(false)}
+                                    className="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Batal
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={sending}
+                                    onClick={handleKirim}
+                                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {sending ? (
+                                        <>
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                            Mengirim...
+                                        </>
+                                    ) : (
+                                        'Ya, Kirim'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* MODAL KONFIRMASI HAPUS */}
                 {selectedCheckSheet && (
@@ -505,27 +676,45 @@ export default function Index({ checkSheets = [], line, flash }) {
             </div>
 
             {/* =====================================================
-                SUCCESS TOAST
+                TOAST (berhasil / gagal)
             ====================================================== */}
-            {showSuccess && (
-                <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
-                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
+            {toast && (
+                <div
+                    className={`fixed right-5 top-5 z-[120] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border bg-white p-4 shadow-2xl shadow-slate-950/40 ${
+                        toast.type === 'error' ? 'border-red-100' : 'border-emerald-100'
+                    }`}
+                >
+                    <div
+                        className={`absolute left-0 top-0 h-full w-1 ${
+                            toast.type === 'error'
+                                ? 'bg-gradient-to-b from-red-400 to-rose-600'
+                                : 'bg-gradient-to-b from-emerald-400 to-green-600'
+                        }`}
+                    />
 
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-green-100">
-                        <span className="font-bold text-emerald-600">✓</span>
+                    <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold ${
+                            toast.type === 'error'
+                                ? 'bg-red-50 text-red-600'
+                                : 'bg-gradient-to-br from-emerald-50 to-green-100 text-emerald-600'
+                        }`}
+                    >
+                        {toast.type === 'error' ? '!' : '✓'}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800">Berhasil</p>
+                        <p className="text-sm font-bold text-slate-800">
+                            {toast.type === 'error' ? 'Gagal' : 'Berhasil'}
+                        </p>
 
                         <p className="mt-0.5 text-sm leading-relaxed text-slate-500">
-                            {successMessage}
+                            {toast.message}
                         </p>
                     </div>
 
                     <button
                         type="button"
-                        onClick={() => setShowSuccess(false)}
+                        onClick={() => setToast(null)}
                         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
                     >
                         ×

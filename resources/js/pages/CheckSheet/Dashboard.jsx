@@ -53,16 +53,30 @@ const ICON_PAUSE = 'M9 5.5v13M15 5.5v13';
 
 /* ------------------------------------------------------------------
 | WARNA PER DIVISI (sama dengan dashboard Preventive Maintenance)
+| text = warna angka di dalam segmen batang
 ------------------------------------------------------------------ */
 const WARNA_DIVISI = {
-    Headrest: { gradient: 'linear-gradient(180deg, #e9d5ff 0%, #c084fc 55%, #9333ea 100%)', solid: '#c084fc' },
-    Saidan: { gradient: 'linear-gradient(180deg, #bbf7d0 0%, #86efac 55%, #4ade80 100%)', solid: '#86efac' },
-    Utility: { gradient: 'linear-gradient(180deg, #60a5fa 0%, #1e3a8a 100%)', solid: '#1e3a8a' },
+    Headrest: {
+        gradient: 'linear-gradient(180deg, #e9d5ff 0%, #c084fc 55%, #9333ea 100%)',
+        solid: '#c084fc',
+        text: '#3b0764',
+    },
+    Saidan: {
+        gradient: 'linear-gradient(180deg, #bbf7d0 0%, #86efac 55%, #4ade80 100%)',
+        solid: '#86efac',
+        text: '#14532d',
+    },
+    Utility: {
+        gradient: 'linear-gradient(180deg, #60a5fa 0%, #1e3a8a 100%)',
+        solid: '#1e3a8a',
+        text: '#ffffff',
+    },
 };
 
 const FALLBACK = {
     gradient: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%)',
     solid: '#94a3b8',
+    text: '#0f172a',
 };
 
 const warna = (divisi) => WARNA_DIVISI[divisi] ?? FALLBACK;
@@ -106,8 +120,7 @@ const MENUS = [
 
 /* ------------------------------------------------------------------
 | DEFINISI 3 SLIDE GRAFIK
-| key    = nama field di data bulanan (laporan[].xxx)
-| fixMax = skala sumbu Y dikunci (persentase 0-100)
+| key = nama field di data bulanan (laporan[].xxx)
 ------------------------------------------------------------------ */
 const CHARTS = [
     {
@@ -125,7 +138,6 @@ const CHARTS = [
         title: 'Persentase Pengisian',
         desc: 'Centang terisi dibanding target (jumlah item × hari × line).',
         suffix: '%',
-        fixMax: 100,
     },
     {
         key: 'abnormality',
@@ -138,10 +150,11 @@ const CHARTS = [
 ];
 
 /* ------------------------------------------------------------------
-| GRAFIK BATANG (dipakai untuk semua slide)
+| GRAFIK BATANG TUMPUK (1 batang per bulan, ditumpuk per divisi)
+| Divisi pertama di paling bawah.
 ------------------------------------------------------------------ */
 function BarChart({ config, laporan, divisi, animated }) {
-    const { key, suffix = '', fixMax } = config;
+    const { key, suffix = '' } = config;
 
     const nilai = (m, d) => {
         const v = m[key]?.[d];
@@ -149,11 +162,14 @@ function BarChart({ config, laporan, divisi, animated }) {
         return v === null || v === undefined ? null : Number(v);
     };
 
-    const maxValue =
-        fixMax ??
-        Math.max(1, ...laporan.flatMap((m) => divisi.map((d) => nilai(m, d) ?? 0)));
+    const totalBulan = (m) => divisi.reduce((sum, d) => sum + (nilai(m, d) ?? 0), 0);
 
-    const adaData = laporan.some((m) => divisi.some((d) => (nilai(m, d) ?? 0) > 0));
+    // Skala Y mengikuti total tumpukan tertinggi, dibulatkan ke kelipatan 4
+    // supaya label sumbu Y selalu bilangan bulat.
+    const rawMax = Math.max(1, ...laporan.map(totalBulan));
+    const maxValue = Math.max(4, Math.ceil(rawMax / 4) * 4);
+
+    const adaData = laporan.some((m) => totalBulan(m) > 0);
 
     return (
         <div className="csd-scroll overflow-x-auto pb-1">
@@ -180,54 +196,81 @@ function BarChart({ config, laporan, divisi, animated }) {
                             ))}
                         </div>
 
-                        {/* BATANG */}
+                        {/* BATANG TUMPUK */}
                         <div className="absolute inset-x-0 bottom-9 top-7 flex px-2">
-                            {laporan.map((m, mi) => (
-                                <div
-                                    key={m.bulan}
-                                    className="flex h-full flex-1 items-end justify-center gap-[3px]"
-                                >
-                                    {divisi.map((d, di) => {
-                                        const value = nilai(m, d);
-                                        const ada = value !== null && value > 0;
-                                        const height = ada ? Math.max((value / maxValue) * 100, 3) : 0;
+                            {laporan.map((m, mi) => {
+                                const total = totalBulan(m);
+                                const ada = total > 0;
+                                const height = ada ? Math.max((total / maxValue) * 100, 3) : 0;
 
-                                        return (
-                                            <div
-                                                key={d}
-                                                className="relative flex h-full w-[18px] items-end justify-center"
-                                                title={`${d} · ${m.nama_bulan}: ${
-                                                    value === null ? '-' : value + suffix
-                                                }`}
-                                            >
-                                                {ada && (
-                                                    <span
-                                                        className="absolute z-10 whitespace-nowrap text-[9px] font-extrabold text-slate-700 transition-all duration-500"
-                                                        style={{
-                                                            bottom: animated
-                                                                ? `min(calc(${height}% + 3px), calc(100% - 14px))`
-                                                                : '0px',
-                                                            opacity: animated ? 1 : 0,
-                                                            transitionDelay: `${mi * 50 + di * 40 + 300}ms`,
-                                                        }}
-                                                    >
-                                                        {value}
-                                                    </span>
-                                                )}
-
-                                                <div
-                                                    className="w-full rounded-t-md transition-all duration-700 ease-out"
+                                return (
+                                    <div
+                                        key={m.bulan}
+                                        className="flex h-full flex-1 items-end justify-center"
+                                    >
+                                        <div
+                                            className="relative flex h-full w-[44px] items-end justify-center"
+                                            title={`${m.nama_bulan} · Total: ${total}${suffix}`}
+                                        >
+                                            {/* TOTAL DI ATAS BATANG */}
+                                            {ada && (
+                                                <span
+                                                    className="absolute z-10 whitespace-nowrap text-[10px] font-extrabold text-slate-800 transition-all duration-500"
                                                     style={{
-                                                        height: animated ? `${height}%` : '0%',
-                                                        background: warna(d).gradient,
-                                                        transitionDelay: `${mi * 50 + di * 40}ms`,
+                                                        bottom: animated
+                                                            ? `min(calc(${height}% + 3px), calc(100% - 14px))`
+                                                            : '0px',
+                                                        opacity: animated ? 1 : 0,
+                                                        transitionDelay: `${mi * 50 + 300}ms`,
                                                     }}
-                                                />
+                                                >
+                                                    {total}
+                                                    {suffix}
+                                                </span>
+                                            )}
+
+                                            {/* TUMPUKAN DIVISI (divisi pertama paling bawah) */}
+                                            <div
+                                                className="flex w-full flex-col-reverse overflow-hidden rounded-t-md transition-all duration-700 ease-out"
+                                                style={{
+                                                    height: animated ? `${height}%` : '0%',
+                                                    transitionDelay: `${mi * 50}ms`,
+                                                }}
+                                            >
+                                                {divisi.map((d) => {
+                                                    const value = nilai(m, d) ?? 0;
+
+                                                    if (value <= 0) return null;
+
+                                                    // Angka hanya ditampilkan jika segmen cukup tinggi
+                                                    const muatLabel = value / maxValue >= 0.07;
+
+                                                    return (
+                                                        <div
+                                                            key={d}
+                                                            title={`${d} · ${m.nama_bulan}: ${value}${suffix}`}
+                                                            className="flex items-center justify-center border-t border-white/40 first:border-t-0"
+                                                            style={{
+                                                                height: `${(value / total) * 100}%`,
+                                                                background: warna(d).gradient,
+                                                            }}
+                                                        >
+                                                            {muatLabel && (
+                                                                <span
+                                                                    className="text-[9px] font-extrabold leading-none"
+                                                                    style={{ color: warna(d).text }}
+                                                                >
+                                                                    {value}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* BASELINE */}

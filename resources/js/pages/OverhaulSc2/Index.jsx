@@ -3,6 +3,9 @@ import ConfirmModal from '@/Components/ConfirmModal';
 import MesinFormModal from '@/Components/MesinFormModal';
 import React, { useEffect, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
+import DokumenModal from '@/Components/DokumenModal';
+
+
 
 /* ------------------------------------------------------------------
 | ICON
@@ -135,6 +138,7 @@ const WEEKS = [1, 2, 3, 4];
 const WEEK_LABEL = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 const ITEMS = ['plan', 'act'];
 
+
 // Contoh: 1200000 + shot -> "1.200.000 shot"
 const formatStandar = (mesin) => {
     if (mesin.standar === null || mesin.standar === undefined || mesin.standar === '') {
@@ -166,6 +170,8 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
     const [editingMesin, setEditingMesin] = useState(null); // null = mode tambah
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
+
+    const [dokumenMesinId, setDokumenMesinId] = useState(null);
 
     // Dialog konfirmasi hapus
     const [confirmDialog, setConfirmDialog] = useState(null);
@@ -231,6 +237,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
             { preserveState: true, preserveScroll: true, replace: true }
         );
     };
+
 
     // =========================
     // CHECKBOX
@@ -313,7 +320,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
         };
 
         if (editingMesin) {
-            router.put(`/overhaul-sc2/${editingMesin.id}`, payload, options);
+            router.post(`/overhaul-sc2/${editingMesin.id}`, { ...payload, _method: 'put' }, options);
         } else {
             router.post('/overhaul-sc2', payload, options);
         }
@@ -471,6 +478,27 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                     </select>
                                 </Field>
 
+                                <a
+                                    href={`/overhaul-sc2/export?tahun=${selectedYear}`}
+                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+                                    title={`Export Schedule Overhaul tahun ${selectedYear} ke Excel`}
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
+                                        <path d="M5 17v3h14v-3" />
+                                    </svg>
+                                    Export Excel
+                                </a>
+
                                 <button
                                     type="button"
                                     onClick={openCreate}
@@ -495,7 +523,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                 <thead className="text-white">
                                     {/* BARIS 1: kolom tetap + TAHUN */}
                                     <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
-                                        {['No', 'Mesin', 'Nama', 'Total Mesin', 'Standar', 'Item'].map(
+                                        {['No', 'Mesin', 'Nama', 'Total Mesin', 'Standar','Dokumen', 'Item'].map(
                                             (header) => (
                                                 <th
                                                     key={header}
@@ -591,6 +619,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                 )}
 
                                                                 {/* NAMA, TOTAL, STANDAR (per data, gabung Plan+Act) */}
+                                                                {/* NAMA, TOTAL, STANDAR, DOKUMEN (per data, gabung Plan+Act) */}
                                                                 {itemIndex === 0 && (
                                                                     <>
                                                                         <td
@@ -610,6 +639,32 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                             className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600"
                                                                         >
                                                                             {formatStandar(mesin)}
+                                                                        </td>
+                                                                        <td
+                                                                            rowSpan={2}
+                                                                            className="border border-slate-200 px-3 py-3 text-center"
+                                                                        >
+                                                                            <button
+                                                                                type="button"
+                                                                                title="Lihat / unggah dokumen"
+                                                                                onClick={() => setDokumenMesinId(mesin.id)}
+                                                                                className={`inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                                                                                    (mesin.dokumens?.length ?? 0) > 0
+                                                                                        ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                                                                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                                                                }`}
+                                                                            >
+                                                                                <span>Lihat Dokumen</span>
+                                                                                <span
+                                                                                    className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold leading-none ${
+                                                                                        (mesin.dokumens?.length ?? 0) > 0
+                                                                                            ? 'bg-blue-600 text-white'
+                                                                                            : 'bg-slate-200 text-slate-500'
+                                                                                    }`}
+                                                                                >
+                                                                                    {mesin.dokumens?.length ?? 0}
+                                                                                </span>
+                                                                            </button>
                                                                         </td>
                                                                     </>
                                                                 )}
@@ -703,6 +758,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                     })
                                                                 )}
 
+                                        
                                                                 {/* AKSI */}
                                                                 {itemIndex === 0 && (
                                                                     <td
@@ -738,7 +794,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan={55} className="px-6 py-16 text-center">
+                                            <td colSpan={56} className="px-6 py-16 text-center">
                                                 <div className="flex flex-col items-center">
                                                     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
                                                         <Icon type="clipboard" className="h-7 w-7 text-slate-400" />
@@ -872,6 +928,13 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                     onSubmit={submitForm}
                     onDeleteMesin={deleteMesinOption}
                     onDeleteSatuan={deleteSatuanOption}
+                />
+            )}
+
+            {dokumenMesinId && mesins.find((m) => m.id === dokumenMesinId) && (
+                <DokumenModal
+                    mesin={mesins.find((m) => m.id === dokumenMesinId)}
+                    onClose={() => setDokumenMesinId(null)}
                 />
             )}
 

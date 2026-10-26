@@ -13,7 +13,8 @@ use App\Http\Controllers\CheckSheetImportController;
 use App\Http\Controllers\CheckSheetMonitoringController;
 use App\Http\Controllers\CheckSheetBbmController;
 use App\Http\Controllers\OverhaulSc2Controller;
-
+use App\Http\Controllers\CheckSheetPengirimanController;
+use App\Http\Controllers\CheckSheetPimpinanController;
 
 
 Route::get('/', [
@@ -148,7 +149,30 @@ Route::middleware('auth')->group(function () {
     ])
         ->middleware('role:admin')
         ->name('preventif-pengiriman.store');
+
+    // Kirim check sheet mingguan ke pimpinan (admin)
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/check-sheet-pengiriman', [
+            CheckSheetPengirimanController::class,
+            'index'
+        ])->name('check-sheet-pengiriman.index');
+
+        Route::post('/check-sheet-pengiriman', [
+            CheckSheetPengirimanController::class,
+            'store'
+        ])->name('check-sheet-pengiriman.store');
+
+        Route::get('/check-sheet-pengiriman/riwayat', [
+            CheckSheetPengirimanController::class,
+            'riwayat'
+        ])->name('check-sheet-pengiriman.riwayat');
         
+        Route::get('/check-sheet-pengiriman/notifikasi', [
+            CheckSheetPengirimanController::class,
+            'notifikasi'
+        ])->name('check-sheet-pengiriman.notifikasi');
+    });
+
     Route::put(
         '/preventif-mesin/{preventifMesin}/bulanan',
         [PreventifMesinController::class, 'updateBulanan']
@@ -165,11 +189,30 @@ Route::middleware('auth')->group(function () {
         [CheckSheetImportController::class, 'store']
     )->name('check-sheets.import.store');
 
+    // ===== Overhaul SC2 =====
+
+    // Export harus di atas route yang memakai {overhaulMesin}
+    Route::get('/overhaul-sc2/export', [OverhaulSc2Controller::class, 'exportExcel'])
+        ->name('overhaul-sc2.export');
+
+    // Hapus pilihan di dropdown form (dipanggil dari Index.jsx)
+    Route::delete('/overhaul-sc2-opsi/mesin', [OverhaulSc2Controller::class, 'destroyMesin'])
+        ->name('overhaul-sc2.opsi.mesin.destroy');
+
+    Route::delete('/overhaul-sc2-opsi/satuan', [OverhaulSc2Controller::class, 'destroySatuan'])
+        ->name('overhaul-sc2.opsi.satuan.destroy');
+
     Route::get('/overhaul-sc2', [OverhaulSc2Controller::class, 'index']);
     Route::post('/overhaul-sc2', [OverhaulSc2Controller::class, 'store']);
     Route::put('/overhaul-sc2/{overhaulMesin}', [OverhaulSc2Controller::class, 'update']);
     Route::delete('/overhaul-sc2/{overhaulMesin}', [OverhaulSc2Controller::class, 'destroy']);
     Route::post('/overhaul-sc2/{overhaulMesin}/schedule', [OverhaulSc2Controller::class, 'saveSchedule']);
+
+    // Dokumen overhaul
+    Route::post('/overhaul-sc2/{overhaulMesin}/dokumen', [OverhaulSc2Controller::class, 'uploadDokumen']);
+    Route::get('/overhaul-dokumen/{dokumen}', [OverhaulSc2Controller::class, 'lihatDokumen']);
+    Route::get('/overhaul-dokumen/{dokumen}/download', [OverhaulSc2Controller::class, 'downloadDokumen']);
+    Route::delete('/overhaul-dokumen/{dokumen}', [OverhaulSc2Controller::class, 'hapusDokumen']);
 
 });
 
@@ -191,4 +234,30 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
 
     Route::post('/pimpinan/pengiriman/{pengiriman}/tolak', [PimpinanController::class, 'tolak'])
         ->name('pimpinan.pengiriman.tolak');
+
+    // Check sheet mingguan (pimpinan)
+    Route::get('/pimpinan/check-sheet', [
+        CheckSheetPimpinanController::class,
+        'index'
+    ])->name('pimpinan.check-sheet.index');
+
+    Route::get('/pimpinan/check-sheet/{pengiriman}', [
+        CheckSheetPimpinanController::class,
+        'show'
+    ])->name('pimpinan.check-sheet.show');
+
+    Route::post('/pimpinan/check-sheet/{pengiriman}/periksa', [
+        CheckSheetPimpinanController::class,
+        'periksa'
+    ])->name('pimpinan.check-sheet.periksa');
+
+    Route::post('/pimpinan/check-sheet/{pengiriman}/tolak', [
+        CheckSheetPimpinanController::class,
+        'tolak'
+    ])->name('pimpinan.check-sheet.tolak');
+
+    Route::delete('/pimpinan/check-sheet/{pengiriman}', [
+        CheckSheetPimpinanController::class,
+        'destroy'
+    ])->name('pimpinan.check-sheet.destroy');
 });

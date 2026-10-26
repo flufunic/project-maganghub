@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\OverhaulSc2Export;
+use App\Models\OverhaulDokumen;
 use App\Models\OverhaulMesin;
 use App\Models\OverhaulSatuan;
 use App\Models\OverhaulSchedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OverhaulSc2Controller extends Controller
 {
@@ -25,6 +29,21 @@ class OverhaulSc2Controller extends Controller
         12 => 'Desember',
     ];
 
+    // Aturan validasi dokumen. max dalam KB: 102400 KB = 100 MB
+    private const ATURAN_DOKUMEN = 'file|max:102400|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png';
+
+    // Maksimal jumlah file per sekali upload
+    private const MAKS_FILE = 5;
+
+    // Tipe file yang tampil langsung di browser (lainnya otomatis diunduh)
+    private const MIME_INLINE = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+    ];
+
+    private const DISK_DOKUMEN = 'local';
+
     // =====================================================
     // DASHBOARD TAHUNAN
     // Plan = jumlah kotak Plan yang dicentang per bulan  (garis)
@@ -36,7 +55,7 @@ class OverhaulSc2Controller extends Controller
         $tahun = (int) $request->input('tahun', now()->year);
         $tahun = max(2000, min(2100, $tahun));
 
-        // Jumlahkan per bulan & item. Mesin yang sudah dihapus (soft delete) tidak ikut.
+        // Mesin yang sudah dihapus (soft delete) tidak ikut dihitung.
         $rows = OverhaulSchedule::query()
             ->join(
                 'overhaul_mesins',
@@ -51,7 +70,6 @@ class OverhaulSc2Controller extends Controller
             ->groupBy('overhaul_schedules.bulan', 'overhaul_schedules.item')
             ->get();
 
-        // Siapkan Januari - Desember, bulan kosong = 0
         $bulanan = [];
 
         for ($b = 1; $b <= 12; $b++) {
@@ -96,6 +114,7 @@ class OverhaulSc2Controller extends Controller
 
         $mesins = OverhaulMesin::with([
             'schedules' => fn ($q) => $q->where('tahun', $tahun),
+            'dokumens'  => fn ($q) => $q->orderBy('id'),
         ])
             ->orderBy('no')
             ->orderBy('mesin')
@@ -112,7 +131,8 @@ class OverhaulSc2Controller extends Controller
 
     public function store(Request $request)
     {
-        OverhaulMesin::create($this->payload($request));
+        $mesin = OverhaulMesin::create($this->payload($request));
+        $this->simpanDokumen($request, $mesin);
         $this->renumber();
 
         return back()->with('success', 'Data mesin berhasil ditambahkan.');
@@ -121,6 +141,7 @@ class OverhaulSc2Controller extends Controller
     public function update(Request $request, OverhaulMesin $overhaulMesin)
     {
         $overhaulMesin->update($this->payload($request));
+        $this->simpanDokumen($request, $overhaulMesin);
         $this->renumber();
 
         return back()->with('success', 'Data mesin berhasil diperbarui.');
@@ -136,8 +157,8 @@ class OverhaulSc2Controller extends Controller
 
     /**
      * Hapus SATU MESIN (grup) beserta semua datanya (SOFT DELETE).
-     * Baris hanya diberi deleted_at, jadwalnya tetap utuh sehingga
-     * bisa dipulihkan lagi dengan restore().
+     * Baris hanya diberi deleted_at, jadwal dan dokumennya tetap utuh
+     * sehingga bisa dipulihkan lagi dengan restore().
      */
     public function destroyMesin(Request $request)
     {
@@ -232,6 +253,106 @@ class OverhaulSc2Controller extends Controller
         return back()->with('success', 'Jadwal berhasil disimpan.');
     }
 
+    // =====================================================
+    // DOKUMEN
+    // File disimpan di disk privat (storage/app/private atau storage/app,
+    // tergantung config/filesystems.php) folder overhaul-dokumen/{id_mesin},
+    // jadi hanya bisa dibuka lewat route yang dilindungi login.
+    // =====================================================
+
+    /** Pesan error validasi dokumen (bahasa Indonesia). */
+    private function pesanDokumen(): array
+    {
+        return [
+            'dokumen.required'   => 'Pilih minimal satu file.',
+            'dokumen.max'        => 'Maksimal ' . self::MAKS_FILE . ' file sekali unggah.',
+            'dokumen.*.max'      => 'Ukuran tiap file maksimal 100 MB.',
+            'dokumen.*.mimes'    => 'Format file harus PDF, Word, Excel, PowerPoint, JPG, atau PNG.',
+            'dokumen.*.file'     => 'File tidak valid.',
+            'dokumen.*.uploaded' => 'Upload gagal. Ukuran file melebihi batas server (maks 100 MB).',
+        ];
+    }
+
+    /**
+     * Simpan semua file dari field "dokumen" milik request ke satu data mesin.
+     * Aman dipanggil walau tidak ada file yang dikirim.
+     */
+    private function simpanDokumen(Request $request, OverhaulMesin $mesin): void
+    {
+        foreach ($request->file('dokumen', []) as $file) {
+            $path = $file->store("overhaul-dokumen/{$mesin->id}", self::DISK_DOKUMEN);
+
+            $mesin->dokumens()->create([
+                'nama_asli' => $file->getClientOriginalName(),
+                'path'      => $path,
+                // MIME dibaca dari isi file di server, bukan dari klien
+                'mime'      => $file->getMimeType() ?: 'application/octet-stream',
+                'ukuran'    => $file->getSize(),
+            ]);
+        }
+    }
+
+    /** Tambah dokumen ke data mesin yang sudah ada (dari modal Dokumen di index). */
+    public function uploadDokumen(Request $request, OverhaulMesin $overhaulMesin)
+    {
+        $request->validate([
+            'dokumen'   => 'required|array|min:1|max:' . self::MAKS_FILE,
+            'dokumen.*' => self::ATURAN_DOKUMEN,
+        ], $this->pesanDokumen());
+
+        $this->simpanDokumen($request, $overhaulMesin);
+
+        return back()->with('success', 'Dokumen berhasil diunggah.');
+    }
+
+    /** PDF & gambar tampil di tab browser; Word/Excel/PPT langsung diunduh. */
+    public function lihatDokumen(OverhaulDokumen $dokumen)
+    {
+        $disk = Storage::disk(self::DISK_DOKUMEN);
+
+        abort_unless($disk->exists($dokumen->path), 404, 'File tidak ditemukan.');
+
+        $bisaInline = in_array($dokumen->mime, self::MIME_INLINE, true);
+
+        $headers = [
+            'Content-Type'           => $dokumen->mime ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        if (! $bisaInline) {
+            return response()->download($disk->path($dokumen->path), $dokumen->nama_asli, $headers);
+        }
+
+        return response()->file($disk->path($dokumen->path), $headers);
+    }
+
+    /** Unduh dokumen dengan nama aslinya. */
+    public function downloadDokumen(OverhaulDokumen $dokumen)
+    {
+        $disk = Storage::disk(self::DISK_DOKUMEN);
+
+        abort_unless($disk->exists($dokumen->path), 404, 'File tidak ditemukan.');
+
+        return response()->download(
+            $disk->path($dokumen->path),
+            $dokumen->nama_asli,
+            ['Content-Type' => $dokumen->mime ?: 'application/octet-stream']
+        );
+    }
+
+    /** Hapus satu dokumen (file fisik + barisnya di database). */
+    public function hapusDokumen(OverhaulDokumen $dokumen)
+    {
+        Storage::disk(self::DISK_DOKUMEN)->delete($dokumen->path);
+        $dokumen->delete();
+
+        return back()->with('success', 'Dokumen berhasil dihapus.');
+    }
+
+    // =====================================================
+    // HELPER
+    // =====================================================
+
     /**
      * Rapikan nomor mesin jadi urut 1, 2, 3, ... tanpa loncat.
      * Mesin yang sama (nama sama) selalu berbagi satu nomor.
@@ -257,6 +378,7 @@ class OverhaulSc2Controller extends Controller
      * - Mesin sudah ada  -> pakai nomor mesin itu (dan nama penulisan aslinya)
      * - Mesin baru       -> nomor terakhir + 1
      * - Satuan baru      -> otomatis masuk daftar pilihan satuan
+     * - Dokumen          -> divalidasi di sini, tapi disimpan terpisah oleh simpanDokumen()
      */
     private function payload(Request $request): array
     {
@@ -266,7 +388,12 @@ class OverhaulSc2Controller extends Controller
             'total_mesin' => 'required|integer|min:1',
             'standar'     => 'nullable|numeric|min:0',
             'satuan'      => 'nullable|string|max:50',
-        ]);
+            'dokumen'     => 'nullable|array|max:' . self::MAKS_FILE,
+            'dokumen.*'   => self::ATURAN_DOKUMEN,
+        ], $this->pesanDokumen());
+
+        // File bukan kolom tabel overhaul_mesins, jangan ikut create()/update()
+        unset($data['dokumen']);
 
         $data['mesin'] = trim($data['mesin']);
 
@@ -292,5 +419,23 @@ class OverhaulSc2Controller extends Controller
         }
 
         return $data;
+    }
+
+    // =====================================================
+    // EXPORT
+    // =====================================================
+
+    public function exportExcel(Request $request)
+    {
+        $data = $request->validate([
+            'tahun' => 'required|integer|min:2000|max:2100',
+        ]);
+
+        $tahun = (int) $data['tahun'];
+
+        return Excel::download(
+            new OverhaulSc2Export($tahun),
+            "Schedule_Overhaul_SC2_{$tahun}.xlsx"
+        );
     }
 }

@@ -129,22 +129,22 @@ export default function Sidebar({ open, onClose }) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {/* LOGO */}
-                            <div className="relative shrink-0">
-                                <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
-
-                                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 text-white shadow-lg">
-                                    <Icon type="logo" className="h-5 w-5" />
-                                </div>
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+                                <img
+                                    src="/images/logo-mms.png"
+                                    alt="Logo MMS"
+                                    className="h-full w-full object-contain"
+                                />
                             </div>
 
                             {/* TITLE */}
                             <div className="min-w-0">
                                 <h2 className="text-sm font-bold tracking-tight text-white">
-                                    Sistem X
+                                    MMS (Admin)
                                 </h2>
 
                                 <p className="mt-0.5 text-[11px] font-medium text-blue-200/70">
-                                    Maintenance Management
+                                    Maintenance Management System
                                 </p>
                             </div>
                         </div>

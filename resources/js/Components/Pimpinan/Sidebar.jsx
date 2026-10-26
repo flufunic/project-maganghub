@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 
 /* ------------------------------------------------------------------
 | ICON  (UI saja, tidak ada logic)
@@ -15,6 +15,13 @@ const ICONS = {
             'M4 19V5a1 1 0 011-1h14a1 1 0 011 1v14',
             'M4 19h16',
             'M8 15v-3M12 15V8M16 15v-5',
+        ],
+    },
+    checksheet: {
+        paths: [
+            'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2',
+            'M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+            'M9 14l2 2 4-4',
         ],
     },
     logout: {
@@ -51,8 +58,36 @@ function Icon({ type, className = 'h-5 w-5' }) {
     );
 }
 
+/* ------------------------------------------------------------------
+| DAFTAR MENU
+| match(path) -> true kalau menu ini sedang aktif
+------------------------------------------------------------------ */
+const MENU = [
+    {
+        key: 'preventif',
+        href: '/pimpinan',
+        icon: 'dashboard',
+        title: 'Preventif Mesin',
+        desc: 'Approval & monitoring',
+        match: (path) =>
+            path === '/pimpinan' || path.startsWith('/pimpinan/pengiriman'),
+    },
+    {
+        key: 'checksheet',
+        href: '/pimpinan/check-sheet',
+        icon: 'checksheet',
+        title: 'Check Sheet Mingguan',
+        desc: 'Rekap & pemeriksaan mingguan',
+        match: (path) => path.startsWith('/pimpinan/check-sheet'),
+    },
+];
+
 export default function Sidebar({ open, onClose }) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const { url } = usePage();
+
+    // buang query string (?a=b) supaya pencocokan aman
+    const path = url.split('?')[0];
 
     return (
         <>
@@ -88,23 +123,21 @@ export default function Sidebar({ open, onClose }) {
                     <div className="flex items-center justify-between">
                         {/* BRAND */}
                         <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <div className="absolute inset-0 rounded-2xl bg-blue-400/40 blur-xl" />
-
-                                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 text-white shadow-lg">
-                                    <Icon type="logo" className="h-6 w-6" />
-                                </div>
-
-                                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0a2260] bg-emerald-400 shadow-[0_0_6px_rgba(110,231,183,0.9)]" />
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+                                <img
+                                    src="/images/logo-mms.png"
+                                    alt="Logo MMS"
+                                    className="h-full w-full object-contain"
+                                />
                             </div>
 
                             <div>
                                 <h2 className="text-sm font-bold tracking-tight text-white">
-                                    Sistem X
+                                    MMS (Pimpinan)
                                 </h2>
 
                                 <p className="mt-0.5 text-[11px] font-medium text-blue-200/70">
-                                    Maintenance Management
+                                    Maintenance Management System
                                 </p>
                             </div>
                         </div>
@@ -124,7 +157,7 @@ export default function Sidebar({ open, onClose }) {
                 {/* =================================================
                     MENU
                 ================================================== */}
-                <nav className="relative flex-1 overflow-y-auto px-4 py-6">
+                <nav className="relative flex-1 space-y-2 overflow-y-auto px-4 py-6">
                     {/* SECTION TITLE */}
                     <div className="mb-3 flex items-center gap-2 px-2">
                         <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">
@@ -134,46 +167,59 @@ export default function Sidebar({ open, onClose }) {
                         <div className="h-px flex-1 bg-white/10" />
                     </div>
 
-                    {/* DASHBOARD PIMPINAN */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            window.location.href = '/pimpinan';
-                            onClose();
-                        }}
-                        className="group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border border-white/20 bg-white/15 px-3 py-3 text-left shadow-lg shadow-blue-950/30 transition-all duration-200 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-                    >
-                        {/* ACTIVE BAR */}
-                        <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
+                    {MENU.map((item) => {
+                        const active = item.match(path);
 
-                        {/* ICON */}
-                        <div className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 transition-transform duration-200 group-hover:scale-105">
-                            <Icon type="dashboard" className="h-5 w-5" />
-                        </div>
+                        return (
+                            <Link
+                                key={item.key}
+                                href={item.href}
+                                onClick={onClose}
+                                aria-current={active ? 'page' : undefined}
+                                className={`group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
+                                    active
+                                        ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30 hover:bg-white/20'
+                                        : 'border-transparent hover:border-white/10 hover:bg-white/10'
+                                }`}
+                            >
+                                {/* ACTIVE BAR */}
+                                {active && (
+                                    <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
+                                )}
 
-                        {/* TEXT */}
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-white">
-                                Dashboard Pimpinan
-                            </p>
+                                {/* ICON */}
+                                <div className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 transition-transform duration-200 group-hover:scale-105">
+                                    <Icon type={item.icon} className="h-5 w-5" />
+                                </div>
 
-                            <p className="mt-0.5 truncate text-[11px] font-medium text-blue-200">
-                                Approval & monitoring
-                            </p>
-                        </div>
+                                {/* TEXT */}
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-white">
+                                        {item.title}
+                                    </p>
 
-                        {/* ARROW */}
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100">
-                            <Icon type="chevron" className="h-4 w-4" />
-                        </div>
-                    </button>
+                                    <p
+                                        className={`mt-0.5 truncate text-[11px] font-medium ${
+                                            active ? 'text-blue-200' : 'text-blue-200/60'
+                                        }`}
+                                    >
+                                        {item.desc}
+                                    </p>
+                                </div>
+
+                                {/* ARROW */}
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100">
+                                    <Icon type="chevron" className="h-4 w-4" />
+                                </div>
+                            </Link>
+                        );
+                    })}
                 </nav>
 
                 {/* =====================================================
                     BOTTOM / LOGOUT
                 ====================================================== */}
                 <div className="relative border-t border-white/10 p-4">
-                    {/* LOGOUT */}
                     <button
                         type="button"
                         onClick={() => setShowLogoutModal(true)}
@@ -183,9 +229,6 @@ export default function Sidebar({ open, onClose }) {
                             <Icon type="logout" className="h-5 w-5" />
                         </div>
 
-                        {/* <span className="flex-1 text-sm font-semibold text-red-200 group-hover:text-white">
-                            Logout
-                        </span> */}
                         <div className="flex-1">
                             <p className="text-[13px] font-semibold text-red-200 group-hover:text-white">
                                 Logout
@@ -237,15 +280,13 @@ export default function Sidebar({ open, onClose }) {
                                 </h3>
 
                                 <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
-                                    Apakah kamu yakin ingin keluar dari
-                                    sistem?
+                                    Apakah kamu yakin ingin keluar dari sistem?
                                 </p>
                             </div>
                         </div>
 
                         {/* MODAL BUTTON */}
                         <div className="flex gap-3 border-t border-slate-100 bg-white px-6 py-5">
-                            {/* BATAL */}
                             <button
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
@@ -254,7 +295,6 @@ export default function Sidebar({ open, onClose }) {
                                 Batal
                             </button>
 
-                            {/* LOGOUT */}
                             <form
                                 onSubmit={(e) => {
                                     e.preventDefault();

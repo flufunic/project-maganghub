@@ -18,4 +18,8 @@ class OverhaulMesin extends Model
     {
         return $this->hasMany(OverhaulSchedule::class);
     }
+    public function dokumens(): HasMany
+    {
+        return $this->hasMany(OverhaulDokumen::class);
+    }
 }

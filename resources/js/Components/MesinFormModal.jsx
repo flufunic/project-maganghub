@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import DokumenInput from '@/Components/DokumenInput';
 
 /* ------------------------------------------------------------------
 | KONSTANTA
@@ -312,6 +313,7 @@ export default function MesinFormModal({
     const [confirming, setConfirming] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [del, setDel] = useState(null); // { type: 'mesin' | 'satuan', value }
+    const [dokumen, setDokumen] = useState([]);
 
     // Error baru dari server -> tampilkan lagi
     useEffect(() => {
@@ -323,6 +325,10 @@ export default function MesinFormModal({
         Object.entries(serverErrors).filter(([key]) => !hiddenServer[key])
     );
     const errors = { ...visibleServer, ...localErrors };
+
+    const dokumenError =
+    errors.dokumen ??
+    Object.entries(errors).find(([key]) => key.startsWith('dokumen.'))?.[1];
 
     const patch = (changes) => {
         setForm((prev) => ({ ...prev, ...changes }));
@@ -416,6 +422,12 @@ export default function MesinFormModal({
                     : 'Pilih satuan untuk standar.';
         }
 
+        if (dokumen.length > 10) {
+            found.dokumen = 'Maksimal 10 dokumen.';
+        } else if (dokumen.some((f) => f.size > 10 * 1024 * 1024)) {
+            found.dokumen = 'Ukuran tiap dokumen maksimal 10 MB.';
+        }
+
         if (Object.keys(found).length > 0) {
             setLocalErrors(found);
             return;
@@ -434,6 +446,7 @@ export default function MesinFormModal({
             total_mesin: form.total_mesin,
             standar: form.standar,
             satuan: satuanFinal,
+            dokumen,
         });
     };
 
@@ -724,6 +737,19 @@ export default function MesinFormModal({
                                 <span className="text-sm font-bold text-blue-700">{standarLabel}</span>
                             </div>
                         </Section>
+
+                        <Section title="Dokumen pendukung">
+                            <div className="sm:col-span-2">
+                                <DokumenInput files={dokumen} onChange={setDokumen} error={dokumenError} />
+
+                                {isEdit && (
+                                    <p className="mt-2 text-xs text-slate-400">
+                                        Dokumen yang sudah ada tidak berubah. File di sini akan ditambahkan.
+                                        Untuk melihat atau menghapus dokumen lama, pakai tombol 📎 di tabel.
+                                    </p>
+                                )}
+                            </div>
+                        </Section>
                     </div>
 
                     {/* FOOTER */}
@@ -779,6 +805,7 @@ export default function MesinFormModal({
                                 ['Nama', form.nama.trim()],
                                 ['Total mesin', form.total_mesin],
                                 ['Standar', standarLabel],
+                                ['Dokumen', dokumen.length > 0 ? `${dokumen.length} file` : '-'],
                             ].map(([label, value]) => (
                                 <div key={label} className="flex items-start justify-between gap-4 px-4 py-2.5">
                                     <dt className="text-slate-500">{label}</dt>
