@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { router } from "@inertiajs/react";
 
@@ -10,6 +9,13 @@ const ICONS = {
             "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2",
             "M9 5a3 3 0 016 0v1H9V5z",
             "M9 13h6M9 17h4",
+        ],
+    },
+    schedule: {
+        paths: [
+            "M5.5 4.5h13a2 2 0 012 2v12a2 2 0 01-2 2h-13a2 2 0 01-2-2v-12a2 2 0 012-2z",
+            "M8 2.5v4M16 2.5v4M3.5 9h17",
+            "M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01",
         ],
     },
     checksheet: {
@@ -63,6 +69,12 @@ const MENUS = [
         icon: "preventif",
         label: "Preventif Mesin",
         desc: "Maintenance schedule",
+    },
+    {
+        href: "/schedule-preventif",
+        icon: "schedule",
+        label: "Schedule Preventif Mingguan",
+        desc: "Plan & act per week",
     },
     {
         href: "/check-sheets",

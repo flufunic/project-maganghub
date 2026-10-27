@@ -16,6 +16,8 @@ use App\Http\Controllers\OverhaulSc2Controller;
 use App\Http\Controllers\CheckSheetPengirimanController;
 use App\Http\Controllers\CheckSheetPimpinanController;
 use App\Http\Controllers\PreventifDokumenController;
+use App\Http\Controllers\ScheduleZonaController;
+use App\Http\Controllers\SchedulePreventifController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,20 +102,26 @@ Route::middleware('auth')->group(function () {
     ])->middleware('role:admin')
       ->name('preventif-pengiriman.store');
 
-    Route::post('/preventif-dokumen', [PreventifDokumenController::class, 'store'])
-    ->name('preventif-dokumen.store');
+    Route::post('/preventif-dokumen', [
+        PreventifDokumenController::class,
+        'store',
+    ])->name('preventif-dokumen.store');
 
-    Route::get('/preventif-dokumen/{dokumen}/download', [PreventifDokumenController::class, 'download'])
-        ->name('preventif-dokumen.download');
+    Route::get('/preventif-dokumen/{dokumen}/download', [
+        PreventifDokumenController::class,
+        'download',
+    ])->name('preventif-dokumen.download');
 
-    Route::delete('/preventif-dokumen/{dokumen}', [PreventifDokumenController::class, 'destroy'])
-        ->name('preventif-dokumen.destroy');
-    
-    Route::get('/preventif-dokumen/{dokumen}/lihat', [PreventifDokumenController::class, 'lihat'])
-        ->name('preventif-dokumen.lihat');
+    Route::delete('/preventif-dokumen/{dokumen}', [
+        PreventifDokumenController::class,
+        'destroy',
+    ])->name('preventif-dokumen.destroy');
 
-    Route::get('/preventif-dokumen/{dokumen}/download', [PreventifDokumenController::class, 'download'])
-        ->name('preventif-dokumen.download');
+    Route::get('/preventif-dokumen/{dokumen}/lihat', [
+        PreventifDokumenController::class,
+        'lihat',
+    ])->name('preventif-dokumen.lihat');
+
     Route::get('/dokumen/{dokumen}/lihat', [
         PreventifDokumenController::class,
         'lihat',
@@ -123,6 +131,40 @@ Route::middleware('auth')->group(function () {
         PreventifDokumenController::class,
         'download',
     ])->name('pimpinan.dokumen.download');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Schedule Preventif (menu baru, plan per week)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('schedule-preventif')->name('schedule-preventif.')->group(function () {
+        Route::get('/', [
+            SchedulePreventifController::class,
+            'index',
+        ])->name('index');
+
+        Route::post('cell', [
+            SchedulePreventifController::class,
+            'simpanCell',
+        ])->name('cell');
+
+        Route::post('zona', [
+            ScheduleZonaController::class,
+            'store',
+        ])->name('zona.store');
+
+        Route::put('zona/{zona}', [
+            ScheduleZonaController::class,
+            'update',
+        ])->name('zona.update');
+
+        Route::delete('zona/{zona}', [
+            ScheduleZonaController::class,
+            'destroy',
+        ])->name('zona.destroy');
+    });
 
 
     /*
@@ -369,6 +411,7 @@ Route::middleware('auth')->group(function () {
         OverhaulSc2Controller::class,
         'hapusDokumen',
     ])->name('overhaul-dokumen.destroy');
+
 });
 
 
@@ -428,4 +471,3 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
         'destroy',
     ])->name('pimpinan.check-sheet.destroy');
 });
-
