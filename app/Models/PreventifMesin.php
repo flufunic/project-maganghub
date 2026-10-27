@@ -145,4 +145,41 @@ class PreventifMesin extends Model
             ->pluck('divisi')
             ->each(fn ($divisi) => static::susunUlangNoItem($divisi));
     }
+
+    public static function generateScheduleCode(): string
+    {
+        $usedCodes = static::query()
+            ->whereNotNull('kode_schedule')
+            ->pluck('kode_schedule')
+            ->map(fn ($code) => strtoupper(trim($code)))
+            ->flip();
+
+        $number = 1;
+
+        while (true) {
+            $code = '';
+            $value = $number;
+
+            while ($value > 0) {
+                $value--;
+                $code = chr(65 + ($value % 26)) . $code;
+                $value = intdiv($value, 26);
+            }
+
+            if (!isset($usedCodes[$code])) {
+                return $code;
+            }
+
+            $number++;
+        }
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (PreventifMesin $item) {
+            if (empty($item->kode_schedule)) {
+                $item->kode_schedule = static::generateScheduleCode();
+            }
+        });
+    }
 }

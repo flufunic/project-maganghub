@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\PreventifDokumen;
 
 
 class PimpinanController extends Controller
@@ -62,6 +63,20 @@ class PimpinanController extends Controller
 
         $bulan = $tanggalPengiriman->month;
         $tahun = $tanggalPengiriman->year;
+        // Dokumen yang diunggah Admin untuk tanggal pengiriman ini
+        $dokumens = PreventifDokumen::query()
+            ->whereDate('tanggal', $tanggal)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($dokumen) => [
+                'id' => $dokumen->id,
+                'nama_asli' => $dokumen->nama_asli,
+                'mime' => $dokumen->mime,
+                'ukuran' => $dokumen->ukuran,
+                'lihat_url' => route('pimpinan.dokumen.lihat', $dokumen),
+                'download_url' => route('pimpinan.dokumen.download', $dokumen),
+            ])
+            ->values();
 
         $preventifMesins = PreventifMesin::where('is_hidden', false)
             ->with([
@@ -163,27 +178,32 @@ class PimpinanController extends Controller
             })
             ->values();
 
-        return Inertia::render('Pimpinan/Detail', [
-            'user' => [
-                'name' => request()->user()?->name,
-                'role' => request()->user()?->role,
-            ],
+        
+            return Inertia::render('Pimpinan/Detail', [
+                'user' => [
+                    'name' => request()->user()?->name,
+                    'role' => request()->user()?->role,
+                ],
 
-            'pengiriman' => [
-                'id' => $pengiriman->id,
-                'tanggal' => $tanggalPengiriman->format('Y-m-d'),
-                'tanggal_format' => $tanggalPengiriman->translatedFormat('d F Y'),
-                'dikirim_oleh' => $pengiriman->pengirim?->name,
-                'dikirim_pada' => $pengiriman->dikirim_pada?->translatedFormat('d F Y'),
-                'status' => $pengiriman->status,
-                'alasan_penolakan' => $pengiriman->alasan_penolakan,
-            ],
+                'pengiriman' => [
+                    'id' => $pengiriman->id,
+                    'tanggal' => $tanggalPengiriman->format('Y-m-d'),
+                    'tanggal_format' => $tanggalPengiriman->translatedFormat('d F Y'),
+                    'dikirim_oleh' => $pengiriman->pengirim?->name,
+                    'dikirim_pada' => $pengiriman->dikirim_pada?->translatedFormat('d F Y'),
+                    'status' => $pengiriman->status,
+                    'alasan_penolakan' => $pengiriman->alasan_penolakan,
+                ],
 
-            'bulan' => $bulan,
-            'tahun' => $tahun,
-            'preventifMesins' => $data,
-            'revisis' => $revisiList,
-        ]);
+                'bulan' => $bulan,
+                'tahun' => $tahun,
+                'preventifMesins' => $data,
+                'revisis' => $revisiList,
+
+                // Dokumen dikirim sebagai prop terpisah
+                'dokumens' => $dokumens,
+            ]);
+
     }
 
     public function periksa(PreventifPengiriman $pengiriman)

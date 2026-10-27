@@ -20,6 +20,19 @@ const ICONS = {
             'M10 11v5.5M14 11v5.5',
         ],
     },
+
+    attach: {
+        paths: [
+            'M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32',
+        ],
+    },
+    file: {
+        paths: [
+            'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z',
+            'M14 3v5h5',
+        ],
+    },
+    upload: { sw: 2, paths: ['M12 16V4m0 0 4 4m-4-4-4 4', 'M5 20h14'] },
     calendar: {
         rect: { x: 3.75, y: 4.5, width: 16.5, height: 16, rx: 2 },
         paths: ['M8 2.75v3.5M16 2.75v3.5M3.75 9h16.5'],
@@ -164,6 +177,7 @@ export default function Index({
     totalHotPlan = 0,
     notifikasi = [],
     notifikasiPengiriman = [],
+    dokumens = {},
 }) {
     // =========================
     // BULAN CHECKLIST
@@ -232,6 +246,15 @@ export default function Index({
         dot: '',
         hot: '',
     });
+
+    // =========================
+    // STATE DOKUMEN
+    // =========================
+    const [showDokumen, setShowDokumen] = useState(false);
+    const [dokumenTanggal, setDokumenTanggal] = useState(null);
+    const [filesDipilih, setFilesDipilih] = useState([]);
+    const [uploadingDokumen, setUploadingDokumen] = useState(false);
+    const [dokumenError, setDokumenError] = useState('');
 
     // =========================
     // NOTIFIKASI PENGIRIMAN
@@ -493,6 +516,71 @@ export default function Index({
             },
         });
     };
+
+    // =========================
+    // DOKUMEN PER TANGGAL
+    // =========================
+    const getDokumenTanggal = (tgl) => dokumens?.[tgl] ?? [];
+
+    const openDokumen = (tgl) => {
+        setDokumenTanggal(tgl);
+        setFilesDipilih([]);
+        setDokumenError('');
+        setShowDokumen(true);
+    };
+
+    const closeDokumen = () => {
+        setShowDokumen(false);
+        setDokumenTanggal(null);
+        setFilesDipilih([]);
+        setDokumenError('');
+    };
+
+    const submitDokumen = () => {
+        if (!dokumenTanggal || filesDipilih.length === 0) {
+            setDokumenError('Pilih minimal satu file.');
+            return;
+        }
+
+        setUploadingDokumen(true);
+        setDokumenError('');
+
+        router.post(
+            '/preventif-dokumen',
+            { tanggal: dokumenTanggal, dokumen: filesDipilih },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: () => setFilesDipilih([]),
+                onError: (errors) =>
+                    setDokumenError(Object.values(errors)[0] ?? 'Upload gagal.'),
+                onFinish: () => setUploadingDokumen(false),
+            }
+        );
+    };
+
+    const confirmDeleteDokumen = (dok) => {
+        setConfirmDialog({
+            title: 'Hapus dokumen?',
+            message: `Apakah kamu yakin ingin menghapus "${dok.nama_asli}"?`,
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            onConfirm: () => {
+                router.delete(`/preventif-dokumen/${dok.id}`, {
+                    preserveScroll: true,
+                    onError: (errors) =>
+                        setDokumenError(Object.values(errors)[0] ?? 'Gagal menghapus.'),
+                    onFinish: () => setConfirmDialog(null),
+                });
+            },
+        });
+    };
+
+    const dokumenAktif = dokumenTanggal ? getDokumenTanggal(dokumenTanggal) : [];
+
+    const dokumenTerkunci = ['disetujui', 'approved'].includes(
+        getNotifikasiPengiriman(dokumenTanggal)?.status
+    );
 
     // =========================
     // KONFIRMASI HAPUS
@@ -1594,7 +1682,7 @@ export default function Index({
                                                     </span>
                                                 </td>
 
-                                                {/* TOMBOL KIRIM PER TANGGAL */}
+                                                {/* TOMBOL KIRIM + DOKUMEN PER TANGGAL */}
                                                 {tanggal.map((day) => {
                                                     const tanggalKirim = getTanggalChecklist(day);
                                                     const notifPengiriman = getNotifikasiPengiriman(tanggalKirim);
@@ -1602,58 +1690,88 @@ export default function Index({
                                                     const disetujui = ['diperiksa', 'disetujui', 'approved'].includes(
                                                         notifPengiriman?.status
                                                     );
+                                                    const jumlahDokumen = getDokumenTanggal(tanggalKirim).length;
 
                                                     return (
                                                         <td
                                                             key={day}
                                                             className="border-r border-white/10 px-1 py-3 text-center"
                                                         >
-                                                            <div className="relative inline-flex">
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={disetujui}
-                                                                    onClick={() => {
-                                                                        if (disetujui) return;
+                                                            <div className="flex flex-col items-center gap-1.5">
+                                                                {/* TOMBOL KIRIM (tidak berubah) */}
+                                                                <div className="relative inline-flex">
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={disetujui}
+                                                                        onClick={() => {
+                                                                            if (disetujui) return;
 
-                                                                        router.post(
-                                                                            '/preventif-pengiriman',
-                                                                            { tanggal: tanggalKirim },
-                                                                            { preserveScroll: true }
-                                                                        );
-                                                                    }}
-                                                                    title={
-                                                                        ditolak
-                                                                            ? `Ditolak: ${notifPengiriman.alasan_penolakan || 'Tidak ada alasan'}`
-                                                                            : disetujui
-                                                                            ? `Disetujui pimpinan (${tanggalKirim})`
-                                                                            : `Kirim data ${tanggalKirim}`
-                                                                    }
-                                                                    className={`group inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border text-white shadow-sm transition-all duration-200 disabled:cursor-default ${
-                                                                        ditolak
-                                                                            ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:-translate-y-0.5 hover:bg-red-400'
-                                                                            : disetujui
-                                                                            ? 'border-emerald-300/40 bg-gradient-to-br from-emerald-400 to-green-600 shadow-emerald-900/30 ring-2 ring-emerald-300/30'
-                                                                            : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:-translate-y-0.5 hover:bg-blue-400 active:translate-y-0'
-                                                                    }`}
-                                                                >
-                                                                    {disetujui ? (
-                                                                        <Icon
-                                                                            type="approve"
-                                                                            className="h-[18px] w-[18px]"
-                                                                        />
-                                                                    ) : (
-                                                                        <Icon
-                                                                            type="send"
-                                                                            className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                                                                        />
+                                                                            router.post(
+                                                                                '/preventif-pengiriman',
+                                                                                { tanggal: tanggalKirim },
+                                                                                { preserveScroll: true }
+                                                                            );
+                                                                        }}
+                                                                        title={
+                                                                            ditolak
+                                                                                ? `Ditolak: ${notifPengiriman.alasan_penolakan || 'Tidak ada alasan'}`
+                                                                                : disetujui
+                                                                                ? `Disetujui pimpinan (${tanggalKirim})`
+                                                                                : `Kirim data ${tanggalKirim}`
+                                                                        }
+                                                                        className={`group inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border text-white shadow-sm transition-all duration-200 disabled:cursor-default ${
+                                                                            ditolak
+                                                                                ? 'border-red-400/30 bg-red-500 shadow-red-900/20 hover:-translate-y-0.5 hover:bg-red-400'
+                                                                                : disetujui
+                                                                                ? 'border-emerald-300/40 bg-gradient-to-br from-emerald-400 to-green-600 shadow-emerald-900/30 ring-2 ring-emerald-300/30'
+                                                                                : 'border-blue-300/20 bg-blue-500 shadow-blue-900/20 hover:-translate-y-0.5 hover:bg-blue-400 active:translate-y-0'
+                                                                        }`}
+                                                                    >
+                                                                        {disetujui ? (
+                                                                            <Icon
+                                                                                type="approve"
+                                                                                className="h-[18px] w-[18px]"
+                                                                            />
+                                                                        ) : (
+                                                                            <Icon
+                                                                                type="send"
+                                                                                className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                                                                            />
+                                                                        )}
+                                                                    </button>
+
+                                                                    {ditolak && (
+                                                                        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-[#0a1a4d] bg-red-500 px-1 text-[8px] font-bold text-white shadow-sm">
+                                                                            !
+                                                                        </span>
                                                                     )}
-                                                                </button>
+                                                                </div>
 
-                                                                {ditolak && (
-                                                                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-[#0a1a4d] bg-red-500 px-1 text-[8px] font-bold text-white shadow-sm">
-                                                                        !
-                                                                    </span>
-                                                                )}
+                                                                {/* TOMBOL DOKUMEN */}
+                                                                <div className="relative inline-flex">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => openDokumen(tanggalKirim)}
+                                                                        title={
+                                                                            jumlahDokumen > 0
+                                                                                ? `${jumlahDokumen} dokumen (${tanggalKirim})`
+                                                                                : `Upload dokumen ${tanggalKirim}`
+                                                                        }
+                                                                        className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
+                                                                            jumlahDokumen > 0
+                                                                                ? 'border-violet-300/40 bg-violet-500 text-white hover:bg-violet-400'
+                                                                                : 'border-white/20 bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
+                                                                        }`}
+                                                                    >
+                                                                        <Icon type="attach" className="h-4 w-4" />
+                                                                    </button>
+
+                                                                    {jumlahDokumen > 0 && (
+                                                                        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-[#0a1a4d] bg-emerald-500 px-1 text-[8px] font-bold text-white shadow-sm">
+                                                                            {jumlahDokumen}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     );
@@ -2000,6 +2118,171 @@ export default function Index({
                 onConfirm={() => confirmDialog?.onConfirm?.()}
                 onCancel={() => setConfirmDialog(null)}
             />
+
+            {/* MODAL DOKUMEN */}
+            {showDokumen && dokumenTanggal && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
+                        {/* HEADER */}
+                        <div className="border-b border-slate-100 px-6 py-5">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-600 shadow-sm">
+                                        <Icon type="attach" className="h-5 w-5" />
+                                    </div>
+
+                                    <div>
+                                        <h2 className="text-base font-bold text-slate-900">
+                                            Dokumen Preventif
+                                        </h2>
+
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Tanggal{' '}
+                                            <span className="font-semibold text-slate-700">
+                                                {dokumenTanggal.split('-').reverse().join('/')}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={closeDokumen}
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-5">
+                            {/* DAFTAR DOKUMEN */}
+                            <p className="mb-2 text-sm font-semibold text-slate-700">
+                                Dokumen terupload ({dokumenAktif.length})
+                            </p>
+
+                            {dokumenAktif.length > 0 ? (
+                                <ul className="idx-scroll max-h-56 space-y-2 overflow-y-auto pr-1">
+                                    {dokumenAktif.map((dok) => (
+                                        <li
+                                            key={dok.id}
+                                            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                                        >
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                                <Icon type="file" className="h-4 w-4" />
+                                            </span>
+
+                                            <div className="min-w-0 flex-1">
+                                                <a
+                                                    href={dok.url_lihat}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="block truncate text-xs font-semibold text-slate-700 hover:text-blue-600 hover:underline"
+                                                    title={`Buka ${dok.nama_asli}`}
+                                                >
+                                                    {dok.nama_asli}
+                                                </a>
+                                                <p className="text-[10px] text-slate-400">
+                                                    {dok.ukuran_format} · {dok.diunggah_pada}
+                                                </p>
+                                            </div>
+
+                                            <a
+                                                href={dok.url_download}
+                                                title="Download"
+                                                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
+                                            >
+                                                <Icon type="download" className="h-4 w-4" />
+                                            </a>
+
+                                            {!dokumenTerkunci && (
+                                                <button
+                                                    type="button"
+                                                    title="Hapus dokumen"
+                                                    onClick={() => confirmDeleteDokumen(dok)}
+                                                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                                >
+                                                    <Icon type="trash" className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-center text-xs text-slate-400">
+                                    Belum ada dokumen untuk tanggal ini.
+                                </p>
+                            )}
+
+                            {/* FORM UPLOAD */}
+                            {dokumenTerkunci ? (
+                                <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                    Data tanggal ini sudah disetujui pimpinan, dokumen tidak bisa diubah.
+                                </p>
+                            ) : (
+                                <div className="mt-5">
+                                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                        Tambah dokumen
+                                    </label>
+
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+                                        onChange={(e) =>
+                                            setFilesDipilih(Array.from(e.target.files ?? []))
+                                        }
+                                        className="block w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 file:mr-3 file:cursor-pointer file:border-0 file:bg-violet-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-violet-700"
+                                    />
+
+                                    <p className="mt-1.5 text-[11px] text-slate-400">
+                                        PDF, JPG, PNG, Word, Excel · maks. 100 MB per file · maks. 10 file.
+                                    </p>
+
+                                    {filesDipilih.length > 0 && (
+                                        <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                                            {filesDipilih.map((f, i) => (
+                                                <li key={i} className="truncate">
+                                                    • {f.name}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
+
+                            {dokumenError && (
+                                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                    {dokumenError}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* FOOTER */}
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={closeDokumen}
+                                className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                            >
+                                Tutup
+                            </button>
+
+                            {!dokumenTerkunci && (
+                                <button
+                                    type="button"
+                                    onClick={submitDokumen}
+                                    disabled={uploadingDokumen || filesDipilih.length === 0}
+                                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <Icon type="upload" className="h-4 w-4" />
+                                    {uploadingDokumen ? 'Mengupload...' : 'Upload'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

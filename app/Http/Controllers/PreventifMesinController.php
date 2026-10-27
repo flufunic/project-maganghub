@@ -13,6 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\PreventifDokumen;
 
 class PreventifMesinController extends Controller
 {
@@ -587,6 +588,19 @@ class PreventifMesinController extends Controller
         // Abnormality paling atas karena paling penting
         $notifikasi = array_merge($notifAbnormality, $notifikasi);
 
+
+        // =========================
+        // DOKUMEN PER TANGGAL (bulan yang sedang ditampilkan)
+        // =========================
+        $dokumens = PreventifDokumen::query()
+            ->whereYear('tanggal', $tahun)
+            ->whereMonth('tanggal', $bulan)
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy(fn ($d) => $d->tanggal->format('Y-m-d'))
+            ->map(fn ($grup) => $grup->map(fn ($d) => $d->toFrontend())->values());
+            
+
         // =========================
         // STATUS PENGIRIMAN PER TANGGAL
         // =========================
@@ -621,11 +635,13 @@ class PreventifMesinController extends Controller
 
             'notifikasi' => $notifikasi,
             'notifikasiPengiriman' => $notifikasiPengiriman,
+            'dokumens' => $dokumens, 
 
             'flash' => [
                 'success' => session('success'),
             ],
         ]);
+        
     }
 
     // =====================================================

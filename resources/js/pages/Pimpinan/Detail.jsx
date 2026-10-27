@@ -119,6 +119,7 @@ export default function Detail({
     pengiriman,
     preventifMesins = [],
     revisis = [],
+    dokumens = [],
 }) {
     const [showTolakModal, setShowTolakModal] = useState(false);
     const [alasanPenolakan, setAlasanPenolakan] = useState('');
@@ -494,6 +495,9 @@ export default function Detail({
                                             <th className="min-w-[220px] border border-slate-200 bg-amber-50 px-4 py-3 text-center font-bold text-amber-700">
                                                 Catatan
                                             </th>
+                                            <th className="min-w-[220px] border border-slate-200 bg-indigo-50 px-4 py-3 text-center font-bold text-indigo-700">
+                                                Dokumen
+                                            </th>
 
                                             {adaRevisi && (
                                                 <th className="min-w-[110px] border border-slate-200 bg-violet-50 px-4 py-3 text-center font-bold text-violet-700">
@@ -596,6 +600,53 @@ export default function Detail({
                                                                 </span>
                                                             )}
                                                         </td>
+
+                                                        {item.id === preventifMesins[0]?.id && (
+                                                            <td
+                                                                rowSpan={preventifMesins.length * 2}
+                                                                className="min-w-[220px] border border-slate-200 bg-indigo-50/30 px-4 py-3 align-top"
+                                                            >
+                                                                {dokumens.length > 0 ? (
+                                                                    <div className="space-y-2">
+                                                                        {dokumens.map((dokumen) => (
+                                                                            <div
+                                                                                key={dokumen.id}
+                                                                                className="rounded-lg border border-indigo-100 bg-white p-2"
+                                                                            >
+                                                                                <p
+                                                                                    className="break-words text-xs font-medium text-slate-700"
+                                                                                    title={dokumen.nama_asli}
+                                                                                >
+                                                                                    {dokumen.nama_asli}
+                                                                                </p>
+
+                                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                                    <a
+                                                                                        href={dokumen.lihat_url}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                                                                    >
+                                                                                        Lihat
+                                                                                    </a>
+
+                                                                                    <a
+                                                                                        href={dokumen.download_url}
+                                                                                        className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                                                                                    >
+                                                                                        Unduh
+                                                                                    </a>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-slate-400">
+                                                                        Belum ada dokumen
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        )}
 
                                                         {/* REVISI (tombol -> pop up) */}
                                                         {adaRevisi && (
