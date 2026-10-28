@@ -9,7 +9,12 @@ class SchedulePreventifPlan extends Model
 {
     protected $table = 'schedule_preventif_plans';
 
-    protected $fillable = ['tahun', 'preventif_mesin_id', 'bulan', 'minggu'];
+    protected $fillable = ['tahun', 'baris_id', 'preventif_mesin_id', 'bulan', 'minggu'];
+
+    public function baris(): BelongsTo
+    {
+        return $this->belongsTo(ScheduleBaris::class, 'baris_id');
+    }
 
     public function item(): BelongsTo
     {

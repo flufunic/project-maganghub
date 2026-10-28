@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class OverhaulDokumen extends Model
 {
     protected $fillable = [
-        'overhaul_mesin_id', 'nama_asli', 'path', 'mime', 'ukuran',
+        'overhaul_mesin_id', 'tahun', 'nama_asli', 'path', 'mime', 'ukuran',
     ];
 
     protected $appends = ['url', 'download_url'];

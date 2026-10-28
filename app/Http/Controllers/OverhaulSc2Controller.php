@@ -114,7 +114,7 @@ class OverhaulSc2Controller extends Controller
 
         $mesins = OverhaulMesin::with([
             'schedules' => fn ($q) => $q->where('tahun', $tahun),
-            'dokumens'  => fn ($q) => $q->orderBy('id'),
+            'dokumens'  => fn ($q) => $q->where('tahun', $tahun)->orderBy('id'),
         ])
             ->orderBy('no')
             ->orderBy('mesin')
@@ -279,10 +279,16 @@ class OverhaulSc2Controller extends Controller
      */
     private function simpanDokumen(Request $request, OverhaulMesin $mesin): void
     {
+        $tahun = max(2000, min(2100, (int) $request->input('tahun', now()->year)));
+
         foreach ($request->file('dokumen', []) as $file) {
-            $path = $file->store("overhaul-dokumen/{$mesin->id}", self::DISK_DOKUMEN);
+            $path = $file->store(
+                "overhaul-dokumen/{$mesin->id}/{$tahun}",
+                self::DISK_DOKUMEN
+            );
 
             $mesin->dokumens()->create([
+                'tahun'     => $tahun,
                 'nama_asli' => $file->getClientOriginalName(),
                 'path'      => $path,
                 // MIME dibaca dari isi file di server, bukan dari klien
@@ -296,6 +302,7 @@ class OverhaulSc2Controller extends Controller
     public function uploadDokumen(Request $request, OverhaulMesin $overhaulMesin)
     {
         $request->validate([
+            'tahun'     => 'required|integer|min:2000|max:2100',
             'dokumen'   => 'required|array|min:1|max:' . self::MAKS_FILE,
             'dokumen.*' => self::ATURAN_DOKUMEN,
         ], $this->pesanDokumen());

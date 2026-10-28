@@ -319,10 +319,21 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
             onFinish: () => setSaving(false),
         };
 
+        // payload bisa berupa object biasa atau FormData
+        const kirim = (extra = {}) => {
+            if (payload instanceof FormData) {
+                payload.set('tahun', selectedYear);
+                Object.entries(extra).forEach(([k, v]) => payload.set(k, v));
+                return payload;
+            }
+
+            return { ...payload, tahun: selectedYear, ...extra };
+        };
+
         if (editingMesin) {
-            router.post(`/overhaul-sc2/${editingMesin.id}`, { ...payload, _method: 'put' }, options);
+            router.post(`/overhaul-sc2/${editingMesin.id}`, kirim({ _method: 'put' }), options);
         } else {
-            router.post('/overhaul-sc2', payload, options);
+            router.post('/overhaul-sc2', kirim(), options);
         }
     };
 
@@ -934,10 +945,10 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
             {dokumenMesinId && mesins.find((m) => m.id === dokumenMesinId) && (
                 <DokumenModal
                     mesin={mesins.find((m) => m.id === dokumenMesinId)}
+                    tahun={selectedYear}
                     onClose={() => setDokumenMesinId(null)}
                 />
             )}
-
             {/* DIALOG KONFIRMASI HAPUS */}
             <ConfirmModal
                 open={Boolean(confirmDialog)}

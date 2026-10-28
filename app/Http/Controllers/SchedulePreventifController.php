@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PreventifChecklist;
 use App\Models\PreventifMesin;
+use App\Models\ScheduleBaris;
 use App\Models\ScheduleItemKode;
 use App\Models\SchedulePreventifPlan;
 use App\Models\ScheduleZona;
@@ -72,9 +73,17 @@ class SchedulePreventifController extends Controller
         // ---------- ZONA (tabel sendiri) ----------
         $zonas = ScheduleZona::orderBy('no')->get();
 
-        // ---------- KODE YANG DIINPUT DI TIAP WEEK ----------
+        // ---------- BARIS PLAN/ACT (soft delete otomatis tersaring) ----------
+        $baris = ScheduleBaris::where('tahun', $tahun)->orderBy('urutan')->orderBy('id')->get();
+
+        if ($baris->isEmpty()) {
+            // tahun yang belum punya baris langsung dibuatkan satu
+            $baris = collect([ScheduleBaris::create(['tahun' => $tahun, 'urutan' => 1])]);
+        }
+
+        // ---------- KODE YANG DIINPUT DI TIAP BARIS & WEEK ----------
         $rows = SchedulePreventifPlan::query()
-            ->where('tahun', $tahun)
+            ->whereIn('baris_id', $baris->pluck('id'))
             ->whereHas('item', fn ($q) => $q->where('is_hidden', false))
             ->get();
 
@@ -108,7 +117,7 @@ class SchedulePreventifController extends Controller
                 $actCount[$key] = ($actCount[$key] ?? 0) + 1;
             });
 
-        // ---------- SUSUN: "bulan-minggu" => [{kode, n}], dan TOTAL PER WEEK ----------
+        // ---------- SUSUN: "baris-bulan-minggu" => [{kode, n}], dan TOTAL PER WEEK (semua baris) ----------
         $plan = $act = $totals = [];
 
         foreach ($rows as $r) {
@@ -124,11 +133,11 @@ class SchedulePreventifController extends Controller
             $nPlan = $planCount[$key] ?? 0;
             $nAct = $actCount[$key] ?? 0;
 
-            $plan[$wk][] = ['kode' => $kode, 'n' => $nPlan];
+            $plan["{$r->baris_id}-{$wk}"][] = ['kode' => $kode, 'n' => $nPlan];
             $totals[$wk]['plan'] = ($totals[$wk]['plan'] ?? 0) + $nPlan;
 
             if ($nAct > 0) {
-                $act[$wk][] = ['kode' => $kode, 'n' => $nAct];
+                $act["{$r->baris_id}-{$wk}"][] = ['kode' => $kode, 'n' => $nAct];
                 $totals[$wk]['act'] = ($totals[$wk]['act'] ?? 0) + $nAct;
             }
         }
@@ -145,6 +154,11 @@ class SchedulePreventifController extends Controller
             'tahun' => $tahun,
             'items' => $items,
             'zonas' => $zonas,
+            'baris' => $baris->map(fn ($b) => [
+                'id' => $b->id,
+                'urutan' => $b->urutan,
+                'nama' => $b->nama,
+            ])->values(),
             'plan' => (object) $urut($plan),
             'act' => (object) $urut($act),
             'totals' => (object) $totals,
@@ -164,6 +178,7 @@ class SchedulePreventifController extends Controller
 
         $data = $request->validate([
             'tahun' => ['required', 'integer', 'between:2000,2100'],
+            'baris_id' => ['required', 'integer'],
             'bulan' => ['required', 'integer', 'between:1,12'],
             'minggu' => ['required', 'integer', 'between:1,4'],
             'kodes' => ['nullable', 'array'],
@@ -171,6 +186,9 @@ class SchedulePreventifController extends Controller
         ]);
 
         $kodes = $data['kodes'] ?? [];
+
+        // baris harus ada (belum dihapus) dan milik tahun yang sama
+        $baris = ScheduleBaris::where('tahun', $data['tahun'])->findOrFail($data['baris_id']);
 
         // kode harus milik item yang masih tampil di menu Preventif Mesin
         $ids = ScheduleItemKode::whereIn('kode', $kodes)
@@ -185,9 +203,9 @@ class SchedulePreventifController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($data, $ids) {
+        DB::transaction(function () use ($data, $ids, $baris) {
             $kunci = [
-                'tahun' => $data['tahun'],
+                'baris_id' => $baris->id,
                 'bulan' => $data['bulan'],
                 'minggu' => $data['minggu'],
             ];
@@ -195,7 +213,10 @@ class SchedulePreventifController extends Controller
             SchedulePreventifPlan::where($kunci)->delete();
 
             foreach ($ids->values() as $itemId) {
-                SchedulePreventifPlan::create($kunci + ['preventif_mesin_id' => $itemId]);
+                SchedulePreventifPlan::create($kunci + [
+                    'tahun' => $data['tahun'],
+                    'preventif_mesin_id' => $itemId,
+                ]);
             }
         });
 

@@ -16,6 +16,7 @@ use App\Http\Controllers\OverhaulSc2Controller;
 use App\Http\Controllers\CheckSheetPengirimanController;
 use App\Http\Controllers\CheckSheetPimpinanController;
 use App\Http\Controllers\PreventifDokumenController;
+use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
 
@@ -164,6 +165,21 @@ Route::middleware('auth')->group(function () {
             ScheduleZonaController::class,
             'destroy',
         ])->name('zona.destroy');
+
+        Route::post('baris', [
+            ScheduleBarisController::class,
+            'store',
+        ])->name('baris.store');
+
+        Route::put('baris/{baris}', [
+            ScheduleBarisController::class,
+            'update',
+        ])->name('baris.update');
+
+        Route::delete('baris/{baris}', [
+            ScheduleBarisController::class,
+            'destroy',
+        ])->name('baris.destroy');
     });
 
 

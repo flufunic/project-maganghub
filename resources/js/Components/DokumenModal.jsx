@@ -7,7 +7,7 @@ export const formatUkuran = (bytes = 0) => {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
 
-export default function DokumenModal({ mesin, onClose }) {
+export default function DokumenModal({ mesin, tahun, onClose }) {
     const inputRef = useRef(null);
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
@@ -24,7 +24,7 @@ export default function DokumenModal({ mesin, onClose }) {
 
         router.post(
             `/overhaul-sc2/${mesin.id}/dokumen`,
-            { dokumen: files },
+            { dokumen: files, tahun },
             {
                 forceFormData: true,
                 preserveScroll: true,
@@ -53,7 +53,7 @@ export default function DokumenModal({ mesin, onClose }) {
                 {/* HEADER */}
                 <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
                     <div>
-                        <h2 className="text-base font-bold text-slate-900">Dokumen</h2>
+                        <h2 className="text-base font-bold text-slate-900">Dokumen Tahun {tahun}</h2>
                         <p className="mt-0.5 text-xs text-slate-500">{mesin.nama}</p>
                     </div>
 
@@ -148,7 +148,7 @@ export default function DokumenModal({ mesin, onClose }) {
                     />
 
                     <p className="mt-1.5 text-[11px] text-slate-400">
-                        Maksimal 10 file, masing-masing 10 MB. PDF, Word, Excel, PowerPoint, JPG, PNG.
+                        Maksimal 10 file, masing-masing 100 MB. PDF, Word, Excel, PowerPoint, JPG, PNG.
                     </p>
 
                     {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}

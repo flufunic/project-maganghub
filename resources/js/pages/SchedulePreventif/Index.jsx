@@ -82,7 +82,11 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'S
 // 48 kolom: [bulan, minggu]
 const WEEKS = MONTHS_SHORT.flatMap((_, m) => [1, 2, 3, 4].map((w) => [m + 1, w]));
 
-const LABEL_COL = { position: 'sticky', left: 0, width: 130, minWidth: 130, maxWidth: 130 };
+// kolom kiri yang menempel: [Baris] [Plan/Act]
+const COL_BARIS = { left: 0, width: 150 };
+const COL_JENIS = { left: 150, width: 60 };
+const COL_TOTAL = { left: 0, width: 210 };
+const stickyCol = (c) => ({ position: 'sticky', left: c.left, width: c.width, minWidth: c.width, maxWidth: c.width });
 
 const parseKodes = (text) =>
     text.split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
@@ -173,6 +177,7 @@ export default function Index({
     tahun,
     items = [],
     zonas = [],
+    baris = [],
     plan = {},
     act = {},
     totals = {},
@@ -194,6 +199,10 @@ export default function Index({
     const [cellError, setCellError] = useState('');
     const [saving, setSaving] = useState(false);
 
+    // ubah nama baris & pesan galat
+    const [namaForm, setNamaForm] = useState(null);
+    const [errorMessage, setErrorMessage] = useState('');
+
     /* ---------------- toast sukses ---------------- */
     useEffect(() => {
         if (flash?.success) {
@@ -201,6 +210,12 @@ export default function Index({
             setShowSuccess(true);
         }
     }, [flash]);
+
+    useEffect(() => {
+        if (!errorMessage) return;
+        const timer = setTimeout(() => setErrorMessage(''), 5000);
+        return () => clearTimeout(timer);
+    }, [errorMessage]);
 
     useEffect(() => {
         if (!showSuccess) return;
@@ -217,8 +232,9 @@ export default function Index({
         );
 
     /* ---------------- helper grid ---------------- */
-    // plan / act: "bulan-minggu" => [{ kode, n }]  (n = jumlah plan atau act kode itu di week tsb)
-    const entriOf = (sumber, bulan, minggu) => sumber?.[`${bulan}-${minggu}`] ?? [];
+    // plan / act: "baris-bulan-minggu" => [{ kode, n }]  (n = jumlah plan atau act kode itu di week tsb)
+    const entriOf = (sumber, barisId, bulan, minggu) => sumber?.[`${barisId}-${bulan}-${minggu}`] ?? [];
+    const barisLabel = (b, i) => (b.nama && b.nama.trim() !== '' ? b.nama : `Baris ${i + 1}`);
     const totalOf = (bulan, minggu, jenis) => totals?.[`${bulan}-${minggu}`]?.[jenis] ?? 0;
     const namaItem = Object.fromEntries(items.map((i) => [i.kode, i.item_preventif]));
 
@@ -228,7 +244,7 @@ export default function Index({
         setZonaForm(zona ? { ...zona, no: zona.no ?? '' } : { ...emptyZona });
     };
 
-    const saveZona = () => {
+    const kirimZona = () => {
         const body = {
             no: zonaForm.no === '' ? null : zonaForm.no,
             zona: zonaForm.zona,
@@ -252,6 +268,43 @@ export default function Index({
         }
     };
 
+    // Tambah zona langsung disimpan. Edit zona minta konfirmasi dulu.
+    const saveZona = () => {
+        if (!zonaForm.id) {
+            kirimZona();
+            return;
+        }
+
+        setConfirmDialog({
+            title: 'Simpan perubahan?',
+            message: `Apakah kamu yakin ingin menyimpan perubahan pada ${zonaForm.nama_line || 'zona ini'}?`,
+            confirmLabel: 'Ya, Simpan',
+            tone: 'blue',
+            onConfirm: () => {
+                setConfirmDialog(null);
+                kirimZona();
+            },
+        });
+    };
+
+    const confirmSaveZona = () => {
+        const baru = !zonaForm.id;
+        const nama = zonaForm.nama_line || 'zona ini';
+
+        setConfirmDialog({
+            title: baru ? 'Tambah zona?' : 'Simpan perubahan?',
+            message: baru
+                ? `Apakah kamu yakin ingin menambahkan ${nama}?`
+                : `Apakah kamu yakin ingin menyimpan perubahan ${nama}?`,
+            confirmLabel: baru ? 'Ya, Tambah' : 'Ya, Simpan',
+            tone: 'blue',
+            onConfirm: () => {
+                setConfirmDialog(null);
+                saveZona();
+            },
+        });
+    };
+
     const confirmDeleteZona = (zona) => {
         setConfirmDialog({
             title: 'Hapus zona?',
@@ -269,9 +322,75 @@ export default function Index({
     };
 
     /* ---------------- PLAN: input kode per week ---------------- */
-    const openCell = (bulan, minggu) => {
+    const openCell = (b, i, bulan, minggu) => {
         setCellError('');
-        setCell({ bulan, minggu, text: entriOf(plan, bulan, minggu).map((e) => e.kode).join(', ') });
+        setCell({
+            barisId: b.id,
+            label: barisLabel(b, i),
+            bulan,
+            minggu,
+            text: entriOf(plan, b.id, bulan, minggu).map((e) => e.kode).join(', '),
+        });
+    };
+
+    /* ---------------- BARIS PLAN/ACT: tambah / ubah nama / hapus (soft delete) ---------------- */
+    const tambahBaris = () => {
+        setConfirmDialog({
+            title: 'Tambah baris?',
+            message: `Apakah kamu yakin ingin menambah baris Plan/Act baru untuk tahun ${tahun}?`,
+            confirmLabel: 'Ya, Tambah',
+            tone: 'blue',
+            onConfirm: () => {
+                setConfirmDialog(null);
+                submitTambahBaris();
+            },
+        });
+    };
+
+    const submitTambahBaris = () => {
+        router.post(
+            '/schedule-preventif/baris',
+            { tahun },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menambah baris.'),
+            }
+        );
+    };
+
+    const saveNamaBaris = () => {
+        router.put(
+            `/schedule-preventif/baris/${namaForm.id}`,
+            { nama: namaForm.nama },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: () => setNamaForm(null),
+                onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menyimpan nama.'),
+            }
+        );
+    };
+
+    const confirmDeleteBaris = (b, i) => {
+        setConfirmDialog({
+            title: 'Hapus baris?',
+            message: `Apakah kamu yakin ingin menghapus ${barisLabel(b, i)}`,
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            onConfirm: () => {
+                router.delete(`/schedule-preventif/baris/${b.id}`, {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menghapus baris.'),
+                    onFinish: () => setConfirmDialog(null),
+                });
+            },
+        });
     };
 
     const toggleKode = (kode) => {
@@ -285,6 +404,7 @@ export default function Index({
             '/schedule-preventif/cell',
             {
                 tahun,
+                baris_id: cell.barisId,
                 bulan: cell.bulan,
                 minggu: cell.minggu,
                 kodes: kosongkan ? [] : parseKodes(cell.text),
@@ -301,6 +421,8 @@ export default function Index({
     };
 
     const terpilih = new Set(cell ? parseKodes(cell.text) : []);
+
+    const totalMesin = zonas.reduce((n, z) => n + Number(z.jumlah_mesin || 0), 0);
 
     const tabs = [
         { key: 'jadwal', label: 'Jadwal', icon: 'calendar', count: null },
@@ -384,30 +506,47 @@ export default function Index({
                                             <b className="text-slate-700">Plan</b>: klik sel pada week yang dimaksud untuk mengisi kode item.{' '}
                                             <b className="text-slate-700">Act</b>: otomatis dari checklist ✓ di menu Preventif Mesin.
                                         </p>
-                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin. Arahkan kursor ke kode untuk melihat nama itemnya.</p>
+                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin, dijumlahkan dari semua baris. Arahkan kursor ke kode untuk melihat nama itemnya.</p>
                                     </div>
 
-                                    <label className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tahun</span>
-                                        <select value={tahun} onChange={(e) => ubahTahun(Number(e.target.value))} className={selectClass}>
-                                            {Array.from({ length: 16 }, (_, i) => 2020 + i).map((y) => (
-                                                <option key={y} value={y}>{y}</option>
-                                            ))}
-                                        </select>
-                                    </label>
+                                    <div className="flex items-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={tambahBaris}
+                                            disabled={saving}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <Icon type="plus" className="h-4 w-4" />
+                                            Tambah baris
+                                        </button>
+
+                                        <label className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tahun</span>
+                                            <select value={tahun} onChange={(e) => ubahTahun(Number(e.target.value))} className={selectClass}>
+                                                {Array.from({ length: 16 }, (_, i) => 2020 + i).map((y) => (
+                                                    <option key={y} value={y}>{y}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    </div>
                                 </div>
 
-                                <div className="overflow-auto rounded-xl border border-slate-200">
+                                <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200">
                                     <table className="border-separate border-spacing-0 whitespace-nowrap text-xs">
                                         <thead>
                                             <tr>
                                                 <th
                                                     rowSpan={2}
-                                                    style={{ ...LABEL_COL, top: 0, zIndex: 30 }}
-                                                    className="border-b border-r-2 border-white/10 bg-[#0a1a4d] px-3 py-2 text-center font-bold text-white"
+                                                    style={{ ...stickyCol(COL_BARIS), top: 0, zIndex: 30 }}
+                                                    className="border-b border-r border-white/10 bg-[#0a1a4d] px-3 py-2 text-center font-bold text-white"
                                                 >
-                                                    Keterangan
+                                                    Baris
                                                 </th>
+                                                <th
+                                                    rowSpan={2}
+                                                    style={{ ...stickyCol(COL_JENIS), top: 0, zIndex: 30 }}
+                                                    className="border-b border-r-2 border-white/10 bg-[#0a1a4d] px-2 py-2 text-center font-bold text-white"
+                                                />
 
                                                 {MONTHS_SHORT.map((m) => (
                                                     <th
@@ -435,56 +574,100 @@ export default function Index({
                                         </thead>
 
                                         <tbody>
-                                            {/* ---------- PLAN (klik untuk isi kode) ---------- */}
-                                            <tr>
-                                                <td style={{ ...LABEL_COL, zIndex: 10 }} className="border-b border-r-2 border-r-blue-900 border-slate-200 bg-blue-50 px-3 py-3 text-center text-sm font-extrabold text-blue-700">
-                                                    Plan
-                                                </td>
+                                            {baris.map((b, i) => (
+                                                <React.Fragment key={b.id}>
+                                                    {/* ---------- PLAN (klik untuk isi kode) ---------- */}
+                                                    <tr>
+                                                        <td
+                                                            rowSpan={2}
+                                                            style={{ ...stickyCol(COL_BARIS), zIndex: 10 }}
+                                                            className="whitespace-normal border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center align-middle"
+                                                        >
+                                                            <p className="break-words text-xs font-extrabold text-slate-700">{barisLabel(b, i)}</p>
 
-                                                {WEEKS.map(([m, w]) => (
-                                                    <td
-                                                        key={`${m}-${w}`}
-                                                        onClick={() => openCell(m, w)}
-                                                        title={`Klik untuk mengisi kode Plan · ${MONTHS[m - 1]} W${w}`}
-                                                        className="min-w-[56px] cursor-pointer whitespace-normal break-words border-b border-r border-slate-200 bg-blue-50/60 px-1 py-3 text-center text-[11px] font-bold text-blue-700 transition hover:bg-amber-100"
-                                                    >
-                                                        <div className="flex flex-wrap items-center justify-center gap-1">
-                                                            {entriOf(plan, m, w).map((e) => (
-                                                                <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
-                                                            ))}
-                                                        </div>
-                                                    </td>
-                                                ))}
-                                            </tr>
+                                                            <div className="mt-1.5 flex items-center justify-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    title="Ubah nama baris"
+                                                                    onClick={() => setNamaForm({ id: b.id, nama: b.nama ?? '' })}
+                                                                    className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100"
+                                                                >
+                                                                    <Icon type="edit" className="h-3.5 w-3.5" />
+                                                                </button>
 
-                                            {/* ---------- ACT (otomatis) ---------- */}
-                                            <tr>
-                                                <td style={{ ...LABEL_COL, zIndex: 10 }} className="border-b border-r-2 border-r-blue-900 border-slate-200 bg-emerald-50 px-3 py-3 text-center text-sm font-extrabold text-emerald-700">
-                                                    Act
-                                                </td>
+                                                                {baris.length > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Hapus baris"
+                                                                        onClick={() => confirmDeleteBaris(b, i)}
+                                                                        className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                                                    >
+                                                                        <Icon type="trash" className="h-3.5 w-3.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
 
-                                                {WEEKS.map(([m, w]) => (
-                                                    <td
-                                                        key={`${m}-${w}`}
-                                                        title="Otomatis dari checklist Preventif Mesin"
-                                                        className="min-w-[56px] whitespace-normal break-words border-b border-r border-slate-200 bg-emerald-50/60 px-1 py-3 text-center text-[11px] font-bold text-emerald-700"
-                                                    >
-                                                        <div className="flex flex-wrap items-center justify-center gap-1">
-                                                        {entriOf(act, m, w).map((e) => (
-                                                            <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
+                                                        <td
+                                                            style={{ ...stickyCol(COL_JENIS), zIndex: 10 }}
+                                                            className="border-b border-r-2 border-r-blue-900 border-slate-200 bg-blue-50 px-2 py-3 text-center text-sm font-extrabold text-blue-700"
+                                                        >
+                                                            Plan
+                                                        </td>
+
+                                                        {WEEKS.map(([m, w]) => (
+                                                            <td
+                                                                key={`${m}-${w}`}
+                                                                onClick={() => openCell(b, i, m, w)}
+                                                                title={`Klik untuk mengisi kode Plan · ${MONTHS[m - 1]} W${w}`}
+                                                                className="min-w-[56px] cursor-pointer whitespace-normal break-words border-b border-r border-slate-200 bg-blue-50/60 px-1 py-3 text-center text-[11px] font-bold text-blue-700 transition hover:bg-amber-100"
+                                                            >
+                                                                <div className="flex flex-wrap items-center justify-center gap-1">
+                                                                    {entriOf(plan, b.id, m, w).map((e) => (
+                                                                        <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
+                                                                    ))}
+                                                                </div>
+                                                            </td>
                                                         ))}
-                                                    </div>
-                                                    </td>
-                                                ))}
-                                            </tr>
+                                                    </tr>
 
-                                            {/* ---------- TOTAL PER WEEK ---------- */}
+                                                    {/* ---------- ACT (otomatis) ---------- */}
+                                                    <tr>
+                                                        <td
+                                                            style={{ ...stickyCol(COL_JENIS), zIndex: 10 }}
+                                                            className="border-b border-r-2 border-r-blue-900 border-slate-300 bg-emerald-50 px-2 py-3 text-center text-sm font-extrabold text-emerald-700"
+                                                        >
+                                                            Act
+                                                        </td>
+
+                                                        {WEEKS.map(([m, w]) => (
+                                                            <td
+                                                                key={`${m}-${w}`}
+                                                                title="Otomatis dari checklist Preventif Mesin"
+                                                                className="min-w-[56px] whitespace-normal break-words border-b border-r border-slate-300 bg-emerald-50/60 px-1 py-3 text-center text-[11px] font-bold text-emerald-700"
+                                                            >
+                                                                <div className="flex flex-wrap items-center justify-center gap-1">
+                                                                    {entriOf(act, b.id, m, w).map((e) => (
+                                                                        <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                </React.Fragment>
+                                            ))}
+
+                                            {/* ---------- TOTAL PER WEEK (semua baris) ---------- */}
                                             {[
                                                 ['Total Plan', 'plan'],
                                                 ['Total Act', 'act'],
                                             ].map(([label, jenis]) => (
                                                 <tr key={label}>
-                                                    <td style={{ ...LABEL_COL, zIndex: 10 }} className="border-b border-r-2 border-r-blue-900 border-amber-200 bg-amber-100 px-3 py-2 text-center font-extrabold text-slate-800">
+                                                    <td
+                                                        colSpan={2}
+                                                        style={{ ...stickyCol(COL_TOTAL), zIndex: 10 }}
+                                                        className="border-b border-r-2 border-r-blue-900 border-amber-200 bg-amber-100 px-3 py-2 text-center font-extrabold text-slate-800"
+                                                    >
                                                         {label}
                                                     </td>
 
@@ -497,7 +680,11 @@ export default function Index({
                                             ))}
 
                                             <tr>
-                                                <td style={{ ...LABEL_COL, zIndex: 10 }} className="border-r-2 border-r-blue-900 bg-amber-100 px-3 py-2 text-center font-extrabold text-slate-800">
+                                                <td
+                                                    colSpan={2}
+                                                    style={{ ...stickyCol(COL_TOTAL), zIndex: 10 }}
+                                                    className="border-r-2 border-r-blue-900 bg-amber-100 px-3 py-2 text-center font-extrabold text-slate-800"
+                                                >
                                                     Pencapaian
                                                 </td>
 
@@ -542,7 +729,7 @@ export default function Index({
                                         <thead>
                                             <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900 text-[11px] uppercase tracking-wider text-white">
                                                 <th className="w-20 px-4 py-3 text-center font-bold">Kode</th>
-                                                <th className="px-4 py-3 text-left font-bold">Plan Pekerjaan</th>
+                                                <th className="px-4 py-3 text-left font-bold">Item Preventif</th>
                                                 <th className="w-32 px-4 py-3 text-center font-bold">Divisi</th>
                                                 <th className="w-32 px-4 py-3 text-center font-bold">Frekuensi</th>
                                                 <th className="w-24 px-4 py-3 text-center font-bold">Aksi</th>
@@ -551,7 +738,7 @@ export default function Index({
 
                                         <tbody>
                                             {items.length === 0 && (
-                                                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Belum ada Plan Pekerjaan.</td></tr>
+                                                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Belum ada item preventif.</td></tr>
                                             )}
 
                                             {items.map((item) => (
@@ -602,8 +789,8 @@ export default function Index({
                                         <thead>
                                             <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900 text-[11px] uppercase tracking-wider text-white">
                                                 <th className="w-16 px-4 py-3 text-center font-bold">No</th>
-                                                <th className="w-24 px-4 py-3 text-center font-bold">Zona</th>
-                                                <th className="px-4 py-3 text-left font-bold">Nama Line / Mesin</th>
+                                                <th className="w-24 px-4 py-3 text-center font-bold">Daftar Mesin Zone</th>
+                                                <th className="px-4 py-3 text-left font-bold">Nama Line</th>
                                                 <th className="w-32 px-4 py-3 text-center font-bold">Jumlah Mesin</th>
                                                 <th className="w-32 px-4 py-3 text-center font-bold">Aksi</th>
                                             </tr>
@@ -633,6 +820,16 @@ export default function Index({
                                                 </tr>
                                             ))}
                                         </tbody>
+
+                                        <tfoot>
+                                            <tr className="bg-amber-50">
+                                                <td colSpan={3} className="px-4 py-3 text-right text-sm font-extrabold text-slate-800">
+                                                    Total Mesin
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-sm font-extrabold text-slate-800">{totalMesin}</td>
+                                                <td />
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
@@ -664,6 +861,50 @@ export default function Index({
                 </div>
             )}
 
+            {/* TOAST GALAT */}
+            {errorMessage && (
+                <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-red-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
+                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-red-400 to-rose-600" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-50 to-rose-100">
+                        <span className="font-bold text-red-600">!</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800">Tidak bisa diproses</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-500">{errorMessage}</p>
+                    </div>
+                    <button type="button" onClick={() => setErrorMessage('')} className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500">×</button>
+                </div>
+            )}
+
+            {/* MODAL UBAH NAMA BARIS */}
+            {namaForm && (
+                <ModalShell
+                    title="Ubah Nama Baris"
+                    subtitle="Kosongkan untuk memakai nama otomatis (Baris 1, Baris 2, ...)"
+                    onClose={() => setNamaForm(null)}
+                    footer={
+                        <>
+                            <button type="button" onClick={() => setNamaForm(null)} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200">Batal</button>
+                            <button type="button" onClick={saveNamaBaris} disabled={saving} className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                {saving ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                        </>
+                    }
+                >
+                    <Field label="Nama baris">
+                        <input
+                            autoFocus
+                            value={namaForm.nama}
+                            onChange={(e) => setNamaForm({ ...namaForm, nama: e.target.value })}
+                            onKeyDown={(e) => e.key === 'Enter' && saveNamaBaris()}
+                            maxLength={100}
+                            placeholder="contoh: Line Sewing 1"
+                            className={inputClass}
+                        />
+                    </Field>
+                </ModalShell>
+            )}
+
             {/* MODAL ZONA */}
             {zonaForm && (
                 <ModalShell
@@ -672,7 +913,7 @@ export default function Index({
                     footer={
                         <>
                             <button type="button" onClick={() => setZonaForm(null)} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200">Batal</button>
-                            <button type="button" onClick={saveZona} disabled={saving} className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
+                            <button type="button" onClick={confirmSaveZona} disabled={saving} className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
                                 {saving ? 'Menyimpan...' : 'Simpan'}
                             </button>
                         </>
@@ -705,7 +946,7 @@ export default function Index({
             {cell && (
                 <ModalShell
                     title="Isi Kode Plan"
-                    subtitle={`${MONTHS[cell.bulan - 1]} ${tahun} · Week ${cell.minggu}`}
+                    subtitle={`${cell.label} · ${MONTHS[cell.bulan - 1]} ${tahun} · Week ${cell.minggu}`}
                     onClose={() => setCell(null)}
                     footer={
                         <>
