@@ -2,7 +2,7 @@ import Sidebar from '@/Components/Sidebar';
 import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import ImportExcelModal from '@/Components/ImportExcelModal';
+
 
 /* ------------------------------------------------------------------
 | ICON
@@ -220,7 +220,7 @@ export default function Index({
     const [tab, setTab] = useState('jadwal');
     const [showSidebar, setShowSidebar] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState(null);
-    const [showImport, setShowImport] = useState(false);
+  
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -548,13 +548,6 @@ export default function Index({
 
                                     <div className="flex items-end gap-2">
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowImport(true)}
-                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
-                                        >
-                                            Import Excel
-                                        </button>
                                         <button
                                             type="button"
                                             onClick={tambahBaris}
@@ -1094,10 +1087,6 @@ export default function Index({
                         ))}
                     </ul>
                 </ModalShell>
-            )}
-
-            {showImport && (
-                <ImportExcelModal items={items} onClose={() => setShowImport(false)} />
             )}
 
             {/* DIALOG KONFIRMASI HAPUS */}
