@@ -130,7 +130,7 @@ export default function Scan({ notifikasi = [] }) {
                         </div>
 
                         {/* KANAN: LONCENG */}
-                        <div className="relative shrink-0">
+                        {/* <div className="relative shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setShowNotifications(!showNotifications)}
@@ -180,7 +180,7 @@ export default function Scan({ notifikasi = [] }) {
                                     </div>
                                 </div>
                             )}
-                        </div>
+                        </div> */}
                     </div>
                 </header>
 

@@ -19,6 +19,8 @@ use App\Http\Controllers\PreventifDokumenController;
 use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
+use App\Http\Controllers\ScheduleImportController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -180,6 +182,16 @@ Route::middleware('auth')->group(function () {
             ScheduleBarisController::class,
             'destroy',
         ])->name('baris.destroy');
+
+        Route::post('import/preview', [
+            ScheduleImportController::class,
+            'preview',
+        ])->name('import.preview');
+
+        Route::post('import', [
+            ScheduleImportController::class,
+            'import',
+        ])->name('import');
     });
 
 

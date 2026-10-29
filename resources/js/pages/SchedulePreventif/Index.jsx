@@ -2,6 +2,7 @@ import Sidebar from '@/Components/Sidebar';
 import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import ImportExcelModal from '@/Components/ImportExcelModal';
 
 /* ------------------------------------------------------------------
 | ICON
@@ -79,6 +80,8 @@ const inputClass =
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
+
+
 // 48 kolom: [bulan, minggu]
 const WEEKS = MONTHS_SHORT.flatMap((_, m) => [1, 2, 3, 4].map((w) => [m + 1, w]));
 
@@ -90,6 +93,9 @@ const stickyCol = (c) => ({ position: 'sticky', left: c.left, width: c.width, mi
 
 const parseKodes = (text) =>
     text.split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+
+// Jumlah kode yang tampil langsung di sel. Sisanya masuk tombol "+N".
+const MAKS_PILL = 1;
 
 // Warna tiap kode otomatis & tetap: kode yang sama selalu berwarna sama.
 // A=1 ... Z=26, AA=27, ... lalu hue digeser sudut emas (137.5°) agar kode berdekatan tetap beda warna.
@@ -125,10 +131,38 @@ function KodePill({ kode, aktif = false, onClick, title }) {
             onClick={onClick}
             title={title}
             style={style}
-            className={`inline-flex min-w-[24px] items-center justify-center rounded-md border font-extrabold leading-none ${ukuran}`}
+            className={`inline-flex shrink-0 min-w-[24px] items-center justify-center rounded-md border font-extrabold leading-none ${ukuran}`}
         >
             {kode}
         </Tag>
+    );
+}
+
+// Isi sel jadwal: tampilkan MAKS_PILL kode saja, sisanya jadi tombol "+N"
+function KodeCell({ entries, namaItem, onLihatSemua }) {
+    const tampil = entries.slice(0, MAKS_PILL);
+    const sisa = entries.length - tampil.length;
+
+    return (
+        <div className="flex flex-wrap items-center justify-center gap-1">
+            {tampil.map((e) => (
+                <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
+            ))}
+
+            {sisa > 0 && (
+                <button
+                    type="button"
+                    title={`Lihat semua kode: ${entries.map((e) => e.kode).join(', ')}`}
+                    onClick={(ev) => {
+                        ev.stopPropagation(); // jangan ikut membuka modal edit Plan
+                        onLihatSemua();
+                    }}
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-extrabold leading-none text-slate-600 transition hover:bg-slate-100"
+                >
+                    +{sisa}
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -186,7 +220,7 @@ export default function Index({
     const [tab, setTab] = useState('jadwal');
     const [showSidebar, setShowSidebar] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState(null);
-
+    const [showImport, setShowImport] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -198,6 +232,9 @@ export default function Index({
     const [cell, setCell] = useState(null);
     const [cellError, setCellError] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // pop up daftar semua kode di satu sel
+    const [lihatKode, setLihatKode] = useState(null);
 
     // ubah nama baris & pesan galat
     const [namaForm, setNamaForm] = useState(null);
@@ -506,10 +543,18 @@ export default function Index({
                                             <b className="text-slate-700">Plan</b>: klik sel pada week yang dimaksud untuk mengisi kode item.{' '}
                                             <b className="text-slate-700">Act</b>: otomatis dari checklist ✓ di menu Preventif Mesin.
                                         </p>
-                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin, dijumlahkan dari semua baris. Arahkan kursor ke kode untuk melihat nama itemnya.</p>
+                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin, dijumlahkan dari semua baris. Arahkan kursor ke kode untuk melihat nama itemnya. Jika kode lebih dari satu, klik tombol +N untuk melihat semuanya.</p>
                                     </div>
 
                                     <div className="flex items-end gap-2">
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowImport(true)}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+                                        >
+                                            Import Excel
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={tambahBaris}
@@ -622,20 +667,29 @@ export default function Index({
                                                                 title={`Klik untuk mengisi kode Plan · ${MONTHS[m - 1]} W${w}`}
                                                                 className="min-w-[56px] cursor-pointer whitespace-normal break-words border-b border-r border-slate-200 bg-blue-50/60 px-1 py-3 text-center text-[11px] font-bold text-blue-700 transition hover:bg-amber-100"
                                                             >
-                                                                <div className="flex flex-wrap items-center justify-center gap-1">
-                                                                    {entriOf(plan, b.id, m, w).map((e) => (
-                                                                        <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
-                                                                    ))}
-                                                                </div>
+                                                                <KodeCell
+                                                                    entries={entriOf(plan, b.id, m, w)}
+                                                                    namaItem={namaItem}
+                                                                    onLihatSemua={() =>
+                                                                        setLihatKode({
+                                                                            jenis: 'Plan',
+                                                                            label: barisLabel(b, i),
+                                                                            bulan: m,
+                                                                            minggu: w,
+                                                                            entries: entriOf(plan, b.id, m, w),
+                                                                            edit: () => openCell(b, i, m, w),
+                                                                        })
+                                                                    }
+                                                                />
                                                             </td>
                                                         ))}
                                                     </tr>
 
-                                                    {/* ---------- ACT (otomatis) ---------- */}
+                                                    {/* ---------- ACT (otomatis, tanpa kode) ---------- */}
                                                     <tr>
                                                         <td
                                                             style={{ ...stickyCol(COL_JENIS), zIndex: 10 }}
-                                                            className="border-b border-r-2 border-r-blue-900 border-slate-300 bg-emerald-50 px-2 py-3 text-center text-sm font-extrabold text-emerald-700"
+                                                            className="border-b border-r-2 border-r-blue-900 border-slate-300 bg-slate-100 px-2 py-3 text-center text-sm font-extrabold text-slate-500"
                                                         >
                                                             Act
                                                         </td>
@@ -643,15 +697,13 @@ export default function Index({
                                                         {WEEKS.map(([m, w]) => (
                                                             <td
                                                                 key={`${m}-${w}`}
-                                                                title="Otomatis dari checklist Preventif Mesin"
-                                                                className="min-w-[56px] whitespace-normal break-words border-b border-r border-slate-300 bg-emerald-50/60 px-1 py-3 text-center text-[11px] font-bold text-emerald-700"
-                                                            >
-                                                                <div className="flex flex-wrap items-center justify-center gap-1">
-                                                                    {entriOf(act, b.id, m, w).map((e) => (
-                                                                        <KodePill key={e.kode} kode={e.kode} title={namaItem[e.kode]} />
-                                                                    ))}
-                                                                </div>
-                                                            </td>
+                                                                title="Act dihitung otomatis dari checklist Preventif Mesin"
+                                                                style={{
+                                                                    backgroundImage:
+                                                                        'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 4px, #f8fafc 4px, #f8fafc 8px)',
+                                                                }}
+                                                                className="min-w-[56px] border-b border-r border-slate-300 bg-slate-50 px-1 py-3"
+                                                            />
                                                         ))}
                                                     </tr>
                                                 </React.Fragment>
@@ -993,6 +1045,59 @@ export default function Index({
                         ))}
                     </div>
                 </ModalShell>
+            )}
+
+            {/* MODAL DAFTAR SEMUA KODE DI SATU SEL */}
+            {lihatKode && (
+                <ModalShell
+                    title={`Kode ${lihatKode.jenis}`}
+                    subtitle={`${lihatKode.label} · ${MONTHS[lihatKode.bulan - 1]} ${tahun} · Week ${lihatKode.minggu} · ${lihatKode.entries.length} kode`}
+                    onClose={() => setLihatKode(null)}
+                    footer={
+                        <>
+                            {lihatKode.edit && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const edit = lihatKode.edit;
+                                        setLihatKode(null);
+                                        edit();
+                                    }}
+                                    className="mr-auto cursor-pointer rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
+                                >
+                                    Edit kode
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => setLihatKode(null)}
+                                className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800"
+                            >
+                                Tutup
+                            </button>
+                        </>
+                    }
+                >
+                    <ul className="space-y-2">
+                        {lihatKode.entries.map((e) => (
+                            <li
+                                key={e.kode}
+                                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                            >
+                                <KodePill kode={e.kode} />
+
+                                <span className="min-w-0 flex-1 text-sm text-slate-700">
+                                    {namaItem[e.kode] ?? '-'}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </ModalShell>
+            )}
+
+            {showImport && (
+                <ImportExcelModal items={items} onClose={() => setShowImport(false)} />
             )}
 
             {/* DIALOG KONFIRMASI HAPUS */}
