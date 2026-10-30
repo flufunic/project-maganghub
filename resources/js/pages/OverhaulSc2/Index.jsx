@@ -533,7 +533,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                             <table className="w-full border-separate border-spacing-0 text-sm">
                                 <thead className="text-white">
                                     {/* BARIS 1: kolom tetap + TAHUN */}
-                                    <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
+                                    <tr className="bg-[#0a1a4d]">
                                         {['No', 'Mesin', 'Nama', 'Total Mesin', 'Standar','Dokumen', 'Item'].map(
                                             (header) => (
                                                 <th
@@ -552,7 +552,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
 
                                         <th
                                             colSpan={48}
-                                            className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-2 text-center"
+                                            className="border-b border-white/10 bg-[#0a1a4d] px-4 py-2 text-center"
                                         >
                                             <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-white">
                                                 {selectedYear}
@@ -568,7 +568,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                     </tr>
 
                                     {/* BARIS 2: BULAN */}
-                                    <tr className="bg-gradient-to-r from-blue-800 via-blue-900 to-indigo-900">
+                                    <tr className="bg-[#0a1a4d]">
                                         {MONTHS.map((month, index) => (
                                             <th
                                                 key={month}
@@ -582,7 +582,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                     </tr>
 
                                     {/* BARIS 3: MINGGU I - IV */}
-                                    <tr className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-900">
+                                    <tr className="bg-[#0a1a4d]">
                                         {MONTHS.map((month) =>
                                             WEEKS.map((week) => (
                                                 <th

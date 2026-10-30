@@ -74,7 +74,7 @@ class SchedulePreventifController extends Controller
         $zonas = ScheduleZona::orderBy('no')->get();
 
         // ---------- BARIS PLAN/ACT (soft delete otomatis tersaring) ----------
-        $baris = ScheduleBaris::where('tahun', $tahun)->orderBy('urutan')->orderBy('id')->get();
+        $baris = ScheduleBaris::with('zona')->where('tahun', $tahun)->orderBy('urutan')->orderBy('id')->get();
 
         if ($baris->isEmpty()) {
             // tahun yang belum punya baris langsung dibuatkan satu
@@ -157,7 +157,9 @@ class SchedulePreventifController extends Controller
             'baris' => $baris->map(fn ($b) => [
                 'id' => $b->id,
                 'urutan' => $b->urutan,
+                'zona_id' => $b->zona_id,
                 'nama' => $b->nama,
+                'nama_line' => $b->zona?->nama_line,
             ])->values(),
             'plan' => (object) $urut($plan),
             'act' => (object) $urut($act),

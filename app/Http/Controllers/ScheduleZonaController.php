@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ScheduleBaris;
 use App\Models\ScheduleZona;
 use Illuminate\Http\Request;
 
-/** CRUD zona. Berdiri sendiri, tidak terkait jadwal maupun item. */
+/**
+ * CRUD zona. Nama Line zona dipakai sebagai nama baris di jadwal
+ * (lewat ScheduleBaris::zona_id). Mengubah Nama Line otomatis mengubah
+ * nama baris yang memakainya.
+ */
 class ScheduleZonaController extends Controller
 {
     private function rules(): array
@@ -41,6 +46,11 @@ class ScheduleZonaController extends Controller
     public function destroy(ScheduleZona $zona)
     {
         $nama = $zona->nama_line;
+
+        // baris jadwal yang memakai zona ini dilepas (nama kembali "Baris N"),
+        // isian Plan-nya tetap aman
+        ScheduleBaris::where('zona_id', $zona->id)->update(['zona_id' => null]);
+
         $zona->delete();
 
         return back()->with('success', "Zona {$nama} berhasil dihapus.");

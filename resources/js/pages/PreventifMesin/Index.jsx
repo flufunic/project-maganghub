@@ -1296,7 +1296,7 @@ export default function Index({
                             <table className="w-full border-separate border-spacing-0 text-sm">
                                 <thead className="text-white">
                                     {/* HEADER UTAMA */}
-                                    <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
+                                    <tr className="bg-[#0a1a4d]">
                                         {[
                                             'Divisi',
                                             'No',
@@ -1329,7 +1329,7 @@ export default function Index({
 
                                         <th
                                             colSpan={jumlahHari}
-                                            className="border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-4 py-2 text-center"
+                                            className="border-b border-white/10 bg-[#0a1a4d] px-4 py-2 text-center"
                                         >
                                             <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-white">
                                                 Jadwal Checklist ·{' '}
@@ -1346,15 +1346,13 @@ export default function Index({
                                     </tr>
 
                                     {/* HEADER TANGGAL */}
-                                    <tr className="bg-gradient-to-r from-blue-800 via-blue-900 to-indigo-900">
+                                   <tr className="bg-[#0a1a4d]">
                                         {tanggal.map((day) => (
                                             <th
                                                 key={day}
-                                                className="min-w-[50px] border-b border-r border-white/10 px-2 py-2 text-center"
+                                                className="min-w-[50px] border-b border-r border-white/10 px-2 py-2 text-center text-[11px] font-bold text-white"
                                             >
-                                                <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-white ring-1 ring-white/10">
-                                                    {day}
-                                                </div>
+                                                {day}
                                             </th>
                                         ))}
                                     </tr>
@@ -1636,7 +1634,7 @@ export default function Index({
                                             )}
 
                                             {/* TOTAL */}
-                                            <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900">
+                                            <tr className="bg-[#0a1a4d]">
                                                 <td
                                                     colSpan={6}
                                                     className="border-r border-white/10 px-4 py-3 text-center"

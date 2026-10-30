@@ -3,7 +3,6 @@ import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 
-
 /* ------------------------------------------------------------------
 | ICON
 ------------------------------------------------------------------ */
@@ -80,8 +79,6 @@ const inputClass =
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
-
-
 // 48 kolom: [bulan, minggu]
 const WEEKS = MONTHS_SHORT.flatMap((_, m) => [1, 2, 3, 4].map((w) => [m + 1, w]));
 
@@ -96,6 +93,10 @@ const parseKodes = (text) =>
 
 // Jumlah kode yang tampil langsung di sel. Sisanya masuk tombol "+N".
 const MAKS_PILL = 1;
+
+// Arsiran garis biru muda (samar) untuk sel Act.
+const ARSIRAN_ACT =
+    'repeating-linear-gradient(45deg, #bae6fd 0, #bae6fd 1.5px, #ffffff 1.5px, #ffffff 8px)';
 
 // Warna tiap kode otomatis & tetap: kode yang sama selalu berwarna sama.
 // A=1 ... Z=26, AA=27, ... lalu hue digeser sudut emas (137.5°) agar kode berdekatan tetap beda warna.
@@ -220,7 +221,7 @@ export default function Index({
     const [tab, setTab] = useState('jadwal');
     const [showSidebar, setShowSidebar] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState(null);
-  
+
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -236,8 +237,8 @@ export default function Index({
     // pop up daftar semua kode di satu sel
     const [lihatKode, setLihatKode] = useState(null);
 
-    // ubah nama baris & pesan galat
-    const [namaForm, setNamaForm] = useState(null);
+    // modal tambah / ubah baris (pilih zona atau nama manual) & pesan galat
+    const [barisForm, setBarisForm] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
 
     /* ---------------- toast sukses ---------------- */
@@ -271,11 +272,22 @@ export default function Index({
     /* ---------------- helper grid ---------------- */
     // plan / act: "baris-bulan-minggu" => [{ kode, n }]  (n = jumlah plan atau act kode itu di week tsb)
     const entriOf = (sumber, barisId, bulan, minggu) => sumber?.[`${barisId}-${bulan}-${minggu}`] ?? [];
-    const barisLabel = (b, i) => (b.nama && b.nama.trim() !== '' ? b.nama : `Baris ${i + 1}`);
+
+    // Nama baris: Nama Line zona (kalau terhubung) > nama manual > "Baris N"
+    const barisLabel = (b, i) => {
+        if (b.nama_line && b.nama_line.trim() !== '') return b.nama_line;
+        if (b.nama && b.nama.trim() !== '') return b.nama;
+        return `Baris ${i + 1}`;
+    };
+
     const totalOf = (bulan, minggu, jenis) => totals?.[`${bulan}-${minggu}`]?.[jenis] ?? 0;
     const namaItem = Object.fromEntries(items.map((i) => [i.kode, i.item_preventif]));
 
-    /* ---------------- ZONA: tambah / edit / hapus (tabel sendiri) ---------------- */
+    // zona yang sudah dipakai baris lain (pada tahun yang tampil)
+    const zonaDipakai = (zonaId, barisId) =>
+        baris.some((b) => b.zona_id === zonaId && b.id !== barisId);
+
+    /* ---------------- ZONA: tambah / edit / hapus ---------------- */
     const openZona = (zona = null) => {
         setZonaErrors({});
         setZonaForm(zona ? { ...zona, no: zona.no ?? '' } : { ...emptyZona });
@@ -345,7 +357,7 @@ export default function Index({
     const confirmDeleteZona = (zona) => {
         setConfirmDialog({
             title: 'Hapus zona?',
-            message: `Apakah kamu yakin ingin menghapus ${zona.nama_line}`,
+            message: `Apakah kamu yakin ingin menghapus ${zona.nama_line}? Baris jadwal yang memakai zona ini akan kembali bernama "Baris N", isian Plan-nya tetap aman.`,
             confirmLabel: 'Ya, Hapus',
             tone: 'red',
             onConfirm: () => {
@@ -370,47 +382,35 @@ export default function Index({
         });
     };
 
-    /* ---------------- BARIS PLAN/ACT: tambah / ubah nama / hapus (soft delete) ---------------- */
-    const tambahBaris = () => {
-        setConfirmDialog({
-            title: 'Tambah baris?',
-            message: `Apakah kamu yakin ingin menambah baris Plan/Act baru untuk tahun ${tahun}?`,
-            confirmLabel: 'Ya, Tambah',
-            tone: 'blue',
-            onConfirm: () => {
-                setConfirmDialog(null);
-                submitTambahBaris();
-            },
-        });
+    /* ---------------- BARIS PLAN/ACT: tambah / ubah / hapus (soft delete) ---------------- */
+    const openTambahBaris = () => {
+        setBarisForm({ id: null, zona_id: '', nama: '' });
     };
 
-    const submitTambahBaris = () => {
-        router.post(
-            '/schedule-preventif/baris',
-            { tahun },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => setSaving(true),
-                onFinish: () => setSaving(false),
-                onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menambah baris.'),
-            }
-        );
+    const openUbahBaris = (b) => {
+        setBarisForm({ id: b.id, zona_id: b.zona_id ?? '', nama: b.nama ?? '' });
     };
 
-    const saveNamaBaris = () => {
-        router.put(
-            `/schedule-preventif/baris/${namaForm.id}`,
-            { nama: namaForm.nama },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => setSaving(true),
-                onFinish: () => setSaving(false),
-                onSuccess: () => setNamaForm(null),
-                onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menyimpan nama.'),
-            }
-        );
+    const saveBaris = () => {
+        const body = {
+            zona_id: barisForm.zona_id === '' ? null : Number(barisForm.zona_id),
+            nama: barisForm.nama,
+        };
+
+        const opsi = {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => setBarisForm(null),
+            onError: (errors) => setErrorMessage(Object.values(errors)[0] ?? 'Gagal menyimpan baris.'),
+        };
+
+        if (barisForm.id) {
+            router.put(`/schedule-preventif/baris/${barisForm.id}`, body, opsi);
+        } else {
+            router.post('/schedule-preventif/baris', { ...body, tahun }, opsi);
+        }
     };
 
     const confirmDeleteBaris = (b, i) => {
@@ -533,7 +533,7 @@ export default function Index({
                         </div>
 
                         {/* =========================================================
-                            TAB JADWAL  (hanya Plan & Act per week, tanpa zona)
+                            TAB JADWAL  (Plan & Act per week; nama baris dari zona)
                         ========================================================== */}
                         {tab === 'jadwal' && (
                             <div className="bg-white p-4">
@@ -541,16 +541,15 @@ export default function Index({
                                     <div className="text-[11px] leading-relaxed text-slate-500">
                                         <p>
                                             <b className="text-slate-700">Plan</b>: klik sel pada week yang dimaksud untuk mengisi kode item.{' '}
-                                            <b className="text-slate-700">Act</b>: otomatis dari checklist ✓ di menu Preventif Mesin.
+                                            <b className="text-slate-700">Act</b>: tidak menampilkan kode, dihitung otomatis dari checklist ✓ di menu Preventif Mesin dan masuk ke baris Total Act.
                                         </p>
-                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin, dijumlahkan dari semua baris. Arahkan kursor ke kode untuk melihat nama itemnya. Jika kode lebih dari satu, klik tombol +N untuk melihat semuanya.</p>
+                                        <p>W1 = tgl 1–7 · W2 = 8–14 · W3 = 15–21 · W4 = 22–akhir bulan. Angka Total = jumlah tanggal plan / act item di week itu menurut menu Preventif Mesin, dijumlahkan dari semua baris. Arahkan kursor ke kode untuk melihat nama itemnya. Jika kode lebih dari satu, klik tombol +N untuk melihat semuanya. Nama baris mengikuti Nama Line zona yang dipilih (ikon pensil).</p>
                                     </div>
 
                                     <div className="flex items-end gap-2">
-
                                         <button
                                             type="button"
-                                            onClick={tambahBaris}
+                                            onClick={openTambahBaris}
                                             disabled={saving}
                                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
@@ -578,7 +577,7 @@ export default function Index({
                                                     style={{ ...stickyCol(COL_BARIS), top: 0, zIndex: 30 }}
                                                     className="border-b border-r border-white/10 bg-[#0a1a4d] px-3 py-2 text-center font-bold text-white"
                                                 >
-                                                    Baris
+                                                    Nama Line
                                                 </th>
                                                 <th
                                                     rowSpan={2}
@@ -591,7 +590,7 @@ export default function Index({
                                                         key={m}
                                                         colSpan={4}
                                                         style={{ position: 'sticky', top: 0, height: 30, zIndex: 20 }}
-                                                        className="border-b border-r border-white/10 bg-gradient-to-r from-blue-700 to-indigo-700 px-2 text-center font-bold text-white"
+                                                        className="border-b border-r border-white/10 bg-[#0a1a4d] px-2 text-center font-bold text-white"
                                                     >
                                                         {m} {tahun}
                                                     </th>
@@ -603,7 +602,7 @@ export default function Index({
                                                     <th
                                                         key={`${m}-${w}`}
                                                         style={{ position: 'sticky', top: 30, zIndex: 20 }}
-                                                        className="min-w-[56px] border-b border-r border-white/10 bg-blue-900 px-2 py-1 text-center font-semibold text-blue-100"
+                                                        className="min-w-[56px] border-b border-r border-white/10 bg-[#0a1a4d] px-2 py-1 text-center font-semibold text-blue-100"
                                                     >
                                                         W{w}
                                                     </th>
@@ -623,11 +622,15 @@ export default function Index({
                                                         >
                                                             <p className="break-words text-xs font-extrabold text-slate-700">{barisLabel(b, i)}</p>
 
+                                                            {b.zona && (
+                                                                <p className="mt-0.5 text-[10px] font-semibold text-slate-400">Zona {b.zona}</p>
+                                                            )}
+
                                                             <div className="mt-1.5 flex items-center justify-center gap-1">
                                                                 <button
                                                                     type="button"
-                                                                    title="Ubah nama baris"
-                                                                    onClick={() => setNamaForm({ id: b.id, nama: b.nama ?? '' })}
+                                                                    title="Ubah zona / nama baris"
+                                                                    onClick={() => openUbahBaris(b)}
                                                                     className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100"
                                                                 >
                                                                     <Icon type="edit" className="h-3.5 w-3.5" />
@@ -678,11 +681,11 @@ export default function Index({
                                                         ))}
                                                     </tr>
 
-                                                    {/* ---------- ACT (otomatis, tanpa kode) ---------- */}
+                                                    {/* ---------- ACT (otomatis, tanpa kode, arsiran biru muda) ---------- */}
                                                     <tr>
                                                         <td
                                                             style={{ ...stickyCol(COL_JENIS), zIndex: 10 }}
-                                                            className="border-b border-r-2 border-r-blue-900 border-slate-300 bg-slate-100 px-2 py-3 text-center text-sm font-extrabold text-slate-500"
+                                                            className="border-b border-r-2 border-r-blue-900 border-slate-300 bg-sky-50 px-2 py-3 text-center text-sm font-extrabold text-sky-600"
                                                         >
                                                             Act
                                                         </td>
@@ -691,11 +694,8 @@ export default function Index({
                                                             <td
                                                                 key={`${m}-${w}`}
                                                                 title="Act dihitung otomatis dari checklist Preventif Mesin"
-                                                                style={{
-                                                                    backgroundImage:
-                                                                        'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 4px, #f8fafc 4px, #f8fafc 8px)',
-                                                                }}
-                                                                className="min-w-[56px] border-b border-r border-slate-300 bg-slate-50 px-1 py-3"
+                                                                style={{ backgroundImage: ARSIRAN_ACT }}
+                                                                className="min-w-[56px] border-b border-r border-slate-300 bg-white px-1 py-3"
                                                             />
                                                         ))}
                                                     </tr>
@@ -812,12 +812,12 @@ export default function Index({
                         )}
 
                         {/* =========================================================
-                            TAB ZONA (tabel sendiri, tidak berhubungan dengan siapa pun)
+                            TAB ZONA (Nama Line dipakai sebagai nama baris di jadwal)
                         ========================================================== */}
                         {tab === 'zona' && (
                             <div className="bg-white p-4">
                                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-xs text-slate-500">Tabel zona berdiri sendiri, tidak terhubung ke jadwal, item, maupun tabel lain.</p>
+                                    <p className="text-xs text-slate-500">Nama Line dipakai sebagai nama baris di tab Jadwal. Menghubungkannya dilakukan lewat ikon pensil pada baris jadwal.</p>
 
                                     <button
                                         type="button"
@@ -921,32 +921,60 @@ export default function Index({
                 </div>
             )}
 
-            {/* MODAL UBAH NAMA BARIS */}
-            {namaForm && (
+            {/* MODAL TAMBAH / UBAH BARIS (pilih zona atau nama manual) */}
+            {barisForm && (
                 <ModalShell
-                    title="Ubah Nama Baris"
-                    subtitle="Kosongkan untuk memakai nama otomatis (Baris 1, Baris 2, ...)"
-                    onClose={() => setNamaForm(null)}
+                    title={barisForm.id ? 'Ubah Baris' : 'Tambah Baris'}
+                    subtitle={`Tahun ${tahun} · pilih zona supaya nama baris mengikuti Nama Line`}
+                    onClose={() => setBarisForm(null)}
                     footer={
                         <>
-                            <button type="button" onClick={() => setNamaForm(null)} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200">Batal</button>
-                            <button type="button" onClick={saveNamaBaris} disabled={saving} className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
+                            <button type="button" onClick={() => setBarisForm(null)} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200">Batal</button>
+                            <button type="button" onClick={saveBaris} disabled={saving} className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
                                 {saving ? 'Menyimpan...' : 'Simpan'}
                             </button>
                         </>
                     }
                 >
-                    <Field label="Nama baris">
-                        <input
-                            autoFocus
-                            value={namaForm.nama}
-                            onChange={(e) => setNamaForm({ ...namaForm, nama: e.target.value })}
-                            onKeyDown={(e) => e.key === 'Enter' && saveNamaBaris()}
-                            maxLength={100}
-                            placeholder="contoh: Line Sewing 1"
-                            className={inputClass}
-                        />
-                    </Field>
+                    <div className="space-y-4">
+                        <Field label="Zona / Nama Line">
+                            <select
+                                autoFocus
+                                value={barisForm.zona_id}
+                                onChange={(e) => setBarisForm({ ...barisForm, zona_id: e.target.value })}
+                                className={inputClass}
+                            >
+                                <option value="">— Tanpa zona (isi nama manual) —</option>
+
+                                {zonas.map((z) => {
+                                    const dipakai = zonaDipakai(z.id, barisForm.id);
+
+                                    return (
+                                        <option key={z.id} value={z.id} disabled={dipakai}>
+                                            {z.no}. {z.nama_line} (Zona {z.zona}){dipakai ? ' — sudah dipakai' : ''}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </Field>
+
+                        {barisForm.zona_id === '' ? (
+                            <Field label="Nama baris (manual)">
+                                <input
+                                    value={barisForm.nama}
+                                    onChange={(e) => setBarisForm({ ...barisForm, nama: e.target.value })}
+                                    onKeyDown={(e) => e.key === 'Enter' && saveBaris()}
+                                    maxLength={100}
+                                    placeholder="kosongkan untuk memakai Baris 1, Baris 2, ..."
+                                    className={inputClass}
+                                />
+                            </Field>
+                        ) : (
+                            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                Nama baris akan mengikuti Nama Line zona yang dipilih, dan ikut berubah kalau Nama Line diedit di tab Zona.
+                            </p>
+                        )}
+                    </div>
                 </ModalShell>
             )}
 
