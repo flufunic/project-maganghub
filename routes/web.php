@@ -153,6 +153,11 @@ Route::middleware('auth')->group(function () {
             'simpanCell',
         ])->name('cell');
 
+        Route::post('arsir', [
+            SchedulePreventifController::class,
+            'toggleArsir',
+        ])->name('arsir');
+
         Route::post('zona', [
             ScheduleZonaController::class,
             'store',

@@ -91,31 +91,73 @@ class SchedulePreventifController extends Controller
         $awalTahun = Carbon::create($tahun, 1, 1)->startOfDay();
         $akhirTahun = Carbon::create($tahun, 12, 31)->endOfDay();
 
-        // ---------- JUMLAH PLAN per item per week (dari jadwal menu Preventif Mesin) ----------
-        // key "itemNo-bulan-minggu" => jumlah tanggal plan
-        $planCount = [];
 
-        PreventifMesin::whereIn('no', $itemIds)->get()->each(function ($p) use (&$planCount, $awalTahun, $akhirTahun) {
+        // ---------- TANGGAL PER ITEM: jadwal plan + tanggal yang dicentang ----------
+        $tanggalItem = [];   // itemNo => ['Y-m-d' => true]  (dipakai untuk Plan)
+        $actDates    = [];   // itemNo => ['Y-m-d' => true]  (dipakai untuk Act)
+
+        // 1) tanggal sesuai jadwal menu Preventif Mesin
+        PreventifMesin::whereIn('no', $itemIds)->get()->each(function ($p) use (&$tanggalItem, $awalTahun, $akhirTahun) {
             foreach ($this->tanggalPlanRentang($p, $awalTahun, $akhirTahun) as $tgl) {
-                $c = Carbon::parse($tgl);
-                $key = "{$p->no}-{$c->month}-" . self::mingguKe($c);
-                $planCount[$key] = ($planCount[$key] ?? 0) + 1;
+                $tanggalItem[$p->no][$tgl] = true;
             }
         });
 
-        // ---------- JUMLAH ACT per item per week (checklist dicentang) ----------
-        $actCount = [];
-
+        // 2) tanggal yang dicentang: masuk Act, dan juga ikut jadi Plan
         PreventifChecklist::query()
             ->whereIn('preventif_mesin_id', $itemIds)
             ->where('status', true)
             ->whereBetween('tanggal', [$awalTahun->toDateString(), $akhirTahun->toDateString()])
             ->get(['preventif_mesin_id', 'tanggal'])
-            ->each(function ($c) use (&$actCount) {
-                $tgl = Carbon::parse($c->tanggal);
-                $key = "{$c->preventif_mesin_id}-{$tgl->month}-" . self::mingguKe($tgl);
-                $actCount[$key] = ($actCount[$key] ?? 0) + 1;
+            ->each(function ($c) use (&$tanggalItem, &$actDates) {
+                $tgl = Carbon::parse($c->tanggal)->toDateString();
+
+                $actDates[$c->preventif_mesin_id][$tgl] = true;
+                $tanggalItem[$c->preventif_mesin_id][$tgl] = true;
             });
+
+        // 3) hitung per item per week
+        $planCount = [];
+        $actCount  = [];
+
+        foreach ($tanggalItem as $itemNo => $tgls) {
+            foreach (array_keys($tgls) as $tgl) {
+                $c = Carbon::parse($tgl);
+                $key = "{$itemNo}-{$c->month}-" . self::mingguKe($c);
+
+                $planCount[$key] = ($planCount[$key] ?? 0) + 1;
+
+                if (isset($actDates[$itemNo][$tgl])) {
+                    $actCount[$key] = ($actCount[$key] ?? 0) + 1;
+                }
+            }
+        }
+        
+        // ---------- JUMLAH PLAN per item per week (dari jadwal menu Preventif Mesin) ----------
+        // key "itemNo-bulan-minggu" => jumlah tanggal plan
+        // $planCount = [];
+
+        // PreventifMesin::whereIn('no', $itemIds)->get()->each(function ($p) use (&$planCount, $awalTahun, $akhirTahun) {
+        //     foreach ($this->tanggalPlanRentang($p, $awalTahun, $akhirTahun) as $tgl) {
+        //         $c = Carbon::parse($tgl);
+        //         $key = "{$p->no}-{$c->month}-" . self::mingguKe($c);
+        //         $planCount[$key] = ($planCount[$key] ?? 0) + 1;
+        //     }
+        // });
+
+        // // ---------- JUMLAH ACT per item per week (checklist dicentang) ----------
+        // $actCount = [];
+
+        // PreventifChecklist::query()
+        //     ->whereIn('preventif_mesin_id', $itemIds)
+        //     ->where('status', true)
+        //     ->whereBetween('tanggal', [$awalTahun->toDateString(), $akhirTahun->toDateString()])
+        //     ->get(['preventif_mesin_id', 'tanggal'])
+        //     ->each(function ($c) use (&$actCount) {
+        //         $tgl = Carbon::parse($c->tanggal);
+        //         $key = "{$c->preventif_mesin_id}-{$tgl->month}-" . self::mingguKe($tgl);
+        //         $actCount[$key] = ($actCount[$key] ?? 0) + 1;
+        //     });
 
         // ---------- SUSUN: "baris-bulan-minggu" => [{kode, n}], dan TOTAL PER WEEK (semua baris) ----------
         $plan = $act = $totals = [];
@@ -149,6 +191,13 @@ class SchedulePreventifController extends Controller
 
             return $grup;
         };
+        // ---------- ARSIR ACT (ditandai manual lewat klik) ----------
+        $arsir = DB::table('schedule_preventif_arsir')
+            ->where('tahun', $tahun)
+            ->whereIn('baris_id', $baris->pluck('id'))
+            ->get()
+            ->mapWithKeys(fn ($r) => ["{$r->baris_id}-{$r->bulan}-{$r->minggu}" => true])
+            ->all();
 
         return Inertia::render('SchedulePreventif/Index', [
             'tahun' => $tahun,
@@ -164,6 +213,7 @@ class SchedulePreventifController extends Controller
             'plan' => (object) $urut($plan),
             'act' => (object) $urut($act),
             'totals' => (object) $totals,
+            'arsir' => (object) $arsir,
             'flash' => ['success' => session('success')],
         ]);
     }
@@ -226,6 +276,40 @@ class SchedulePreventifController extends Controller
             'success',
             empty($kodes) ? 'Isi jadwal dikosongkan.' : 'Jadwal berhasil disimpan.'
         );
+    }
+
+    /** Klik sekali pada sel Act: beri arsir / hapus arsir. */
+    public function toggleArsir(Request $request)
+    {
+        $data = $request->validate([
+            'tahun' => ['required', 'integer', 'between:2000,2100'],
+            'baris_id' => ['required', 'integer'],
+            'bulan' => ['required', 'integer', 'between:1,12'],
+            'minggu' => ['required', 'integer', 'between:1,4'],
+            'aktif' => ['required', 'boolean'],
+        ]);
+
+        // baris harus ada (belum dihapus) dan milik tahun yang sama
+        $baris = ScheduleBaris::where('tahun', $data['tahun'])->findOrFail($data['baris_id']);
+
+        $kunci = [
+            'baris_id' => $baris->id,
+            'tahun' => $data['tahun'],
+            'bulan' => $data['bulan'],
+            'minggu' => $data['minggu'],
+        ];
+
+        if ($data['aktif']) {
+            // insertOrIgnore: aman kalau terklik dobel (unique key mencegah duplikat)
+            DB::table('schedule_preventif_arsir')->insertOrIgnore($kunci + [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('schedule_preventif_arsir')->where($kunci)->delete();
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     // =====================================================

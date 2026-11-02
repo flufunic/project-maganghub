@@ -2,6 +2,7 @@ import Sidebar from '@/Components/Sidebar';
 import ConfirmModal from '@/Components/ConfirmModal';
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import axios from 'axios'; 
 
 /* ------------------------------------------------------------------
 | ICON
@@ -207,6 +208,7 @@ function ModalShell({ title, subtitle, onClose, footer, children }) {
 }
 
 const emptyZona = { id: null, no: '', zona: '', nama_line: '', jumlah_mesin: 1 };
+const ARSIR_KOSONG = {}; 
 
 export default function Index({
     tahun,
@@ -215,6 +217,7 @@ export default function Index({
     baris = [],
     plan = {},
     act = {},
+    arsir = ARSIR_KOSONG, 
     totals = {},
     flash,
 }) {
@@ -240,6 +243,13 @@ export default function Index({
     // modal tambah / ubah baris (pilih zona atau nama manual) & pesan galat
     const [barisForm, setBarisForm] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
+
+    // status arsir Act (optimistic, biar klik langsung terasa)
+    const [arsirLokal, setArsirLokal] = useState(arsir);
+
+    useEffect(() => {
+        setArsirLokal(arsir);
+    }, [arsir]);
 
     /* ---------------- toast sukses ---------------- */
     useEffect(() => {
@@ -455,6 +465,35 @@ export default function Index({
                 onError: (errors) => setCellError(Object.values(errors)[0] ?? 'Gagal menyimpan.'),
             }
         );
+    };
+
+    /* ---------------- ACT: klik sekali untuk arsir / hapus arsir ---------------- */
+    const toggleArsir = async (barisId, bulan, minggu) => {
+        const key = `${barisId}-${bulan}-${minggu}`;
+        const aktifBaru = !arsirLokal[key];
+
+        const setKey = (nilai) =>
+            setArsirLokal((prev) => {
+                const next = { ...prev };
+                if (nilai) next[key] = true;
+                else delete next[key];
+                return next;
+            });
+
+        setKey(aktifBaru); // tampilan berubah langsung
+
+        try {
+            await axios.post('/schedule-preventif/arsir', {
+                tahun,
+                baris_id: barisId,
+                bulan,
+                minggu,
+                aktif: aktifBaru,
+            });
+        } catch (e) {
+            setKey(!aktifBaru); // gagal simpan: kembalikan
+            setErrorMessage(e.response?.data?.message ?? 'Gagal menyimpan arsir.');
+        }
     };
 
     const terpilih = new Set(cell ? parseKodes(cell.text) : []);
@@ -690,14 +729,19 @@ export default function Index({
                                                             Act
                                                         </td>
 
-                                                        {WEEKS.map(([m, w]) => (
-                                                            <td
-                                                                key={`${m}-${w}`}
-                                                                title="Act dihitung otomatis dari checklist Preventif Mesin"
-                                                                style={{ backgroundImage: ARSIRAN_ACT }}
-                                                                className="min-w-[56px] border-b border-r border-slate-300 bg-white px-1 py-3"
-                                                            />
-                                                        ))}
+                                                        {WEEKS.map(([m, w]) => {
+                                                            const terarsir = Boolean(arsirLokal[`${b.id}-${m}-${w}`]);
+
+                                                            return (
+                                                                <td
+                                                                    key={`${m}-${w}`}
+                                                                    onClick={() => toggleArsir(b.id, m, w)}
+                                                                    title={terarsir ? 'Klik untuk hapus arsir' : 'Klik untuk memberi arsir'}
+                                                                    style={terarsir ? { backgroundImage: ARSIRAN_ACT } : undefined}
+                                                                    className="min-w-[56px] cursor-pointer select-none border-b border-r border-slate-300 bg-white px-1 py-3 transition hover:bg-sky-100"
+                                                                />
+                                                            );
+                                                        })}
                                                     </tr>
                                                 </React.Fragment>
                                             ))}
