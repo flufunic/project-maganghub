@@ -31,6 +31,13 @@ const ICONS = {
             "M15 12a3 3 0 11-6 0 3 3 0 016 0z",
         ],
     },
+    joken: {
+        paths: [
+            "M7 3.5h7.5L19 8v12a1 1 0 01-1 1H7a1 1 0 01-1-1v-16a1 1 0 011-1z",
+            "M14 3.5V8.5h5",
+            "M9 13h6M9 17h6",
+        ],
+    },
     logout: {
         paths: [
             "M15 12H3",
@@ -87,6 +94,12 @@ const MENUS = [
         icon: "overhaul",
         label: "Schedule Overhaul SC2",
         desc: "Jadwal overhaul mesin",
+    },
+    {
+        href: "/joken",
+        icon: "joken",
+        label: "Joken Mesin",
+        desc: "Standarisasi setting mesin",
     },
 ];
 

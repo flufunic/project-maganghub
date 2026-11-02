@@ -19,7 +19,7 @@ use App\Http\Controllers\PreventifDokumenController;
 use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
-
+use App\Http\Controllers\JokenController;
 
 
 /*
@@ -435,6 +435,15 @@ Route::middleware('auth')->group(function () {
         OverhaulSc2Controller::class,
         'hapusDokumen',
     ])->name('overhaul-dokumen.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Joken
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('auth')->group(function () {
+        Route::resource('joken', JokenController::class);
+    });
 
 });
 
