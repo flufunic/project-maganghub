@@ -74,7 +74,7 @@ Route::get('/check-sheet-dashboard', [
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------

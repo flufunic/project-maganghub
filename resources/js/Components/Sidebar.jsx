@@ -1,73 +1,35 @@
 import React, { useState } from "react";
 import { router } from "@inertiajs/react";
+import {
+    X,
+    ChevronRight,
+    Wrench,
+    CalendarClock,
+    Activity,
+    Cog,
+    SlidersHorizontal,
+    LogOut,
+} from "lucide-react";
 
 const ICONS = {
-    close: { sw: 2, paths: ["M6 18L18 6M6 6l12 12"] },
-    chevron: { sw: 2, paths: ["M9 5l7 7-7 7"] },
-    preventif: {
-        paths: [
-            "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2",
-            "M9 5a3 3 0 016 0v1H9V5z",
-            "M9 13h6M9 17h4",
-        ],
-    },
-    schedule: {
-        paths: [
-            "M5.5 4.5h13a2 2 0 012 2v12a2 2 0 01-2 2h-13a2 2 0 01-2-2v-12a2 2 0 012-2z",
-            "M8 2.5v4M16 2.5v4M3.5 9h17",
-            "M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01",
-        ],
-    },
-    checksheet: {
-        paths: [
-            "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2",
-            "M9 5a3 3 0 016 0v1H9V5z",
-            "M9 13l2 2 4-4",
-        ],
-    },
-    overhaul: {
-        paths: [
-            "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
-            "M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-        ],
-    },
-    joken: {
-        paths: [
-            "M7 3.5h7.5L19 8v12a1 1 0 01-1 1H7a1 1 0 01-1-1v-16a1 1 0 011-1z",
-            "M14 3.5V8.5h5",
-            "M9 13h6M9 17h6",
-        ],
-    },
-    logout: {
-        paths: [
-            "M15 12H3",
-            "M8 7l-5 5 5 5",
-            "M21 19V5a2 2 0 00-2-2h-6a2 2 0 00-2 2v2",
-        ],
-    },
+    close: X,
+    chevron: ChevronRight,
+    preventif: Wrench,
+    schedule: CalendarClock,
+    checksheet: Activity,
+    overhaul: Cog,
+    joken: SlidersHorizontal,
+    logout: LogOut,
 };
 
 function Icon({ type, className = "h-5 w-5" }) {
-    const icon = ICONS[type];
+    const Comp = ICONS[type];
 
-    if (!icon) return null;
+    if (!Comp) return null;
 
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={icon.sw ?? 1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {icon.paths.map((path, index) => (
-                <path key={index} d={path} />
-            ))}
-        </svg>
-    );
+    const strokeWidth = type === "close" || type === "chevron" ? 2 : 1.75;
+
+    return <Comp className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
 const MENUS = [
@@ -166,7 +128,7 @@ export default function Sidebar({ open, onClose }) {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/15 hover:text-white"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:rotate-90 hover:bg-white/15 hover:text-white"
                             title="Tutup"
                         >
                             <Icon type="close" className="h-4 w-4" />
@@ -188,11 +150,12 @@ export default function Sidebar({ open, onClose }) {
                             <button
                                 key={menu.href}
                                 type="button"
+                                aria-current={menu.active ? "page" : undefined}
                                 onClick={() => {
                                     router.visit(menu.href);
                                     onClose();
                                 }}
-                                className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl px-3 py-3 text-left transition ${
+                                className={`group relative flex h-[68px] w-full items-center gap-3 overflow-hidden rounded-2xl px-3 text-left transition ${
                                     menu.active
                                         ? "border border-white/20 bg-white/15 shadow-lg shadow-blue-950/30"
                                         : "border border-transparent hover:border-white/10 hover:bg-white/10"
@@ -203,10 +166,10 @@ export default function Sidebar({ open, onClose }) {
                                 )}
 
                                 <div
-                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
                                         menu.active
-                                            ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40"
-                                            : "bg-white/10 text-blue-100/80 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white"
+                                            ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-white/25"
+                                            : "bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20"
                                     }`}
                                 >
                                     <Icon type={menu.icon} className="h-5 w-5" />
@@ -214,7 +177,8 @@ export default function Sidebar({ open, onClose }) {
 
                                 <div className="min-w-0 flex-1">
                                     <p
-                                        className={`text-[13px] font-semibold ${
+                                        title={menu.label}
+                                        className={`line-clamp-2 text-[13px] font-semibold leading-tight ${
                                             menu.active
                                                 ? "text-white"
                                                 : "text-blue-50/90 group-hover:text-white"
@@ -223,7 +187,7 @@ export default function Sidebar({ open, onClose }) {
                                         {menu.label}
                                     </p>
                                     <p
-                                        className={`mt-0.5 text-[11px] ${
+                                        className={`mt-0.5 truncate text-[11px] ${
                                             menu.active
                                                 ? "text-blue-200"
                                                 : "text-blue-200/50 group-hover:text-blue-200/80"
@@ -233,7 +197,7 @@ export default function Sidebar({ open, onClose }) {
                                     </p>
                                 </div>
 
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+                                <div className="absolute right-2 top-1/2 flex h-7 w-7 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100">
                                     <Icon type="chevron" className="h-3.5 w-3.5" />
                                 </div>
                             </button>
@@ -248,7 +212,7 @@ export default function Sidebar({ open, onClose }) {
                         onClick={() => setShowLogoutModal(true)}
                         className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-red-300/20 hover:bg-red-500/15"
                     >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 transition group-hover:scale-105">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 ring-1 ring-white/20 transition group-hover:scale-105">
                             <Icon type="logout" className="h-5 w-5" />
                         </div>
 
