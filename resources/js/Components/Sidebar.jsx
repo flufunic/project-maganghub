@@ -92,7 +92,7 @@ const MENUS = [
     {
         href: "/overhaul-sc2",
         icon: "overhaul",
-        label: "Schedule Overhaul SC2",
+        label: "Schedule Overhaul",
         desc: "Jadwal overhaul mesin",
     },
     {
@@ -175,7 +175,7 @@ export default function Sidebar({ open, onClose }) {
                 </div>
 
                 {/* MENU */}
-                <nav className="relative flex-1 overflow-y-auto px-3 py-5">
+                <nav className="relative flex-1 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
                     <div className="mb-3 flex items-center gap-2 px-3">
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-300 shadow-[0_0_6px_rgba(147,197,253,0.8)]" />
                         <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">

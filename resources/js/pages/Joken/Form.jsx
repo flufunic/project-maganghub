@@ -1,20 +1,20 @@
 import ConfirmModal from '@/Components/ConfirmModal';
 import { Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import { Icon, PageShell, glassCard, inputClass, cellInput, btnPrimary, Field } from '@/Components/Joken/ui';
+import { Icon, PageShell, glassCard, inputClass, Field } from '@/Components/Joken/ui';
 
-const LABEL_DEFAULT = [
-    'Tarikan tension atas', 'Tarikan tension bawah', 'Tekanan sepatu', 'Kinop langkah',
-    'Model Sepatu', 'Ketinggian Sepatu luar', 'Ketinggian sepatu dalam', 'Keseimbangan Bahan',
-    'Jarum', 'Timing Rotary Hook', 'Jarak Timing Rotary Hook', 'Margin Jahitan',
-    'Ketinggian Spring', 'FEED_DOG (Gigi Mesin)', 'Ketinggian Rotary Hook', 'Alur Benang',
-    'Qty Kunciran', 'Ketinggian Spring Tension', 'Ketinggian Kawat Sepatu', 'Foto Aktual Kawat Sepatu',
+const IDENTITAS_PRODUKSI = [
+    ['line', 'Line'],
+    ['model', 'Model'],
+    ['pic', 'PIC'],
+    ['no_line', 'No Line'],
 ];
 
-const IDENTITAS = [
-    ['line', 'Line'], ['model', 'Model'], ['pic', 'PIC'], ['no_line', 'No Line'],
-    ['supplier', 'Supplier'], ['part_name', 'Part Name'],
-    ['part_number', 'Part Number'], ['mfg_location', 'MFG. Location'],
+const IDENTITAS_PART = [
+    ['supplier', 'Supplier'],
+    ['part_name', 'Part Name'],
+    ['part_number', 'Part Number'],
+    ['mfg_location', 'MFG. Location'],
 ];
 
 const MAKS_KOLOM = 50;
@@ -33,6 +33,42 @@ const barisKosong = () => ({
     files: {},
 });
 
+const kolomKosong = () => ({ uid: newUid('c'), label: '', type: 'text' });
+
+/* input di dalam tabel: tampil seperti teks, garis muncul saat fokus */
+const tblInput =
+    'w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-xs text-slate-700 outline-none transition placeholder:text-slate-300 hover:border-slate-200 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100';
+
+/* tombol aksi: selalu tampil */
+const aksiBtn =
+    'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition';
+const aksiHapus = `${aksiBtn} border-red-200 bg-red-50 text-red-600 hover:bg-red-100`;
+const aksiSalin = `${aksiBtn} border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100`;
+
+const thBase =
+    'sticky top-0 z-20 border-b-2 border-r border-slate-300 bg-slate-200 px-3 py-3 text-left text-[11px] font-extrabold uppercase tracking-wider text-slate-700';
+
+/* ---------- kartu section ---------- */
+function Section({ no, title, desc, action, children }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-sm font-extrabold text-white shadow-md shadow-blue-200">
+                        {no}
+                    </span>
+                    <div>
+                        <h2 className="text-sm font-extrabold text-slate-800">{title}</h2>
+                        {desc && <p className="mt-0.5 text-[11px] text-slate-500">{desc}</p>}
+                    </div>
+                </div>
+                {action}
+            </div>
+            <div className="p-5">{children}</div>
+        </section>
+    );
+}
+
 /* ---------- sel foto: preview + upload ---------- */
 function ImageCell({ path, file, onPick, onRemove }) {
     const preview = useMemo(
@@ -46,38 +82,37 @@ function ImageCell({ path, file, onPick, onRemove }) {
         };
     }, [preview]);
 
+    const pilih = (e) => {
+        const f = e.target.files?.[0];
+        if (f) onPick(f);
+        e.target.value = '';
+    };
+
+    if (!preview) {
+        return (
+            <label className="flex h-20 w-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-400 bg-slate-50 text-slate-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600">
+                <Icon type="upload" className="h-4 w-4" />
+                <span className="text-[11px] font-semibold">Upload foto</span>
+                <input type="file" accept="image/*" className="hidden" onChange={pilih} />
+            </label>
+        );
+    }
+
     return (
-        <div className="flex w-36 flex-col items-center gap-1.5">
-            {preview && (
-                <img src={preview} alt="" className="h-16 w-full rounded-md border border-slate-200 object-cover" />
-            )}
+        <div className="w-28">
+            <div className="h-20 w-28 overflow-hidden rounded-lg border border-slate-300">
+                <img src={preview} alt="" className="h-full w-full object-cover" />
+            </div>
 
-            <div className="flex items-center gap-1">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-600 transition hover:bg-blue-100">
+            <div className="mt-1 flex items-center gap-1">
+                <label className="flex h-7 flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 text-[11px] font-bold text-blue-600 transition hover:bg-blue-100">
                     <Icon type="upload" className="h-3.5 w-3.5" />
-                    {preview ? 'Ganti' : 'Upload'}
-                    <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) onPick(f);
-                            e.target.value = '';
-                        }}
-                    />
+                    Ganti
+                    <input type="file" accept="image/*" className="hidden" onChange={pilih} />
                 </label>
-
-                {preview && (
-                    <button
-                        type="button"
-                        title="Hapus foto"
-                        onClick={onRemove}
-                        className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-red-200 bg-red-50 text-sm font-bold text-red-600 transition hover:bg-red-100"
-                    >
-                        ×
-                    </button>
-                )}
+                <button type="button" onClick={onRemove} title="Hapus foto" className={aksiHapus}>
+                    <Icon type="trash" className="h-3.5 w-3.5" />
+                </button>
             </div>
         </div>
     );
@@ -88,7 +123,7 @@ export default function Form({ joken }) {
 
     /* ---------------- state ---------------- */
     const [head, setHead] = useState({
-        judul: joken?.judul ?? 'JOKEN MESIN SEWING',
+        judul: joken?.judul ?? 'JOKEN MESIN',
         no_registrasi: joken?.no_registrasi ?? '',
         line: joken?.line ?? '',
         model: joken?.model ?? '',
@@ -100,14 +135,9 @@ export default function Form({ joken }) {
         mfg_location: joken?.mfg_location ?? '',
     });
 
-    const [columns, setColumns] = useState(() => {
-        if (joken?.kolom?.length) return joken.kolom;
-        return LABEL_DEFAULT.map((label, i) => ({
-            uid: `c${i + 1}`,
-            label,
-            type: i === LABEL_DEFAULT.length - 1 ? 'image' : 'text',
-        }));
-    });
+    const [columns, setColumns] = useState(() =>
+        joken?.kolom?.length ? joken.kolom : [kolomKosong()]
+    );
 
     const [rows, setRows] = useState(() => {
         if (joken?.rows?.length) {
@@ -127,6 +157,8 @@ export default function Form({ joken }) {
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState(null);
+
+    const tutup = () => setConfirmDialog(null);
 
     /* ---------------- helper update ---------------- */
     const setRow = (ruid, patch) =>
@@ -149,14 +181,23 @@ export default function Form({ joken }) {
     };
 
     const removeImage = (ruid, cuid) =>
-        setRows((rs) =>
-            rs.map((r) => {
-                if (r.uid !== ruid) return r;
-                const files = { ...r.files };
-                delete files[cuid];
-                return { ...r, files, values: { ...r.values, [cuid]: null } };
-            })
-        );
+        setConfirmDialog({
+            title: 'Hapus foto?',
+            message: 'Apakah kamu yakin ingin menghapus foto ini?',
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            onConfirm: () => {
+                setRows((rs) =>
+                    rs.map((r) => {
+                        if (r.uid !== ruid) return r;
+                        const files = { ...r.files };
+                        delete files[cuid];
+                        return { ...r, files, values: { ...r.values, [cuid]: null } };
+                    })
+                );
+                tutup();
+            },
+        });
 
     /* ---------------- kolom ---------------- */
     const addCol = () => {
@@ -164,7 +205,8 @@ export default function Form({ joken }) {
             setErrors({ kolom: `Maksimal ${MAKS_KOLOM} kolom.` });
             return;
         }
-        setColumns((cs) => [...cs, { uid: newUid('c'), label: '', type: 'text' }]);
+        setErrors({});
+        setColumns((cs) => [...cs, kolomKosong()]);
     };
 
     const setColLabel = (cuid, label) =>
@@ -191,7 +233,7 @@ export default function Form({ joken }) {
             onConfirm: () => {
                 bersihkanKolom(col.uid);
                 setColumns((cs) => cs.map((c) => (c.uid === col.uid ? { ...c, type } : c)));
-                setConfirmDialog(null);
+                tutup();
             },
         });
     };
@@ -209,7 +251,7 @@ export default function Form({ joken }) {
             onConfirm: () => {
                 bersihkanKolom(col.uid);
                 setColumns((cs) => cs.filter((c) => c.uid !== col.uid));
-                setConfirmDialog(null);
+                tutup();
             },
         });
     };
@@ -220,13 +262,7 @@ export default function Form({ joken }) {
     const duplicateRow = (r) =>
         setRows((rs) => {
             const i = rs.findIndex((x) => x.uid === r.uid);
-            const salinan = {
-                ...r,
-                uid: newUid('r'),
-                values: { ...r.values },
-                files: {},
-            };
-            // foto tidak ikut disalin
+            const salinan = { ...r, uid: newUid('r'), values: { ...r.values }, files: {} };
             columns.filter((c) => c.type === 'image').forEach((c) => (salinan.values[c.uid] = null));
             return [...rs.slice(0, i + 1), salinan, ...rs.slice(i + 1)];
         });
@@ -243,15 +279,13 @@ export default function Form({ joken }) {
             tone: 'red',
             onConfirm: () => {
                 setRows((rs) => rs.filter((x) => x.uid !== r.uid));
-                setConfirmDialog(null);
+                tutup();
             },
         });
     };
 
-    /* ---------------- submit ---------------- */
-    const submit = (e) => {
-        e.preventDefault();
-
+    /* ---------------- submit (dengan konfirmasi) ---------------- */
+    const kirim = () => {
         const payload = {
             ...head,
             columns,
@@ -271,18 +305,38 @@ export default function Form({ joken }) {
         });
     };
 
+    const submit = (e) => {
+        e.preventDefault();
+        if (saving) return;
+
+        const nomor = head.no_registrasi.trim();
+
+        setConfirmDialog({
+            title: edit ? 'Simpan perubahan?' : 'Simpan joken baru?',
+            message: edit
+                ? `Apakah kamu yakin ingin menyimpan perubahan pada joken ${nomor || joken.no_registrasi}?`
+                : `Apakah kamu yakin ingin menyimpan joken${nomor ? ` ${nomor}` : ' ini'}?`,
+            confirmLabel: edit ? 'Ya, Simpan Perubahan' : 'Ya, Simpan',
+            tone: 'blue',
+            onConfirm: () => {
+                tutup();
+                kirim();
+            },
+        });
+    };
+
     const pesanError = Object.values(errors);
 
     return (
         <PageShell
             title={edit ? 'Edit Joken' : 'Buat Joken'}
-            heading={edit ? `Edit Joken · ${joken.no_registrasi}` : 'Buat Joken Mesin Sewing'}
+            heading={edit ? `Edit Joken · ${joken.no_registrasi}` : 'Buat Joken Mesin'}
             backHref="/joken"
         >
             <form onSubmit={submit} className={`overflow-hidden rounded-2xl ${glassCard}`}>
-                <div className="space-y-5 bg-white p-4">
+                <div className="space-y-4 bg-slate-50/80 p-4">
                     {pesanError.length > 0 && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
                             <ul className="list-inside list-disc space-y-0.5">
                                 {pesanError.slice(0, 8).map((m, i) => (
                                     <li key={i}>{m}</li>
@@ -294,106 +348,122 @@ export default function Form({ joken }) {
                         </div>
                     )}
 
-                    {/* ===== JUDUL & NO REGISTRASI ===== */}
-                    <section className="grid gap-4 md:grid-cols-3">
-                        <div className="md:col-span-2">
-                            <Field label="Judul" error={errors.judul}>
+                    {/* ===== 1. INFORMASI DOKUMEN ===== */}
+                    <Section no="1" title="Informasi Dokumen" desc="Judul dan nomor registrasi dokumen">
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="md:col-span-2">
+                                <Field label="Judul" error={errors.judul}>
+                                    <input
+                                        value={head.judul}
+                                        onChange={(e) => setHead({ ...head, judul: e.target.value })}
+                                        placeholder="contoh: JOKEN MESIN"
+                                        className={`${inputClass} text-base font-bold`}
+                                    />
+                                </Field>
+                            </div>
+                            <Field label="No. Registrasi" error={errors.no_registrasi}>
                                 <input
-                                    value={head.judul}
-                                    onChange={(e) => setHead({ ...head, judul: e.target.value })}
+                                    value={head.no_registrasi}
+                                    onChange={(e) => setHead({ ...head, no_registrasi: e.target.value })}
+                                    placeholder="contoh: FJIK/SC2/MTC/000"
                                     className={inputClass}
                                 />
                             </Field>
                         </div>
-                        <Field label="No. Registrasi" error={errors.no_registrasi}>
-                            <input
-                                value={head.no_registrasi}
-                                onChange={(e) => setHead({ ...head, no_registrasi: e.target.value })}
-                                placeholder="contoh: FJIK/SC2/MTC/000"
-                                className={inputClass}
-                            />
-                        </Field>
-                    </section>
+                    </Section>
 
-                    {/* ===== IDENTITAS JOKEN ===== */}
-                    <section>
-                        <h2 className="mb-3 text-sm font-extrabold text-slate-800">Identitas Joken</h2>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {IDENTITAS.map(([key, label]) => (
-                                <Field key={key} label={label} error={errors[key]}>
-                                    <input
-                                        value={head[key]}
-                                        onChange={(e) => setHead({ ...head, [key]: e.target.value })}
-                                        className={inputClass}
-                                    />
-                                </Field>
+                    {/* ===== 2. IDENTITAS JOKEN ===== */}
+                    <Section no="2" title="Identitas Joken" desc="Data line, model, dan part">
+                        <div className="grid gap-5 lg:grid-cols-2">
+                            {[
+                                ['Produksi', IDENTITAS_PRODUKSI],
+                                ['Part', IDENTITAS_PART],
+                            ].map(([judul, grup]) => (
+                                <div key={judul} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">{judul}</p>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {grup.map(([key, label]) => (
+                                            <Field key={key} label={label} error={errors[key]}>
+                                                <input
+                                                    value={head[key]}
+                                                    onChange={(e) => setHead({ ...head, [key]: e.target.value })}
+                                                    className={inputClass}
+                                                />
+                                            </Field>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                    </section>
+                    </Section>
 
-                    {/* ===== DETAIL STANDARISASI ===== */}
-                    <section>
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <h2 className="text-sm font-extrabold text-slate-800">Detail Standarisasi</h2>
-                                <p className="text-[11px] text-slate-500">
-                                    {columns.length} kolom parameter · {rows.length} baris. Nama dan tipe kolom bisa diubah, kolom bisa ditambah atau dihapus.
-                                </p>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={addCol} className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100">
-                                    <Icon type="plus" className="h-4 w-4" />
-                                    Tambah kolom
-                                </button>
-                                <button type="button" onClick={addRow} className={btnPrimary}>
-                                    <Icon type="plus" className="h-4 w-4" />
-                                    Tambah baris
-                                </button>
-                            </div>
-                        </div>
+                    {/* ===== 3. DETAIL STANDARISASI ===== */}
+                    <Section
+                        no="3"
+                        title="Detail Standarisasi"
+                        desc={`${columns.length} kolom parameter · ${rows.length} baris`}
+                        action={
+                            <button
+                                type="button"
+                                onClick={addCol}
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                <Icon type="plus" className="h-4 w-4" />
+                                Tambah kolom
+                            </button>
+                        }
+                    >
+                        <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+                            Isi nama parameter di header tiap kolom. Ikon biru untuk menduplikat baris, ikon merah untuk menghapus kolom atau baris.
+                        </p>
 
                         {(errors.kolom || errors.baris || errors.file) && (
-                            <p className="mb-2 text-xs font-medium text-red-500">
+                            <p className="mb-3 text-xs font-medium text-red-500">
                                 {errors.kolom || errors.baris || errors.file}
                             </p>
                         )}
 
-                        <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200">
+                        <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-300">
                             <table className="border-separate border-spacing-0 text-xs">
                                 <thead>
-                                    <tr className="bg-slate-100 align-top">
-                                        <th className="sticky top-0 z-20 w-14 border-b border-r border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-700">No</th>
-                                        <th className="sticky top-0 z-20 min-w-[110px] border-b border-r border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-700">QCPC</th>
-                                        <th className="sticky top-0 z-20 min-w-[240px] border-b border-r border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-700">PROSES</th>
-                                        <th className="sticky top-0 z-20 min-w-[140px] border-b border-r border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-700">MODEL MATERIAL</th>
-                                        <th className="sticky top-0 z-20 min-w-[120px] border-b border-r-2 border-r-blue-900 border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-700">TYPE MESIN</th>
+                                    <tr className="align-top">
+                                        <th className={`${thBase} left-0 z-30 w-20 text-center`}>No</th>
+                                        <th className={`${thBase} min-w-[110px]`}>QCPC</th>
+                                        <th className={`${thBase} min-w-[240px]`}>Proses</th>
+                                        <th className={`${thBase} min-w-[150px]`}>Model Material</th>
+                                        <th className={`${thBase} min-w-[130px] !border-r-2 !border-r-slate-500`}>Type Mesin</th>
 
                                         {columns.map((c, idx) => (
-                                            <th key={c.uid} className="sticky top-0 z-20 min-w-[160px] border-b border-r border-slate-200 bg-slate-100 px-2 py-2 font-normal">
-                                                <div className="mb-1 text-center text-sm font-extrabold text-blue-700">{idx + 1}</div>
+                                            <th
+                                                key={c.uid}
+                                                className="sticky top-0 z-20 min-w-[170px] border-b-2 border-r border-slate-300 bg-slate-200 px-2 py-2 font-normal"
+                                            >
+                                                <div className="flex items-center justify-between px-1">
+                                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                                                        Parameter {idx + 1}
+                                                    </span>
+                                                    <button type="button" onClick={() => removeCol(c, idx)} title="Hapus kolom" className={aksiHapus}>
+                                                        <Icon type="trash" className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+
                                                 <input
                                                     value={c.label}
                                                     onChange={(e) => setColLabel(c.uid, e.target.value)}
                                                     placeholder="Nama parameter"
-                                                    className={cellInput}
+                                                    className={`mt-1.5 w-full rounded-md border bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none placeholder:font-normal placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${
+                                                        c.label.trim() === '' ? 'border-amber-400' : 'border-slate-300'
+                                                    }`}
                                                 />
+
                                                 <select
                                                     value={c.type}
                                                     onChange={(e) => changeColType(c, e.target.value)}
-                                                    className={`${cellInput} mt-1 cursor-pointer`}
+                                                    className="mt-1 w-full cursor-pointer rounded-md bg-transparent px-1 py-0.5 text-[11px] font-medium text-slate-600 outline-none hover:text-slate-900"
                                                 >
-                                                    <option value="text">Teks</option>
-                                                    <option value="image">Foto (upload)</option>
+                                                    <option value="text">Tipe: Teks</option>
+                                                    <option value="image">Tipe: Foto</option>
                                                 </select>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeCol(c, idx)}
-                                                    className="mt-1 inline-flex h-7 w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-red-200 bg-red-50 text-[11px] font-bold text-red-600 transition hover:bg-red-100"
-                                                >
-                                                    <Icon type="trash" className="h-3.5 w-3.5" />
-                                                    Hapus
-                                                </button>
                                             </th>
                                         ))}
                                     </tr>
@@ -401,34 +471,34 @@ export default function Form({ joken }) {
 
                                 <tbody>
                                     {rows.map((r, ri) => (
-                                        <tr key={r.uid} className="align-top hover:bg-blue-50/30">
-                                            <td className="border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center">
-                                                <div className="font-extrabold text-slate-700">{ri + 1}</div>
-                                                <div className="mt-1 flex flex-col items-center gap-1">
-                                                    <button type="button" title="Duplikat baris" onClick={() => duplicateRow(r)} className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100">
+                                        <tr key={r.uid} className="align-top hover:bg-slate-50">
+                                            <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-slate-100 px-1.5 py-2 text-center">
+                                                <span className="block text-xs font-bold text-slate-600">{ri + 1}</span>
+                                                <div className="mt-1.5 flex justify-center gap-1">
+                                                    <button type="button" title="Duplikat baris" onClick={() => duplicateRow(r)} className={aksiSalin}>
                                                         <Icon type="copy" className="h-3.5 w-3.5" />
                                                     </button>
-                                                    <button type="button" title="Hapus baris" onClick={() => removeRow(r, ri)} className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">
+                                                    <button type="button" title="Hapus baris" onClick={() => removeRow(r, ri)} className={aksiHapus}>
                                                         <Icon type="trash" className="h-3.5 w-3.5" />
                                                     </button>
                                                 </div>
                                             </td>
 
-                                            <td className="border-b border-r border-slate-200 p-1.5">
-                                                <input value={r.qcpc} onChange={(e) => setRow(r.uid, { qcpc: e.target.value })} className={cellInput} />
+                                            <td className="border-b border-slate-200 p-1.5">
+                                                <input value={r.qcpc} onChange={(e) => setRow(r.uid, { qcpc: e.target.value })} className={tblInput} />
                                             </td>
-                                            <td className="border-b border-r border-slate-200 p-1.5">
-                                                <textarea rows={2} value={r.proses} onChange={(e) => setRow(r.uid, { proses: e.target.value })} className={cellInput} />
+                                            <td className="border-b border-slate-200 p-1.5">
+                                                <textarea rows={2} value={r.proses} onChange={(e) => setRow(r.uid, { proses: e.target.value })} className={tblInput} />
                                             </td>
-                                            <td className="border-b border-r border-slate-200 p-1.5">
-                                                <input value={r.model_material} onChange={(e) => setRow(r.uid, { model_material: e.target.value })} className={cellInput} />
+                                            <td className="border-b border-slate-200 p-1.5">
+                                                <input value={r.model_material} onChange={(e) => setRow(r.uid, { model_material: e.target.value })} className={tblInput} />
                                             </td>
-                                            <td className="border-b border-r-2 border-r-blue-900 border-slate-200 p-1.5">
-                                                <input value={r.type_mesin} onChange={(e) => setRow(r.uid, { type_mesin: e.target.value })} className={cellInput} />
+                                            <td className="border-b border-r-2 border-slate-200 border-r-slate-400 p-1.5">
+                                                <input value={r.type_mesin} onChange={(e) => setRow(r.uid, { type_mesin: e.target.value })} className={tblInput} />
                                             </td>
 
                                             {columns.map((c) => (
-                                                <td key={c.uid} className="border-b border-r border-slate-200 p-1.5 text-center">
+                                                <td key={c.uid} className="border-b border-slate-200 p-1.5 text-center">
                                                     {c.type === 'image' ? (
                                                         <div className="flex justify-center">
                                                             <ImageCell
@@ -442,7 +512,7 @@ export default function Form({ joken }) {
                                                         <input
                                                             value={r.values[c.uid] ?? ''}
                                                             onChange={(e) => setValue(r.uid, c.uid, e.target.value)}
-                                                            className={`${cellInput} text-center`}
+                                                            className={`${tblInput} text-center`}
                                                         />
                                                     )}
                                                 </td>
@@ -452,10 +522,19 @@ export default function Form({ joken }) {
                                 </tbody>
                             </table>
                         </div>
-                    </section>
+
+                        <button
+                            type="button"
+                            onClick={addRow}
+                            className="mt-3 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-400 text-xs font-semibold text-slate-600 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                            <Icon type="plus" className="h-4 w-4" />
+                            Tambah baris
+                        </button>
+                    </Section>
 
                     {/* ===== TOMBOL ===== */}
-                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                    <div className="sticky bottom-3 z-30 flex items-center justify-end gap-2 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-lg backdrop-blur">
                         <Link href="/joken" className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200">
                             Batal
                         </Link>
@@ -464,7 +543,7 @@ export default function Form({ joken }) {
                             disabled={saving}
                             className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {saving ? 'Menyimpan...' : 'Simpan'}
+                            {saving ? 'Menyimpan...' : edit ? 'Simpan Perubahan' : 'Simpan'}
                         </button>
                     </div>
                 </div>
@@ -477,7 +556,7 @@ export default function Form({ joken }) {
                 confirmLabel={confirmDialog?.confirmLabel}
                 tone={confirmDialog?.tone}
                 onConfirm={() => confirmDialog?.onConfirm?.()}
-                onCancel={() => setConfirmDialog(null)}
+                onCancel={tutup}
             />
         </PageShell>
     );

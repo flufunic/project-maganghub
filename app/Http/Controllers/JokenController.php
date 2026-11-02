@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use App\Exports\JokenExport;
+use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class JokenController extends Controller
 {
@@ -71,15 +74,17 @@ class JokenController extends Controller
         return redirect()->route('joken.show', $joken)->with('success', 'Joken berhasil diperbarui.');
     }
 
+    /**
+     * Soft delete: di aplikasi hilang, di database tetap ada (deleted_at terisi).
+     * Foto sengaja TIDAK dihapus dari storage supaya data bisa dipulihkan lewat SQL:
+     *   UPDATE jokens SET deleted_at = NULL WHERE id = ...;
+     */
     public function destroy(Joken $joken)
     {
-        $joken->load('rows');
-        $paths = $this->semuaGambar($joken);
+        $nomor = $joken->no_registrasi;
+        $joken->delete();
 
-        $joken->delete(); // rows ikut terhapus (cascade)
-        Storage::disk('public')->delete($paths);
-
-        return redirect()->route('joken.index')->with('success', 'Joken berhasil dihapus.');
+        return redirect()->route('joken.index')->with('success', "Joken {$nomor} berhasil dihapus.");
     }
 
     /* ----------------------------------------------------------- */
@@ -88,7 +93,11 @@ class JokenController extends Controller
     {
         $request->validate([
             'judul'         => 'required|string|max:255',
-            'no_registrasi' => ['required', 'string', 'max:100', Rule::unique('jokens', 'no_registrasi')->ignore($joken?->id)],
+            // data yang sudah dihapus (soft delete) tidak dihitung, jadi nomornya bisa dipakai lagi
+            'no_registrasi' => [
+                'required', 'string', 'max:100',
+                Rule::unique('jokens', 'no_registrasi')->whereNull('deleted_at')->ignore($joken?->id),
+            ],
             'line'          => 'nullable|string|max:100',
             'model'         => 'nullable|string|max:100',
             'pic'           => 'nullable|string|max:100',
@@ -111,8 +120,10 @@ class JokenController extends Controller
             'rows.*.values'         => 'nullable|array',
             'rows.*.values.*'       => 'nullable|string|max:500',
             'rows.*.files'          => 'nullable|array',
-            'rows.*.files.*'        => 'nullable|image|max:4096', // maks 4 MB
-        ], [], [
+            'rows.*.files.*'        => 'nullable|image|max:4096',
+        ], [
+            'no_registrasi.unique' => 'No. Registrasi sudah dipakai joken lain.',
+        ], [
             'columns.*.label' => 'nama kolom',
             'rows.*.files.*'  => 'foto',
         ]);
@@ -152,7 +163,6 @@ class JokenController extends Controller
                         if ($file) {
                             $path = $file->store('joken', 'public');
                         } else {
-                            // pertahankan foto lama, hanya jika memang milik joken ini
                             $path = $r['values'][$uid] ?? null;
                             if (!in_array($path, $oldPaths, true)) {
                                 $path = null;
@@ -181,7 +191,7 @@ class JokenController extends Controller
             return $keep;
         });
 
-        // hapus file foto yang sudah tidak dipakai
+        // foto yang diganti/dihapus saat edit dibersihkan dari storage
         Storage::disk('public')->delete(array_values(array_diff($oldPaths, $keep)));
     }
 
@@ -199,5 +209,19 @@ class JokenController extends Controller
         }
 
         return $paths;
+    }
+    public function export(Joken $joken)
+    {
+        $joken->load('rows');
+        $data     = $joken->toArray();
+        $filename = 'Joken-' . Str::slug($joken->no_registrasi) . '.xlsx';
+
+        return response()->streamDownload(function () use ($data) {
+            $book = (new JokenExport($data))->build();
+            (new Xlsx($book))->save('php://output');
+            $book->disconnectWorksheets();
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 }

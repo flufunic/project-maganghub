@@ -443,6 +443,8 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('auth')->group(function () {
         Route::resource('joken', JokenController::class);
+        // routes/web.php (di grup yang sudah dilindungi login)
+        Route::get('/joken/{joken}/export', [JokenController::class, 'export'])->name('joken.export');
     });
 
 });

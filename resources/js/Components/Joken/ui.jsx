@@ -146,7 +146,7 @@ export function PageShell({ title, heading, backHref, children }) {
                 <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl print:hidden">
                     <div className="mx-auto flex max-w-[1800px] items-center justify-center px-6 py-3">
                         <p className="text-xs font-medium text-white/70">
-                            © {new Date().getFullYear()} Emma Sarkilla · Joken Mesin Sewing
+                            © {new Date().getFullYear()} Emma Sarkilla · Joken Mesin
                         </p>
                     </div>
                 </footer>

@@ -3,6 +3,8 @@ import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Icon, PageShell, glassCard, btnPrimary } from '@/Components/Joken/ui';
 
+const aksiBtn = 'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border transition';
+
 export default function Index({ jokens, filters }) {
     const [q, setQ] = useState(filters?.q ?? '');
     const [confirmDialog, setConfirmDialog] = useState(null);
@@ -12,23 +14,19 @@ export default function Index({ jokens, filters }) {
         router.get('/joken', { q }, { preserveState: true, replace: true });
     };
 
-    const hapus = (j) => {
+    const tutup = () => setConfirmDialog(null);
+
+    const hapus = (j) =>
         setConfirmDialog({
             title: 'Hapus joken?',
-            message: `Apakah kamu yakin ingin menghapus joken ${j.no_registrasi}? Semua baris dan foto di dalamnya ikut terhapus.`,
+            message: `Apakah kamu yakin ingin menghapus joken ${j.no_registrasi}?`,
             confirmLabel: 'Ya, Hapus',
             tone: 'red',
-            onConfirm: () => {
-                router.delete(`/joken/${j.id}`, {
-                    preserveScroll: true,
-                    onFinish: () => setConfirmDialog(null),
-                });
-            },
+            onConfirm: () => router.delete(`/joken/${j.id}`, { preserveScroll: true, onFinish: tutup }),
         });
-    };
 
     return (
-        <PageShell title="Joken Mesin Sewing">
+        <PageShell title="Joken Mesin">
             <div className={`overflow-hidden rounded-2xl ${glassCard}`}>
                 <div className="bg-white p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -86,13 +84,13 @@ export default function Index({ jokens, filters }) {
                                         <td className="border-b border-slate-200 px-4 py-2.5 text-center text-slate-600">{j.rows_count}</td>
                                         <td className="border-b border-slate-200 px-4 py-2.5">
                                             <div className="flex items-center justify-center gap-1.5">
-                                                <Link href={`/joken/${j.id}`} title="Lihat" className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100">
+                                                <Link href={`/joken/${j.id}`} title="Lihat" className={`${aksiBtn} border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`}>
                                                     <Icon type="eye" />
                                                 </Link>
-                                                <Link href={`/joken/${j.id}/edit`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100">
+                                                <Link href={`/joken/${j.id}/edit`} title="Edit" className={`${aksiBtn} border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100`}>
                                                     <Icon type="edit" />
                                                 </Link>
-                                                <button type="button" title="Hapus" onClick={() => hapus(j)} className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">
+                                                <button type="button" title="Hapus" onClick={() => hapus(j)} className={`${aksiBtn} border-red-200 bg-red-50 text-red-600 hover:bg-red-100`}>
                                                     <Icon type="trash" />
                                                 </button>
                                             </div>
@@ -103,7 +101,6 @@ export default function Index({ jokens, filters }) {
                         </table>
                     </div>
 
-                    {/* PAGINATION */}
                     {jokens.links.length > 3 && (
                         <div className="mt-3 flex flex-wrap items-center justify-center gap-1">
                             {jokens.links.map((l, i) =>
@@ -113,18 +110,12 @@ export default function Index({ jokens, filters }) {
                                         href={l.url}
                                         preserveScroll
                                         className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                                            l.active
-                                                ? 'border-blue-600 bg-blue-600 text-white'
-                                                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                                            l.active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                                         }`}
                                         dangerouslySetInnerHTML={{ __html: l.label }}
                                     />
                                 ) : (
-                                    <span
-                                        key={i}
-                                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-300"
-                                        dangerouslySetInnerHTML={{ __html: l.label }}
-                                    />
+                                    <span key={i} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-300" dangerouslySetInnerHTML={{ __html: l.label }} />
                                 )
                             )}
                         </div>
@@ -139,7 +130,7 @@ export default function Index({ jokens, filters }) {
                 confirmLabel={confirmDialog?.confirmLabel}
                 tone={confirmDialog?.tone}
                 onConfirm={() => confirmDialog?.onConfirm?.()}
-                onCancel={() => setConfirmDialog(null)}
+                onCancel={tutup}
             />
         </PageShell>
     );
