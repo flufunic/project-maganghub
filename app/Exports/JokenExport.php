@@ -21,8 +21,9 @@ class JokenExport
     private const HEAD  = 'F2F2F2'; // latar header tabel & judul section
     private const DASH  = 'A6A6A6'; // tanda "–" untuk data kosong
 
-    private const IMG_ROW_PT = 62;
-    private const IMG_ROW_PX = 83;
+    // Tiap foto menempati satu "slot" di dalam sel (ditumpuk ke bawah)
+    private const SLOT_PX = 76;
+    private const SLOT_PT = 57;
 
     private const PRODUKSI = [['line', 'Line'], ['model', 'Model'], ['pic', 'PIC'], ['no_line', 'No Line']];
     private const PART = [
@@ -63,8 +64,9 @@ class JokenExport
         // ===== Lebar kolom =====
         $this->widths = [1 => 13, 2 => 36, 3 => 22, 4 => 18];
         foreach ($kolom as $i => $k) {
-            $px = (float) ($k['lebar'] ?? $k['width'] ?? 0);
-            $this->widths[5 + $i] = $px > 0 ? min(40, max(16, $px / 7)) : 22;
+            $px      = (float) ($k['lebar'] ?? $k['width'] ?? 0);
+            $default = ($k['type'] ?? '') === 'image' ? 26 : 22;
+            $this->widths[5 + $i] = $px > 0 ? min(40, max(16, $px / 7)) : $default;
         }
         for ($i = 5; $i <= $last; $i++) {
             $this->widths[$i] ??= 16;
@@ -207,7 +209,7 @@ class JokenExport
                 $maxLines = max($maxLines, $this->lines((string) $val, $this->widths[$ci] - 2));
             }
 
-            $hasImage = false;
+            $imgSlots = 0; // jumlah foto terbanyak di satu sel pada baris ini
             foreach ($kolom as $i => $k) {
                 $ci   = 5 + $i;
                 $col  = Coordinate::stringFromColumnIndex($ci);
@@ -215,22 +217,25 @@ class JokenExport
                 $v    = $nilai[$k['uid'] ?? ''] ?? null;
 
                 if (($k['type'] ?? '') === 'image') {
-                    if ($v && $this->image($sheet, $cell, (string) $v, $this->widths[$ci] * 7 + 5)) {
-                        $hasImage = true;
+                    $n = $this->images($sheet, $cell, $this->fotos($v), $this->widths[$ci] * 7 + 5);
+                    if ($n > 0) {
+                        $imgSlots = max($imgSlots, $n);
                     } else {
                         $this->cell($sheet, $cell, '');
                     }
                     continue;
                 }
-                $this->cell($sheet, $cell, $v);
-                $maxLines = max($maxLines, $this->lines((string) ($v ?? ''), $this->widths[$ci] - 2));
+
+                $text = is_array($v) ? implode(', ', array_filter($v, 'is_scalar')) : $v;
+                $this->cell($sheet, $cell, $text);
+                $maxLines = max($maxLines, $this->lines((string) ($text ?? ''), $this->widths[$ci] - 2));
             }
 
             $height = max(26, $maxLines * 13 + 12);
-            if ($hasImage) {
-                $height = max($height, self::IMG_ROW_PT);
+            if ($imgSlots > 0) {
+                $height = max($height, $imgSlots * self::SLOT_PT + 6);
             }
-            $sheet->getRowDimension($r)->setRowHeight(min(300, $height));
+            $sheet->getRowDimension($r)->setRowHeight(min(400, $height));
             $r++;
         }
 
@@ -270,6 +275,19 @@ class JokenExport
             $v = json_decode($v, true);
         }
         return is_array($v) ? $v : [];
+    }
+
+    // nilai foto bisa string lama (1 foto), array (banyak foto), atau string JSON
+    private function fotos(mixed $v): array
+    {
+        if (is_string($v) && str_starts_with(trim($v), '[')) {
+            $v = json_decode($v, true);
+        }
+        if (is_string($v)) {
+            $v = [$v];
+        }
+
+        return array_values(array_filter(is_array($v) ? $v : [], fn ($p) => is_string($p) && $p !== ''));
     }
 
     // perkiraan jumlah baris teks dalam sel dengan lebar tertentu (karakter)
@@ -341,37 +359,46 @@ class JokenExport
             ->setWrapText(true);
     }
 
-    // Tanam foto dari storage/app/public ke sel. Return false kalau file tidak ada.
-    private function image(Worksheet $sheet, string $cell, string $relativePath, float $cellPx): bool
+    // Tanam beberapa foto, ditumpuk ke bawah dalam satu sel. Return jumlah foto yang berhasil dipasang.
+    private function images(Worksheet $sheet, string $cell, array $paths, float $cellPx): int
     {
         $base = realpath(storage_path('app/public'));
-        $path = $base ? realpath($base . DIRECTORY_SEPARATOR . $relativePath) : false;
-
-        // cegah path traversal dan file di luar storage public
-        if (! $path || ! str_starts_with($path, $base . DIRECTORY_SEPARATOR) || ! is_file($path)) {
-            return false;
+        if (! $base) {
+            return 0;
         }
 
-        $size = @getimagesize($path);
-        if (! $size) {
-            return false;
+        $placed = 0;
+        foreach ($paths as $rel) {
+            $path = realpath($base . DIRECTORY_SEPARATOR . $rel);
+
+            // cegah path traversal dan file di luar storage public
+            if (! $path || ! str_starts_with($path, $base . DIRECTORY_SEPARATOR) || ! is_file($path)) {
+                continue;
+            }
+
+            $size = @getimagesize($path);
+            if (! $size) {
+                continue;
+            }
+
+            [$w, $h] = $size;
+            $scale   = min(max(40, $cellPx - 12) / $w, (self::SLOT_PX - 8) / $h, 1);
+            $dw      = max(1, (int) round($w * $scale));
+            $dh      = max(1, (int) round($h * $scale));
+
+            $d = new Drawing();
+            $d->setPath($path);
+            $d->setCoordinates($cell);
+            $d->setResizeProportional(false);
+            $d->setWidth($dw);
+            $d->setHeight($dh);
+            $d->setOffsetX((int) max(2, ($cellPx - $dw) / 2));
+            $d->setOffsetY($placed * self::SLOT_PX + (int) max(2, (self::SLOT_PX - $dh) / 2));
+            $d->setWorksheet($sheet);
+
+            $placed++;
         }
 
-        [$w, $h] = $size;
-        $scale   = min(max(40, $cellPx - 12) / $w, 70 / $h, 1);
-        $dw      = max(1, (int) round($w * $scale));
-        $dh      = max(1, (int) round($h * $scale));
-
-        $drawing = new Drawing();
-        $drawing->setPath($path);
-        $drawing->setCoordinates($cell);
-        $drawing->setResizeProportional(false);
-        $drawing->setWidth($dw);
-        $drawing->setHeight($dh);
-        $drawing->setOffsetX((int) max(2, ($cellPx - $dw) / 2));
-        $drawing->setOffsetY((int) max(2, (self::IMG_ROW_PX - $dh) / 2));
-        $drawing->setWorksheet($sheet);
-
-        return true;
+        return $placed;
     }
 }

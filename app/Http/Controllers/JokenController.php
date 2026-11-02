@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\JokenExport;
 use App\Models\Joken;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use App\Exports\JokenExport;
-use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class JokenController extends Controller
 {
+    // Maksimal foto per sel. Samakan dengan MAKS_FOTO di Form.jsx
+    private const MAKS_FOTO = 2;
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q'));
@@ -87,11 +92,26 @@ class JokenController extends Controller
         return redirect()->route('joken.index')->with('success', "Joken {$nomor} berhasil dihapus.");
     }
 
+    public function export(Joken $joken)
+    {
+        $joken->load('rows');
+        $data     = $joken->toArray();
+        $filename = 'Joken-' . Str::slug($joken->no_registrasi) . '.xlsx';
+
+        return response()->streamDownload(function () use ($data) {
+            $book = (new JokenExport($data))->build();
+            (new Xlsx($book))->save('php://output');
+            $book->disconnectWorksheets();
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
     /* ----------------------------------------------------------- */
 
     private function validasi(Request $request, ?Joken $joken): void
     {
-        $request->validate([
+        $rules = [
             'judul'         => 'required|string|max:255',
             // data yang sudah dihapus (soft delete) tidak dihitung, jadi nomornya bisa dipakai lagi
             'no_registrasi' => [
@@ -112,21 +132,63 @@ class JokenController extends Controller
             'columns.*.label' => 'required|string|max:100',
             'columns.*.type'  => 'required|in:text,image',
 
-            'rows'                  => 'required|array|min:1',
-            'rows.*.qcpc'           => 'nullable|string|max:100',
-            'rows.*.proses'         => 'nullable|string',
-            'rows.*.model_material' => 'nullable|string|max:150',
-            'rows.*.type_mesin'     => 'nullable|string|max:150',
-            'rows.*.values'         => 'nullable|array',
-            'rows.*.values.*'       => 'nullable|string|max:500',
-            'rows.*.files'          => 'nullable|array',
-            'rows.*.files.*'        => 'nullable|image|max:4096',
-        ], [
+            'rows'                   => 'required|array|min:1',
+            'rows.*.qcpc'            => 'nullable|string|max:100',
+            'rows.*.proses'          => 'nullable|string',
+            'rows.*.model_material'  => 'nullable|string|max:150',
+            'rows.*.type_mesin'      => 'nullable|string|max:150',
+            'rows.*.values'          => 'nullable|array',
+            'rows.*.files'           => 'nullable|array',
+        ];
+
+        $attributes = ['columns.*.label' => 'nama kolom'];
+
+        // Aturan nilai/foto dibuat per kolom, karena kolom teks (string) dan foto (array) beda bentuknya.
+        $kolom = collect($request->input('columns', []))
+            ->filter(fn ($c) => is_array($c) && isset($c['uid']) && is_string($c['uid']) && ctype_alnum($c['uid']))
+            ->values();
+
+        foreach ($kolom as $c) {
+            $uid = $c['uid'];
+
+            if (($c['type'] ?? '') === 'image') {
+                $rules["rows.*.values.$uid"]   = 'nullable|array|max:' . self::MAKS_FOTO;
+                $rules["rows.*.values.$uid.*"] = 'nullable|string|max:500';
+                $rules["rows.*.files.$uid"]    = 'nullable|array|max:' . self::MAKS_FOTO;
+                $rules["rows.*.files.$uid.*"]  = 'image|max:4096';
+                $attributes["rows.*.files.$uid.*"] = 'foto';
+            } else {
+                $rules["rows.*.values.$uid"] = 'nullable|string|max:500';
+            }
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
             'no_registrasi.unique' => 'No. Registrasi sudah dipakai joken lain.',
-        ], [
-            'columns.*.label' => 'nama kolom',
-            'rows.*.files.*'  => 'foto',
-        ]);
+        ], $attributes);
+
+        // Foto lama yang dipertahankan + foto baru tidak boleh melebihi batas per sel.
+        $validator->after(function ($v) use ($request, $kolom) {
+            foreach ((array) $request->input('rows', []) as $i => $r) {
+                foreach ($kolom as $c) {
+                    if (($c['type'] ?? '') !== 'image') {
+                        continue;
+                    }
+
+                    $uid  = $c['uid'];
+                    $lama = count(Arr::wrap(data_get($r, "values.$uid")));
+                    $baru = count(Arr::wrap($request->file("rows.$i.files.$uid")));
+
+                    if ($lama + $baru > self::MAKS_FOTO) {
+                        $v->errors()->add(
+                            "rows.$i.files.$uid",
+                            'Baris ' . ($i + 1) . ', kolom "' . ($c['label'] ?? '') . '": maksimal ' . self::MAKS_FOTO . ' foto per sel.'
+                        );
+                    }
+                }
+            }
+        });
+
+        $validator->validate();
     }
 
     private function simpan(Request $request, Joken $joken): void
@@ -158,21 +220,22 @@ class JokenController extends Controller
                     $uid = $k['uid'];
 
                     if ($k['type'] === 'image') {
-                        $file = $request->file("rows.$i.files.$uid");
+                        // 1) foto lama yang dipertahankan (hanya path yang memang milik joken ini)
+                        $paths = collect(Arr::wrap($r['values'][$uid] ?? []))
+                            ->filter(fn ($p) => is_string($p) && in_array($p, $oldPaths, true))
+                            ->unique()
+                            ->values()
+                            ->all();
 
-                        if ($file) {
-                            $path = $file->store('joken', 'public');
-                        } else {
-                            $path = $r['values'][$uid] ?? null;
-                            if (!in_array($path, $oldPaths, true)) {
-                                $path = null;
+                        // 2) foto baru yang diupload
+                        foreach (Arr::wrap($request->file("rows.$i.files.$uid")) as $file) {
+                            if ($file) {
+                                $paths[] = $file->store('joken', 'public');
                             }
                         }
 
-                        if ($path) {
-                            $keep[] = $path;
-                        }
-                        $nilai[$uid] = $path;
+                        $keep        = array_merge($keep, $paths);
+                        $nilai[$uid] = $paths ?: null;   // disimpan sebagai array path
                     } else {
                         $nilai[$uid] = $r['values'][$uid] ?? null;
                     }
@@ -195,33 +258,24 @@ class JokenController extends Controller
         Storage::disk('public')->delete(array_values(array_diff($oldPaths, $keep)));
     }
 
+    /** Semua path foto milik joken ini. Nilai lama (string) maupun baru (array) sama-sama dibaca. */
     private function semuaGambar(Joken $joken): array
     {
         $imageUids = collect($joken->kolom ?? [])->where('type', 'image')->pluck('uid')->all();
         $paths = [];
 
         foreach ($joken->rows as $row) {
+            $nilai = $row->nilai ?? [];
+
             foreach ($imageUids as $uid) {
-                if (!empty($row->nilai[$uid])) {
-                    $paths[] = $row->nilai[$uid];
+                foreach (Arr::wrap($nilai[$uid] ?? []) as $p) {
+                    if (is_string($p) && $p !== '') {
+                        $paths[] = $p;
+                    }
                 }
             }
         }
 
         return $paths;
-    }
-    public function export(Joken $joken)
-    {
-        $joken->load('rows');
-        $data     = $joken->toArray();
-        $filename = 'Joken-' . Str::slug($joken->no_registrasi) . '.xlsx';
-
-        return response()->streamDownload(function () use ($data) {
-            $book = (new JokenExport($data))->build();
-            (new Xlsx($book))->save('php://output');
-            $book->disconnectWorksheets();
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ]);
     }
 }

@@ -19,6 +19,12 @@ const IDENTITAS_PART = [
 
 const MAKS_KOLOM = 50;
 const MAKS_MB = 4;
+const MAKS_FOTO = 2; // maksimal foto per sel. Samakan dengan MAKS_FOTO di JokenController.php
+
+const KOSONG = []; // referensi tetap, supaya preview foto tidak dibuat ulang tiap render
+
+// Nilai foto bisa string lama (1 foto), array (banyak foto), atau kosong
+const asList = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
 
 let seq = 0;
 const newUid = (prefix) => `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -69,51 +75,64 @@ function Section({ no, title, desc, action, children }) {
     );
 }
 
-/* ---------- sel foto: preview + upload ---------- */
-function ImageCell({ path, file, onPick, onRemove }) {
-    const preview = useMemo(
-        () => (file ? URL.createObjectURL(file) : path ? `/storage/${path}` : null),
-        [file, path]
-    );
+/* ---------- sel foto: banyak foto, preview, upload ---------- */
+function ImageCell({ paths, files, onAdd, onRemovePath, onRemoveFile }) {
+    // preview untuk file yang baru dipilih (belum tersimpan)
+    const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
 
     useEffect(() => {
-        return () => {
-            if (file && preview) URL.revokeObjectURL(preview);
-        };
-    }, [preview]);
+        return () => previews.forEach((u) => URL.revokeObjectURL(u));
+    }, [previews]);
+
+    const total = paths.length + files.length;
+    const penuh = total >= MAKS_FOTO;
 
     const pilih = (e) => {
-        const f = e.target.files?.[0];
-        if (f) onPick(f);
+        const picked = Array.from(e.target.files ?? []);
         e.target.value = '';
+        if (picked.length) onAdd(picked);
     };
 
-    if (!preview) {
-        return (
-            <label className="flex h-20 w-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-400 bg-slate-50 text-slate-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600">
-                <Icon type="upload" className="h-4 w-4" />
-                <span className="text-[11px] font-semibold">Upload foto</span>
-                <input type="file" accept="image/*" className="hidden" onChange={pilih} />
-            </label>
-        );
-    }
+    const kotak = 'relative h-20 w-24 shrink-0 overflow-hidden rounded-lg border';
+    const hapusBtn =
+        'absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-600/90 text-white shadow transition hover:bg-red-700';
 
     return (
-        <div className="w-28">
-            <div className="h-20 w-28 overflow-hidden rounded-lg border border-slate-300">
-                <img src={preview} alt="" className="h-full w-full object-cover" />
-            </div>
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+            {/* foto yang sudah tersimpan */}
+            {paths.map((p) => (
+                <div key={p} className={`${kotak} border-slate-300`}>
+                    <img src={`/storage/${p}`} alt="" className="h-full w-full object-cover" />
+                    <button type="button" onClick={() => onRemovePath(p)} title="Hapus foto" className={hapusBtn}>
+                        <span className="text-xs font-bold leading-none">×</span>
+                    </button>
+                </div>
+            ))}
 
-            <div className="mt-1 flex items-center gap-1">
-                <label className="flex h-7 flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 text-[11px] font-bold text-blue-600 transition hover:bg-blue-100">
-                    <Icon type="upload" className="h-3.5 w-3.5" />
-                    Ganti
-                    <input type="file" accept="image/*" className="hidden" onChange={pilih} />
+            {/* foto baru (belum tersimpan) */}
+            {previews.map((src, i) => (
+                <div key={`baru-${i}`} className={`${kotak} border-blue-300`}>
+                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <span className="absolute bottom-1 left-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">BARU</span>
+                    <button type="button" onClick={() => onRemoveFile(i)} title="Hapus foto" className={hapusBtn}>
+                        <span className="text-xs font-bold leading-none">×</span>
+                    </button>
+                </div>
+            ))}
+
+            {/* tombol upload, hilang kalau sudah penuh */}
+            {!penuh && (
+                <label
+                    className={`${kotak} flex cursor-pointer flex-col items-center justify-center gap-0.5 border-dashed border-slate-400 bg-slate-50 text-slate-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600`}
+                >
+                    <Icon type="upload" className="h-4 w-4" />
+                    <span className="text-[11px] font-semibold">{total === 0 ? 'Upload foto' : 'Tambah foto'}</span>
+                    <span className="text-[10px] text-slate-400">
+                        {total}/{MAKS_FOTO}
+                    </span>
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={pilih} />
                 </label>
-                <button type="button" onClick={onRemove} title="Hapus foto" className={aksiHapus}>
-                    <Icon type="trash" className="h-3.5 w-3.5" />
-                </button>
-            </div>
+            )}
         </div>
     );
 }
@@ -169,18 +188,40 @@ export default function Form({ joken }) {
             rs.map((r) => (r.uid === ruid ? { ...r, values: { ...r.values, [cuid]: v } } : r))
         );
 
-    const pickImage = (ruid, cuid, file) => {
-        if (file.size > MAKS_MB * 1024 * 1024) {
-            setErrors({ file: `Ukuran foto maksimal ${MAKS_MB} MB.` });
+    /* ---------------- foto (banyak per sel) ---------------- */
+    const addFotos = (ruid, cuid, picked) => {
+        const besar = picked.find((f) => f.size > MAKS_MB * 1024 * 1024);
+        if (besar) {
+            setErrors({ file: `Ukuran foto maksimal ${MAKS_MB} MB (${besar.name}).` });
             return;
         }
-        setErrors({});
+
+        const baris = rows.find((x) => x.uid === ruid);
+        const sisa = MAKS_FOTO - asList(baris?.values[cuid]).length - (baris?.files[cuid]?.length ?? 0);
+
+        if (sisa <= 0) {
+            setErrors({ file: `Maksimal ${MAKS_FOTO} foto per sel.` });
+            return;
+        }
+
+        setErrors(
+            picked.length > sisa
+                ? { file: `Maksimal ${MAKS_FOTO} foto per sel, hanya ${sisa} foto pertama yang ditambahkan.` }
+                : {}
+        );
+
+        const diambil = picked.slice(0, sisa);
         setRows((rs) =>
-            rs.map((r) => (r.uid === ruid ? { ...r, files: { ...r.files, [cuid]: file } } : r))
+            rs.map((r) =>
+                r.uid === ruid
+                    ? { ...r, files: { ...r.files, [cuid]: [...(r.files[cuid] ?? []), ...diambil] } }
+                    : r
+            )
         );
     };
 
-    const removeImage = (ruid, cuid) =>
+    // hapus satu foto: { path } untuk foto yang sudah tersimpan, { index } untuk foto baru
+    const hapusFoto = (ruid, cuid, { path, index }) =>
         setConfirmDialog({
             title: 'Hapus foto?',
             message: 'Apakah kamu yakin ingin menghapus foto ini?',
@@ -190,11 +231,21 @@ export default function Form({ joken }) {
                 setRows((rs) =>
                     rs.map((r) => {
                         if (r.uid !== ruid) return r;
-                        const files = { ...r.files };
-                        delete files[cuid];
-                        return { ...r, files, values: { ...r.values, [cuid]: null } };
+
+                        if (path !== undefined) {
+                            return {
+                                ...r,
+                                values: { ...r.values, [cuid]: asList(r.values[cuid]).filter((p) => p !== path) },
+                            };
+                        }
+
+                        return {
+                            ...r,
+                            files: { ...r.files, [cuid]: (r.files[cuid] ?? []).filter((_, i) => i !== index) },
+                        };
                     })
                 );
+                setErrors({});
                 tutup();
             },
         });
@@ -263,7 +314,8 @@ export default function Form({ joken }) {
         setRows((rs) => {
             const i = rs.findIndex((x) => x.uid === r.uid);
             const salinan = { ...r, uid: newUid('r'), values: { ...r.values }, files: {} };
-            columns.filter((c) => c.type === 'image').forEach((c) => (salinan.values[c.uid] = null));
+            // foto tidak ikut disalin
+            columns.filter((c) => c.type === 'image').forEach((c) => (salinan.values[c.uid] = []));
             return [...rs.slice(0, i + 1), salinan, ...rs.slice(i + 1)];
         });
 
@@ -289,7 +341,23 @@ export default function Form({ joken }) {
         const payload = {
             ...head,
             columns,
-            rows: rows.map(({ uid, ...r }) => r),
+            rows: rows.map(({ uid, ...r }) => {
+                const values = {};
+                const files = {};
+
+                columns.forEach((c) => {
+                    if (c.type === 'image') {
+                        const lama = asList(r.values[c.uid]); // path foto yang dipertahankan
+                        const baru = r.files[c.uid] ?? []; // file yang baru dipilih
+                        if (lama.length) values[c.uid] = lama;
+                        if (baru.length) files[c.uid] = baru;
+                    } else {
+                        values[c.uid] = r.values[c.uid] ?? '';
+                    }
+                });
+
+                return { ...r, values, files };
+            }),
         };
         if (edit) payload._method = 'put'; // multipart tidak bisa PUT, jadi POST + _method
 
@@ -414,7 +482,7 @@ export default function Form({ joken }) {
                         }
                     >
                         <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                            Isi nama parameter di header tiap kolom. Ikon biru untuk menduplikat baris, ikon merah untuk menghapus kolom atau baris.
+                            Isi nama parameter di header tiap kolom. Kolom bertipe Foto bisa diisi sampai {MAKS_FOTO} foto per sel. Ikon biru untuk menduplikat baris, ikon merah untuk menghapus kolom atau baris.
                         </p>
 
                         {(errors.kolom || errors.baris || errors.file) && (
@@ -436,7 +504,9 @@ export default function Form({ joken }) {
                                         {columns.map((c, idx) => (
                                             <th
                                                 key={c.uid}
-                                                className="sticky top-0 z-20 min-w-[170px] border-b-2 border-r border-slate-300 bg-slate-200 px-2 py-2 font-normal"
+                                                className={`sticky top-0 z-20 border-b-2 border-r border-slate-300 bg-slate-200 px-2 py-2 font-normal ${
+                                                    c.type === 'image' ? 'min-w-[230px]' : 'min-w-[170px]'
+                                                }`}
                                             >
                                                 <div className="flex items-center justify-between px-1">
                                                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
@@ -500,14 +570,13 @@ export default function Form({ joken }) {
                                             {columns.map((c) => (
                                                 <td key={c.uid} className="border-b border-slate-200 p-1.5 text-center">
                                                     {c.type === 'image' ? (
-                                                        <div className="flex justify-center">
-                                                            <ImageCell
-                                                                path={r.values[c.uid]}
-                                                                file={r.files[c.uid]}
-                                                                onPick={(f) => pickImage(r.uid, c.uid, f)}
-                                                                onRemove={() => removeImage(r.uid, c.uid)}
-                                                            />
-                                                        </div>
+                                                        <ImageCell
+                                                            paths={asList(r.values[c.uid])}
+                                                            files={r.files[c.uid] ?? KOSONG}
+                                                            onAdd={(picked) => addFotos(r.uid, c.uid, picked)}
+                                                            onRemovePath={(path) => hapusFoto(r.uid, c.uid, { path })}
+                                                            onRemoveFile={(index) => hapusFoto(r.uid, c.uid, { index })}
+                                                        />
                                                     ) : (
                                                         <input
                                                             value={r.values[c.uid] ?? ''}

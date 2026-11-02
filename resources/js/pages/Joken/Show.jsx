@@ -25,13 +25,19 @@ const garis = 'border-b border-r border-slate-300 last:border-r-0';
 const th = `${garis} bg-slate-100 px-4 py-3 text-[11px] font-bold text-slate-700 print:px-2 print:py-2`;
 const td = `${garis} px-4 py-4 text-slate-700 print:px-2 print:py-2`;
 
-// Lebar kolom parameter: pakai ketentuan kolom (k.lebar / k.width) kalau ada,
-// default 150px.
+// Lebar kolom parameter: pakai ketentuan kolom (k.lebar / k.width) kalau ada.
+// Default 150px, kolom foto 200px supaya 2 foto muat berdampingan.
 const LEBAR_DEFAULT = 150;
-const lebarMin = (k) => ({ minWidth: Number(k.lebar ?? k.width) || LEBAR_DEFAULT });
+const LEBAR_FOTO = 200;
+const lebarMin = (k) => ({
+    minWidth: Number(k.lebar ?? k.width) || (k.type === 'image' ? LEBAR_FOTO : LEBAR_DEFAULT),
+});
 
 // Isi sel dibatasi lebarnya, jadi teks panjang turun ke baris ke-2 (bukan memanjang terus).
 const ISI_MAX = 'mx-auto max-w-[200px] break-words leading-snug';
+
+// Nilai foto bisa string lama (1 foto) atau array (banyak foto)
+const fotoList = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
 
 export default function Show({ joken }) {
     const kolom = joken.kolom ?? [];
@@ -156,14 +162,19 @@ export default function Show({ joken }) {
                                                 return (
                                                     <td key={k.uid} style={lebarMin(k)} className={td}>
                                                         {k.type === 'image' ? (
-                                                            v ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setPreview(`/storage/${v}`)}
-                                                                    className="group mx-auto block h-16 w-24 cursor-zoom-in overflow-hidden rounded-lg border border-slate-300"
-                                                                >
-                                                                    <img src={`/storage/${v}`} alt="" className="h-full w-full object-cover transition group-hover:scale-110" />
-                                                                </button>
+                                                            fotoList(v).length ? (
+                                                                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                                                                    {fotoList(v).map((p) => (
+                                                                        <button
+                                                                            key={p}
+                                                                            type="button"
+                                                                            onClick={() => setPreview(`/storage/${p}`)}
+                                                                            className="group block h-16 w-20 cursor-zoom-in overflow-hidden rounded-lg border border-slate-300"
+                                                                        >
+                                                                            <img src={`/storage/${p}`} alt="" className="h-full w-full object-cover transition group-hover:scale-110" />
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
                                                             ) : (
                                                                 <span className="text-slate-300">–</span>
                                                             )
