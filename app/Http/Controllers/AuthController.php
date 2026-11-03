@@ -27,6 +27,7 @@ class AuthController extends Controller
         $credentials = [
             'name' => $request->name,
             'password' => $request->password,
+            'is_active' => true,
         ];
 
         if (!Auth::attempt($credentials)) {
@@ -36,6 +37,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $request->user()->forceFill(['last_login_at' => now()])->save();
 
         return $this->redirectByRole();
     }
@@ -44,10 +46,23 @@ class AuthController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->role === 'pimpinan') {
-            return redirect('/pimpinan');
-        }
+        return match ($user->role) {
+            'admin'             => redirect('/preventif-mesin'),
+            'pimpinan'          => redirect('/pimpinan'),
+            'spv_produksi',
+            'operator_produksi' => redirect('/rrf'),
+            default             => $this->rejectUnknownRole(),
+        };
+    }
 
-        return redirect('/preventif-mesin');
+    private function rejectUnknownRole()
+    {
+        Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+
+        return redirect('/login')->withErrors([
+            'login' => 'Role akun tidak dikenali.',
+        ]);
     }
 }

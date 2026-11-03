@@ -43,7 +43,8 @@ Route::get('/login', [
 Route::post('/login', [
     AuthController::class,
     'login',
-])->name('login.store');
+])->middleware('throttle:5,1')
+  ->name('login.store');
 
 // Logout
 Route::post('/logout', function (Request $request) {
@@ -441,11 +442,10 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     | Joken
     |--------------------------------------------------------------------------
     */
-    Route::middleware('auth')->group(function () {
-        Route::resource('joken', JokenController::class);
-        // routes/web.php (di grup yang sudah dilindungi login)
-        Route::get('/joken/{joken}/export', [JokenController::class, 'export'])->name('joken.export');
-    });
+ 
+    Route::resource('joken', JokenController::class);
+    // routes/web.php (di grup yang sudah dilindungi login)
+    Route::get('/joken/{joken}/export', [JokenController::class, 'export'])->name('joken.export');
 
 });
 
@@ -505,4 +505,28 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
         CheckSheetPimpinanController::class,
         'destroy',
     ])->name('pimpinan.check-sheet.destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
+| RRF sisi Produksi
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])->group(function () {
+    Route::get('/rrf', function () {
+        return Inertia::render('Rrf/Index');
+    })->name('rrf.index');
+});
+
+/*
+|--------------------------------------------------------------------------
+| RRF sisi Maintenance
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
+    Route::get('/mtc/rrf', function () {
+        return Inertia::render('Rrf/MtcIndex');
+    })->name('mtc.rrf.index');
 });
