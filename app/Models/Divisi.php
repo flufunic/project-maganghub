@@ -9,10 +9,16 @@ class Divisi extends Model
 {
     protected $fillable = [
         'nama_divisi',
+        'kode_rrf',
     ];
 
     public function mesins(): HasMany
     {
         return $this->hasMany(Mesin::class);
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
     }
 }

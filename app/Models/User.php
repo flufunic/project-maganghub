@@ -15,7 +15,7 @@ use Illuminate\Notifications\Notifiable;
     'email',
     'password',
     'role',
-    'department_id',
+    'divisi_id',
     'is_active',
     'must_change_password',
 ])]
@@ -25,11 +25,6 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -41,8 +36,8 @@ class User extends Authenticatable
         ];
     }
 
-    public function department(): BelongsTo
+    public function divisi(): BelongsTo
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(Divisi::class);
     }
 }

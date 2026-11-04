@@ -20,7 +20,8 @@ use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
 use App\Http\Controllers\JokenController;
-
+use App\Http\Controllers\RrfController;
+use App\Http\Controllers\RrfNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -513,11 +514,34 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])->group(function () {
-    Route::get('/rrf', function () {
-        return Inertia::render('Rrf/Index');
-    })->name('rrf.index');
-});
+Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])
+    ->prefix('rrf')
+    ->name('rrf.')
+    ->group(function () {
+        Route::get('/', [RrfController::class, 'index'])->name('index');
+        Route::get('/create', [RrfController::class, 'create'])->name('create');
+        Route::post('/', [RrfController::class, 'store'])->name('store');
+
+        Route::get('/{rrf}', [RrfController::class, 'show'])
+            ->whereNumber('rrf')->name('show');
+        Route::get('/{rrf}/edit', [RrfController::class, 'edit'])
+            ->whereNumber('rrf')->name('edit');
+        Route::put('/{rrf}', [RrfController::class, 'update'])
+            ->whereNumber('rrf')->name('update');
+
+        Route::post(
+            '/notifikasi/{notification}/baca',
+            [RrfNotificationController::class, 'baca']
+        )->name('notifikasi.baca');
+
+        // Hanya SPV produksi
+        Route::middleware('role:spv_produksi')->group(function () {
+            Route::post('/{rrf}/approve', [RrfController::class, 'approve'])
+                ->whereNumber('rrf')->name('approve');
+            Route::post('/{rrf}/reject', [RrfController::class, 'reject'])
+                ->whereNumber('rrf')->name('reject');
+        });
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -529,4 +553,9 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     Route::get('/mtc/rrf', function () {
         return Inertia::render('Rrf/MtcIndex');
     })->name('mtc.rrf.index');
+
+    Route::post(
+        '/notifikasi/{notification}/baca',
+        [RrfNotificationController::class, 'baca']
+    )->name('notifikasi.baca');
 });

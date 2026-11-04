@@ -54,6 +54,23 @@ function Icon({ type, className = 'h-6 w-6' }) {
         );
     }
 
+    if (type === 'eye') {
+        return (
+            <svg viewBox="0 0 24 24" className={className} {...common} aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+        );
+    }
+
+    if (type === 'trash') {
+        return (
+            <svg viewBox="0 0 24 24" className={className} {...common} aria-hidden="true">
+                <path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+            </svg>
+        );
+    }
+
     return (
         <svg viewBox="0 0 24 24" className={className} {...common} aria-hidden="true">
             <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
@@ -285,7 +302,7 @@ export default function Index({ pengirimans = [] }) {
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[900px] text-sm">
+                                <table className="w-full min-w-[760px] text-sm">
                                     <thead>
                                         <tr className="bg-slate-50/80 text-left text-xs font-bold text-slate-500">
                                             <th className="px-6 py-4">Minggu</th>
@@ -324,18 +341,21 @@ export default function Index({ pengirimans = [] }) {
                                                         <div className="flex items-center justify-center gap-2">
                                                             <Link
                                                                 href={`/pimpinan/check-sheet/${item.id}`}
-                                                                className="inline-flex cursor-pointer items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-indigo-800"
+                                                                title="Lihat data"
+                                                                aria-label="Lihat data"
+                                                                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-sm transition hover:from-blue-700 hover:to-indigo-800"
                                                             >
-                                                                Lihat Data
+                                                                <Icon type="eye" className="h-5 w-5" />
                                                             </Link>
 
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setHapusItem(item)}
                                                                 title="Hapus data pengiriman"
-                                                                className="cursor-pointer rounded-xl border border-red-200 bg-white px-3 py-2.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                                                                aria-label="Hapus data pengiriman"
+                                                                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition hover:bg-red-50"
                                                             >
-                                                                Hapus
+                                                                <Icon type="trash" className="h-5 w-5" />
                                                             </button>
                                                         </div>
                                                     </td>

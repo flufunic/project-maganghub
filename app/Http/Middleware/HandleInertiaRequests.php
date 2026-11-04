@@ -2,38 +2,75 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\RrfNotification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * Root template yang dimuat pada kunjungan pertama.
-     * Harus sama dengan nama file di resources/views/.
-     */
-    protected $rootView = 'welcome';
+    protected $rootView = 'app';
 
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Data yang tersedia di semua halaman React lewat usePage().props
-     */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
 
             'auth' => [
-                'user' => $request->user() ? [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'role' => $request->user()->role,
-                    'department_id' => $request->user()->department_id,
+                'user' => $user ? [
+                    'id'        => $user->id,
+                    'name'      => $user->name,
+                    'role'      => $user->role,
+                    'divisi_id' => $user->divisi_id,
+                    'divisi'    => $user->divisi?->nama_divisi,
                 ] : null,
             ],
+
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+            ],
+
+            'rrfForm' => [
+                'form_no'    => config('rrf.form_no'),
+                'form_rev'   => config('rrf.form_rev'),
+                'perusahaan' => config('rrf.perusahaan'),
+            ],
+
+            'rrfNotifications' => fn () => $user
+                ? [
+                    'jumlah_belum_dibaca' => RrfNotification::where('user_id', $user->id)
+                        ->whereNull('dibaca_pada')
+                        ->count(),
+
+                    'daftar' => RrfNotification::where('user_id', $user->id)
+                        ->with('rrf:id,rrf_no')
+                        ->latest()
+                        ->limit(10)
+                        ->get()
+                        ->map(fn ($notification) => [
+                            'id' => $notification->id,
+                            'judul' => $notification->judul,
+                            'pesan' => $notification->pesan,
+                            'dibaca' => !is_null($notification->dibaca_pada),
+                            'waktu' => $notification->created_at?->format('d/m/Y H:i'),
+                            'rrf_no' => $notification->rrf?->rrf_no,
+                            'read_url' => route(
+                                'rrf.notifikasi.baca',
+                                $notification->id
+                            ),
+                        ])
+                        ->values(),
+                ]
+                : [
+                    'jumlah_belum_dibaca' => 0,
+                    'daftar' => [],
+                ],
         ];
     }
 }
