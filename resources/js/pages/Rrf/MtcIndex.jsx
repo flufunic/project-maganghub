@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+
 import {
     Search,
     Eye,
@@ -31,9 +33,11 @@ export default function MtcIndex({
     const isAdmin = peran === 'admin';
 
     const [search, setSearch] = useState(filters.q ?? '');
+
     const [status, setStatus] = useState(
         isPimpinan ? 'selesai' : (filters.status ?? '')
     );
+
     const [divisi, setDivisi] = useState(filters.divisi ?? '');
 
     const opsi = {
@@ -164,12 +168,12 @@ export default function MtcIndex({
             <Head title={judulHalaman} />
 
             {/* =========================================================
-                HEADER
+                HEADER HALAMAN
             ========================================================= */}
 
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         <div
                             className={`h-8 w-1 rounded-full ${
                                 isPimpinan
@@ -382,12 +386,7 @@ export default function MtcIndex({
                     }`}
                 >
                     {/* SEARCH */}
-
-                    <div
-                        className={`relative ${
-                            isPimpinan ? 'md:col-span-2' : 'md:col-span-2'
-                        }`}
-                    >
+                    <div className="relative md:col-span-2">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                         <input
@@ -400,7 +399,6 @@ export default function MtcIndex({
                     </div>
 
                     {/* STATUS */}
-
                     {!isPimpinan && (
                         <select
                             value={status}
@@ -420,7 +418,6 @@ export default function MtcIndex({
                     )}
 
                     {/* DIVISI */}
-
                     <select
                         value={divisi}
                         onChange={(e) => setDivisi(e.target.value)}
@@ -437,7 +434,6 @@ export default function MtcIndex({
                 </div>
 
                 {/* BUTTON */}
-
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <button
                         type="button"
@@ -565,7 +561,6 @@ export default function MtcIndex({
                                         }`}
                                     >
                                         {/* RRF */}
-
                                         <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3.5">
                                             <Link
                                                 href={`/mtc/rrf/${r.id}`}
@@ -576,29 +571,23 @@ export default function MtcIndex({
                                         </td>
 
                                         {/* TANGGAL */}
-
                                         <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3.5 text-xs text-slate-600">
                                             {r.tanggal
-                                                ? String(r.tanggal).split(
-                                                      ' '
-                                                  )[0]
+                                                ? String(r.tanggal).split(' ')[0]
                                                 : '-'}
                                         </td>
 
                                         {/* DIVISI */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5 text-xs font-semibold text-slate-700">
                                             {r.divisi ?? '-'}
                                         </td>
 
                                         {/* LOKASI */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5 text-xs text-slate-600">
                                             {r.lokasi ?? '-'}
                                         </td>
 
                                         {/* MESIN */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5">
                                             <p className="text-xs font-bold text-slate-800">
                                                 {r.mesin ?? '-'}
@@ -606,7 +595,6 @@ export default function MtcIndex({
                                         </td>
 
                                         {/* CLASS */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5">
                                             <span className="inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
                                                 {r.kelas ?? '-'}
@@ -614,19 +602,16 @@ export default function MtcIndex({
                                         </td>
 
                                         {/* JENIS */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5 text-xs font-medium capitalize text-slate-600">
                                             {r.jenis_permintaan ?? '-'}
                                         </td>
 
                                         {/* PEMBUAT */}
-
                                         <td className="border-b border-r border-slate-100 px-4 py-3.5 text-xs text-slate-600">
                                             {r.pembuat ?? '-'}
                                         </td>
 
                                         {/* STATUS */}
-
                                         <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3.5">
                                             {isPimpinan &&
                                             r.status === 'selesai' ? (
@@ -651,7 +636,6 @@ export default function MtcIndex({
                                         </td>
 
                                         {/* AKSI */}
-
                                         <td className="border-b border-slate-100 px-4 py-3.5">
                                             <div className="flex justify-center">
                                                 <Link

@@ -97,6 +97,9 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         'storeChecklist',
     ])->name('preventif-mesin.checklist.store');
 
+    Route::put('/preventif-mesin/{preventifMesin}/plan', [PreventifMesinController::class, 'updatePlan'])
+    ->name('preventif-mesin.plan.update');
+
     Route::put('/preventif-mesin/{preventifMesin}/bulanan', [
         PreventifMesinController::class,
         'updateBulanan',

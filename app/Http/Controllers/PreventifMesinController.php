@@ -14,6 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\PreventifDokumen;
+use App\Models\PreventifMesinPlanOverride;
 
 class PreventifMesinController extends Controller
 {
@@ -105,7 +106,7 @@ class PreventifMesinController extends Controller
         $divisiReport = [];
 
         foreach ($preventifMesins as $preventif) {
-            $tanggalPlan = $this->generateTanggalPlan($preventif, $tahun, $bulan);
+            $tanggalPlan = $this->getTanggalPlanEfektif($preventif, $tahun, $bulan);
 
             $totalJadwalItem = count($tanggalPlan);
 
@@ -386,11 +387,19 @@ class PreventifMesinController extends Controller
         // =========================
         $allPreventifMesins->transform(
             function ($preventif) use ($tahun, $bulan, $abnormalitasPerItem, $formatAbnormalitas) {
-                $preventif->tanggal_plan = $this->generateTanggalPlan(
+
+                // Tanggal Plan efektif (otomatis atau manual)
+                $preventif->tanggal_plan = $this->getTanggalPlanEfektif(
                     $preventif,
                     $tahun,
                     $bulan
                 );
+
+                // Menandai apakah Plan bulan ini sudah diedit secara manual
+                $preventif->punya_plan_manual = $preventif->planOverrides()
+                    ->where('tahun', $tahun)
+                    ->where('bulan', $bulan)
+                    ->exists();
 
                 $nilai = $this->nilaiBulanan($preventif);
 
@@ -1172,6 +1181,32 @@ class PreventifMesinController extends Controller
         return $tanggalPlan;
     }
 
+    
+    private function getTanggalPlanEfektif(
+        PreventifMesin $preventifMesin,
+        int $tahun,
+        int $bulan
+    ): array {
+        $override = $preventifMesin->planOverrides()
+            ->where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->first();
+
+        // Jika sudah ada Plan manual, gunakan tanggal manual.
+        // Termasuk jika array-nya kosong.
+        if ($override !== null) {
+            return $override->tanggal_plan ?? [];
+        }
+
+        // Jika belum pernah diedit, gunakan jadwal otomatis.
+        return $this->generateTanggalPlan(
+            $preventifMesin,
+            $tahun,
+            $bulan
+        );
+    }
+
+
     private function tambahPeriode(Carbon $tanggal, int $nilai, ?string $satuan): Carbon
     {
         $nilai = (float) $nilai;
@@ -1275,7 +1310,7 @@ class PreventifMesinController extends Controller
         };
 
         foreach ($preventifMesins as $preventif) {
-            $tanggalPlan = $this->generateTanggalPlan($preventif, $tahun, $bulan);
+            $tanggalPlan = $this->getTanggalPlanEfektif($preventif, $tahun, $bulan);
 
             $nilai = $this->nilaiBulanan($preventif);
             $totalDot += (float) ($nilai['dot'] ?? 0);
@@ -1344,4 +1379,51 @@ class PreventifMesinController extends Controller
             $filename
         );
     }
+
+    public function updatePlan(Request $request, PreventifMesin $preventifMesin)
+    {
+        $validated = $request->validate([
+            'bulan' => 'required|integer|between:1,12',
+            'tahun' => 'required|integer|between:2000,2100',
+            'tanggal_plan' => 'present|array',
+            'tanggal_plan.*' => 'required|date_format:Y-m-d',
+        ]);
+
+        $bulan = (int) $validated['bulan'];
+        $tahun = (int) $validated['tahun'];
+
+        $tanggalPlan = collect($validated['tanggal_plan'])
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        // Pastikan semua tanggal berada pada bulan dan tahun yang dipilih.
+        foreach ($tanggalPlan as $tanggal) {
+            $tanggalCarbon = Carbon::createFromFormat('Y-m-d', $tanggal);
+
+            if (
+                $tanggalCarbon->year !== $tahun ||
+                $tanggalCarbon->month !== $bulan
+            ) {
+                return back()->withErrors([
+                    'tanggal_plan' => 'Tanggal Plan harus sesuai dengan bulan dan tahun yang dipilih.',
+                ])->withInput();
+            }
+        }
+
+        PreventifMesinPlanOverride::updateOrCreate(
+            [
+                'preventif_mesin_id' => $preventifMesin->no,
+                'tahun' => $tahun,
+                'bulan' => $bulan,
+            ],
+            [
+                'tanggal_plan' => $tanggalPlan,
+            ]
+        );
+
+        return back()->with('success', 'Plan bulanan berhasil diperbarui.');
+    }
+
 }

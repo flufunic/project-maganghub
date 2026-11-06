@@ -248,6 +248,14 @@ export default function Index({
     });
 
     // =========================
+    // STATE EDIT PLAN BULANAN
+    // =========================
+    const [showPlanEditor, setShowPlanEditor] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState(null);
+    const [draftPlanDates, setDraftPlanDates] = useState([]);
+    const [savingPlan, setSavingPlan] = useState(false);
+
+    // =========================
     // STATE DOKUMEN
     // =========================
     const [showDokumen, setShowDokumen] = useState(false);
@@ -390,6 +398,56 @@ export default function Index({
             },
             {
                 preserveScroll: true,
+            }
+        );
+    };
+
+    // =========================
+    // EDIT PLAN BULANAN
+    // =========================
+    const openPlanEditor = (preventif) => {
+        setSelectedPlan(preventif);
+        setDraftPlanDates([...(preventif.tanggal_plan ?? [])]);
+        setShowPlanEditor(true);
+    };
+
+    const closePlanEditor = () => {
+        if (savingPlan) return;
+        setShowPlanEditor(false);
+        setSelectedPlan(null);
+        setDraftPlanDates([]);
+    };
+
+    const toggleDraftPlanDate = (day) => {
+        const date = getTanggalChecklist(day);
+
+        setDraftPlanDates((current) =>
+            current.includes(date)
+                ? current.filter((item) => item !== date)
+                : [...current, date].sort()
+        );
+    };
+
+    const savePlan = () => {
+        if (!selectedPlan) return;
+
+        setSavingPlan(true);
+
+        router.put(
+            `/preventif-mesin/${selectedPlan.no}/plan`,
+            {
+                bulan: selectedMonth + 1,
+                tahun: selectedYear,
+                tanggal_plan: [...draftPlanDates].sort(),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowPlanEditor(false);
+                    setSelectedPlan(null);
+                    setDraftPlanDates([]);
+                },
+                onFinish: () => setSavingPlan(false),
             }
         );
     };
@@ -1287,6 +1345,13 @@ export default function Index({
                         <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </div>
 
+                    {/* KETERANGAN PLAN / ACT */}
+                    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] font-semibold">
+                        <span className="text-blue-600">○ Plan otomatis</span>
+                        <span className="text-orange-500">○ Plan manual</span>
+                        <span className="text-emerald-600">✓ ACT</span>
+                    </div>
+
                     {/* TABLE */}
                     <div
                         style={{ animationDelay: '100ms' }}
@@ -1339,7 +1404,7 @@ export default function Index({
 
                                         <th
                                             rowSpan="2"
-                                            className="border-b border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                            className="w-[120px] min-w-[120px] border-b border-white/10 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
                                             Aksi
                                         </th>
@@ -1367,268 +1432,227 @@ export default function Index({
                                                         filteredPreventifMesins,
                                                         index
                                                     );
-
-                                                    const rowStatus =
-                                                        getStatus(preventif);
-
-                                                    const rowHighlighted =
-                                                        highlight?.no === preventif.no;
-
+                                                            const rowHighlighted = highlight?.no === preventif.no;
                                                     const adaAbnormality =
                                                         (preventif.abnormalitas_terbuka?.length ?? 0) > 0;
+                                                    const planManual = Boolean(preventif.punya_plan_manual);
 
                                                     return (
-                                                        <tr
-                                                            key={preventif.no}
-                                                            id={`row-${preventif.no}`}
-                                                            className={`group transition-colors duration-500 ${
-                                                                rowHighlighted
-                                                                    ? 'bg-amber-100/70'
-                                                                    : adaAbnormality
-                                                                    ? 'bg-red-50/40 hover:bg-red-50/70'
-                                                                    : 'hover:bg-blue-50/50'
-                                                            }`}
-                                                        >
-                                                            {/* DIVISI */}
-                                                            {rowSpan > 0 && (
-                                                                <td
-                                                                    rowSpan={rowSpan}
-                                                                    className="border border-slate-200 bg-slate-50 px-4 py-3 text-center align-middle font-bold text-slate-700"
-                                                                >
-                                                                    {preventif.divisi}
+                                                        <React.Fragment key={preventif.no}>
+                                                            {/* BARIS PLAN */}
+                                                            <tr
+                                                                id={`row-${preventif.no}`}
+                                                                className={`group transition-colors duration-300 ${
+                                                                    rowHighlighted
+                                                                        ? 'bg-amber-100/70'
+                                                                        : adaAbnormality
+                                                                        ? 'bg-red-50/40'
+                                                                        : 'hover:bg-blue-50/50'
+                                                                }`}
+                                                            >
+                                                                {rowSpan > 0 && (
+                                                                    <td
+                                                                        rowSpan={rowSpan * 2}
+                                                                        className="border border-slate-200 bg-slate-50 px-4 py-3 text-center align-middle font-bold text-slate-700"
+                                                                    >
+                                                                        {preventif.divisi}
+                                                                    </td>
+                                                                )}
+
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle font-medium text-slate-600">
+                                                                    {preventif.no_item}
                                                                 </td>
-                                                            )}
 
-                                                            {/* NO */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center font-medium text-slate-600">
-                                                                {preventif.no_item}
-                                                            </td>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 align-middle text-slate-700">
+                                                                    <div className="max-w-[360px] whitespace-normal leading-relaxed">
+                                                                        <span className="font-medium text-slate-700">
+                                                                            {preventif.item_preventif}
+                                                                        </span>
 
-                                                            {/* ITEM */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-slate-700">
-                                                                <div className="max-w-[360px] whitespace-normal leading-relaxed">
-                                                                    <span className="font-medium text-slate-700">
-                                                                        {preventif.item_preventif}
-                                                                    </span>
+                                                                        {preventif.item_preventif_master &&
+                                                                            preventif.item_preventif !== preventif.item_preventif_master && (
+                                                                                <span className="ml-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 align-middle text-[10px] font-bold text-violet-600">
+                                                                                    Khusus bulan ini
+                                                                                </span>
+                                                                            )}
 
-                                                                    {preventif.item_preventif_master &&
-                                                                        preventif.item_preventif !==
-                                                                            preventif.item_preventif_master && (
-                                                                            <span className="ml-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 align-middle text-[10px] font-bold text-violet-600">
-                                                                                Khusus bulan ini
-                                                                            </span>
-                                                                        )}
-
-                                                                    {/* ABNORMALITY DARI CHECKSHEET */}
-                                                                    {adaAbnormality && (
-                                                                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2">
-                                                                            <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-600">
-                                                                                <Icon
-                                                                                    type="alert"
-                                                                                    className="h-3.5 w-3.5"
-                                                                                />
-                                                                                Perlu pengecekan lebih lanjut
-                                                                            </p>
-
-                                                                            <ul className="mt-1 space-y-1.5">
-                                                                                {preventif.abnormalitas_terbuka.map(
-                                                                                    (a) => (
-                                                                                        <li
-                                                                                            key={a.id}
-                                                                                            className="text-[11px] leading-relaxed text-slate-600"
-                                                                                        >
-                                                                                            <span className="font-semibold text-slate-700">
-                                                                                                {a.tanggal_format}
-                                                                                            </span>
-                                                                                            {a.mesin
-                                                                                                ? ` · ${a.mesin}`
-                                                                                                : ''}
-                                                                                            {' — '}
-                                                                                            {a.abnormality}{' '}
-                                                                                            <Link
-                                                                                                href={a.url}
-                                                                                                className="font-semibold text-blue-600 hover:underline"
-                                                                                            >
+                                                                        {adaAbnormality && (
+                                                                            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2">
+                                                                                <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-600">
+                                                                                    <Icon type="alert" className="h-3.5 w-3.5" />
+                                                                                    Perlu pengecekan lebih lanjut
+                                                                                </p>
+                                                                                <ul className="mt-1 space-y-1.5">
+                                                                                    {preventif.abnormalitas_terbuka.map((a) => (
+                                                                                        <li key={a.id} className="text-[11px] leading-relaxed text-slate-600">
+                                                                                            <span className="font-semibold text-slate-700">{a.tanggal_format}</span>
+                                                                                            {a.mesin ? ` · ${a.mesin}` : ''}
+                                                                                            {' — '}{a.abnormality}{' '}
+                                                                                            <Link href={a.url} className="font-semibold text-blue-600 hover:underline">
                                                                                                 Lihat checksheet
                                                                                             </Link>
                                                                                         </li>
-                                                                                    )
-                                                                                )}
-                                                                            </ul>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-
-                                                            {/* PERIODE */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {preventif.periode_nilai !== null &&
-                                                                preventif.periode_nilai !== undefined &&
-                                                                preventif.periode_nilai !== ''
-                                                                    ? `${parseFloat(preventif.periode_nilai)} ${preventif.periode_satuan || ''}`
-                                                                    : '-'}
-                                                            </td>
-
-                                                            {/* DURASI */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(preventif.durasi)}
-                                                            </td>
-
-                                                            {/* TOTAL DURASI */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(preventif.total_durasi)}
-                                                            </td>
-
-                                                            {/* DOT */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(preventif.dot)}
-                                                            </td>
-
-                                                            {/* HOT */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600">
-                                                                {formatJam(preventif.hot)}
-                                                            </td>
-
-                                                            {/* STATUS */}
-                                                            <td className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap">
-                                                                {rowStatus === 'ACT' ? (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.7)]" />
-                                                                        ACT
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 text-xs font-bold text-amber-700 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.7)]" />
-                                                                        Plan
-                                                                    </span>
-                                                                )}
-                                                            </td>
-
-                                                            {/* CHECKLIST */}
-                                                            {tanggal.map((day) => {
-                                                                const plan = isTanggalPlan(preventif, day);
-                                                                const checked = isChecked(preventif, day);
-                                                                const checklist = getChecklist(preventif, day);
-
-                                                                const hasCatatan = Boolean(
-                                                                    checklist?.catatan &&
-                                                                        String(checklist.catatan).trim() !== ''
-                                                                );
-
-                                                                const cellHighlighted =
-                                                                    rowHighlighted && highlight?.day === day;
-
-                                                                return (
-                                                                    <td
-                                                                        key={day}
-                                                                        id={`cell-${preventif.no}-${day}`}
-                                                                        className={`border border-slate-200 px-1.5 py-2 text-center transition-colors ${
-                                                                            cellHighlighted
-                                                                                ? 'idx-pulse !bg-amber-200'
-                                                                                : checked
-                                                                                ? 'bg-emerald-50'
-                                                                                : plan
-                                                                                ? 'bg-blue-50/40'
-                                                                                : 'bg-white'
-                                                                        }`}
-                                                                    >
-                                                                        <div className="flex flex-col items-center gap-1">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    toggleChecklist(preventif, day)
-                                                                                }
-                                                                                className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 ${
-                                                                                    checked
-                                                                                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-200 hover:-translate-y-0.5'
-                                                                                        : plan
-                                                                                        ? 'border-blue-200 bg-white text-blue-500 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50'
-                                                                                        : 'border-slate-200 bg-white text-slate-300 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50'
-                                                                                }`}
-                                                                                title={
-                                                                                    checked
-                                                                                        ? 'Klik untuk membatalkan ACT'
-                                                                                        : plan
-                                                                                        ? 'Klik untuk ACT / Closed'
-                                                                                        : 'Tidak ada jadwal Plan, tetap bisa diisi'
-                                                                                }
-                                                                            >
-                                                                                {checked ? (
-                                                                                    <span className="text-base font-bold leading-none">
-                                                                                        ✓
-                                                                                    </span>
-                                                                                ) : plan ? (
-                                                                                    <span className="text-lg font-bold leading-none">
-                                                                                        ○
-                                                                                    </span>
-                                                                                ) : null}
-                                                                            </button>
-
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    openCatatan(preventif, day)
-                                                                                }
-                                                                                className={`relative cursor-pointer text-sm transition hover:scale-110 ${
-                                                                                    hasCatatan
-                                                                                        ? 'text-blue-600'
-                                                                                        : 'text-slate-400 hover:text-slate-600'
-                                                                                }`}
-                                                                                title={
-                                                                                    hasCatatan
-                                                                                        ? 'Lihat catatan'
-                                                                                        : 'Tambah catatan'
-                                                                                }
-                                                                            >
-                                                                                📝
-
-                                                                                {hasCatatan && (
-                                                                                    <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
-                                                                                )}
-                                                                            </button>
-                                                                        </div>
-                                                                    </td>
-                                                                );
-                                                            })}
-
-                                                            {/* AKSI */}
-                                                            <td className="border border-slate-200 px-3 py-3">
-                                                                <div className="flex items-center justify-center gap-1.5">
-                                                                    {/* EDIT BULANAN */}
-                                                                    <button
-                                                                        type="button"
-                                                                        title={`Isi durasi, DOT & HOT ${months[selectedMonth]} ${selectedYear}`}
-                                                                        onClick={() => openBulanan(preventif)}
-                                                                        className="relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100 hover:shadow-md"
-                                                                    >
-                                                                        <Icon type="clock" className="h-4 w-4" />
-
-                                                                        {preventif.punya_data_bulanan && (
-                                                                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500" />
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </div>
                                                                         )}
-                                                                    </button>
+                                                                    </div>
+                                                                </td>
 
-                                                                    {/* EDIT */}
-                                                                    <Link
-                                                                        href={`/preventif-mesin/${preventif.no}/edit`}
-                                                                        title="Edit data"
-                                                                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
-                                                                    >
-                                                                        <Icon type="edit" className="h-4 w-4" />
-                                                                    </Link>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600">
+                                                                    {preventif.periode_nilai !== null && preventif.periode_nilai !== undefined && preventif.periode_nilai !== ''
+                                                                        ? `${parseFloat(preventif.periode_nilai)} ${preventif.periode_satuan || ''}`
+                                                                        : '-'}
+                                                                </td>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600">
+                                                                    {formatJam(preventif.durasi)}
+                                                                </td>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600">
+                                                                    {formatJam(preventif.total_durasi)}
+                                                                </td>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600">
+                                                                    {formatJam(preventif.dot)}
+                                                                </td>
+                                                                <td rowSpan={2} className="border border-slate-200 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600">
+                                                                    {formatJam(preventif.hot)}
+                                                                </td>
 
-                                                                    {/* HAPUS */}
-                                                                    <button
-                                                                        type="button"
-                                                                        title="Hapus data"
-                                                                        onClick={() => confirmDelete(preventif)}
-                                                                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
-                                                                    >
-                                                                        <Icon type="trash" className="h-4 w-4" />
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
+                                                                <td className="border border-slate-200 bg-blue-50/50 px-3 py-2 text-center align-middle">
+                                                                    <span className="text-[10px] font-extrabold tracking-wider text-blue-600">PLAN</span>
+                                                                </td>
+
+                                                                {tanggal.map((day) => {
+                                                                    const plan = isTanggalPlan(preventif, day);
+                                                                    const cellHighlighted = rowHighlighted && highlight?.day === day;
+
+                                                                    return (
+                                                                        <td
+                                                                            key={`plan-${day}`}
+                                                                            id={`plan-cell-${preventif.no}-${day}`}
+                                                                            className={`border border-slate-200 px-1.5 py-2 text-center ${
+                                                                                cellHighlighted ? 'bg-amber-100' : plan ? (planManual ? 'bg-orange-50' : 'bg-blue-50/40') : 'bg-white'
+                                                                            }`}
+                                                                        >
+                                                                            <div
+                                                                                className={`mx-auto flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
+                                                                                    plan
+                                                                                        ? planManual
+                                                                                            ? 'border-orange-300 bg-orange-50 text-orange-500'
+                                                                                            : 'border-blue-300 bg-blue-50 text-blue-500'
+                                                                                        : 'border-slate-200 bg-white text-transparent'
+                                                                                }`}
+                                                                                title={plan ? (planManual ? 'Plan manual' : 'Plan otomatis') : 'Tidak ada Plan'}
+                                                                            >
+                                                                                {plan ? (
+                                                                                    <span className="text-lg font-bold leading-none">○</span>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+
+                                                                <td
+                                                                    rowSpan={2}
+                                                                    className="w-[120px] min-w-[120px] border border-slate-200 px-3 py-3 align-middle"
+                                                                >
+                                                                    <div className="mx-auto grid w-full grid-cols-2 place-items-center gap-3">
+                                                                        {/* EDIT PLAN */}
+                                                                        <button
+                                                                            type="button"
+                                                                            title={`Edit Plan ${months[selectedMonth]} ${selectedYear}`}
+                                                                            onClick={() => openPlanEditor(preventif)}
+                                                                            className={`inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
+                                                                                planManual
+                                                                                    ? 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100'
+                                                                                    : 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                                                            }`}
+                                                                        >
+                                                                            <Icon type="calendar" className="h-4 w-4" />
+                                                                        </button>
+
+                                                                        {/* EDIT DURASI */}
+                                                                        <button
+                                                                            type="button"
+                                                                            title={`Isi durasi, DOT & HOT ${months[selectedMonth]} ${selectedYear}`}
+                                                                            onClick={() => openBulanan(preventif)}
+                                                                            className="relative inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100"
+                                                                        >
+                                                                            <Icon type="clock" className="h-4 w-4" />
+
+                                                                            {preventif.punya_data_bulanan && (
+                                                                                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500" />
+                                                                            )}
+                                                                        </button>
+
+                                                                        {/* EDIT DATA */}
+                                                                        <Link
+                                                                            href={`/preventif-mesin/${preventif.no}/edit`}
+                                                                            title="Edit data"
+                                                                            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100"
+                                                                        >
+                                                                            <Icon type="edit" className="h-4 w-4" />
+                                                                        </Link>
+
+                                                                        {/* HAPUS DATA */}
+                                                                        <button
+                                                                            type="button"
+                                                                            title="Hapus data"
+                                                                            onClick={() => confirmDelete(preventif)}
+                                                                            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100"
+                                                                        >
+                                                                            <Icon type="trash" className="h-4 w-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+
+                                                            {/* BARIS ACT */}
+                                                            <tr className={`transition-colors duration-300 ${rowHighlighted ? 'bg-amber-50/70' : 'bg-white hover:bg-emerald-50/30'}`}>
+                                                                <td className="border border-slate-200 bg-emerald-50/50 px-3 py-2 text-center align-middle">
+                                                                    <span className="text-[10px] font-extrabold tracking-wider text-emerald-600">ACT</span>
+                                                                </td>
+                                                                {tanggal.map((day) => {
+                                                                    const checked = isChecked(preventif, day);
+                                                                    const checklist = getChecklist(preventif, day);
+                                                                    const hasCatatan = Boolean(checklist?.catatan && String(checklist.catatan).trim() !== '');
+                                                                    const cellHighlighted = rowHighlighted && highlight?.day === day;
+
+                                                                    return (
+                                                                        <td
+                                                                            key={`act-${day}`}
+                                                                            id={`cell-${preventif.no}-${day}`}
+                                                                            className={`border border-slate-200 px-1.5 py-1.5 text-center transition-colors ${
+                                                                                cellHighlighted ? 'idx-pulse !bg-amber-200' : checked ? 'bg-emerald-50' : 'bg-white'
+                                                                            }`}
+                                                                        >
+                                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => toggleChecklist(preventif, day)}
+                                                                                    className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
+                                                                                        checked
+                                                                                            ? 'border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-sm'
+                                                                                            : 'border-slate-200 bg-white text-slate-300 hover:border-emerald-300 hover:bg-emerald-50'
+                                                                                    }`}
+                                                                                    title={checked ? 'Klik untuk membatalkan ACT' : 'Klik untuk menandai ACT'}
+                                                                                >
+                                                                                    {checked && <span className="text-sm font-bold leading-none">✓</span>}
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => openCatatan(preventif, day)}
+                                                                                    className={`relative cursor-pointer text-xs transition hover:scale-110 ${hasCatatan ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                                                                    title={hasCatatan ? 'Lihat catatan' : 'Tambah catatan'}
+                                                                                >
+                                                                                    📝
+                                                                                    {hasCatatan && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border-2 border-white bg-red-500" />}
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        </React.Fragment>
                                                     );
                                                 }
                                             )}
@@ -1929,6 +1953,75 @@ export default function Index({
                     >
                         ×
                     </button>
+                </div>
+            )}
+
+            {/* MODAL EDIT PLAN BULANAN */}
+            {showPlanEditor && selectedPlan && (
+                <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[#030a26]/60 px-4 py-6 backdrop-blur-md">
+                    <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
+                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">Edit Jadwal Plan Bulanan</h2>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    {selectedPlan.item_preventif} · {months[selectedMonth]} {selectedYear}
+                                </p>
+                            </div>
+                            <button type="button" onClick={closePlanEditor} className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">×</button>
+                        </div>
+
+                        <div className="px-6 py-5">
+                            <div className="mb-4 flex flex-wrap items-center gap-4 text-xs font-semibold">
+                                <span className="flex items-center gap-1.5 text-blue-600"><span className="text-lg">○</span> Plan otomatis</span>
+                                <span className="flex items-center gap-1.5 text-orange-500"><span className="text-lg">○</span> Plan manual</span>
+                                <span className="text-slate-500">Klik tanggal untuk menambah atau menghapus Plan.</span>
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-2">
+                                {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((dayName) => (
+                                    <div key={dayName} className="py-1 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">{dayName}</div>
+                                ))}
+                                {Array.from({ length: new Date(selectedYear, selectedMonth, 1).getDay() }, (_, index) => (
+                                    <div key={`empty-${index}`} />
+                                ))}
+                                {tanggal.map((day) => {
+                                    const date = getTanggalChecklist(day);
+                                    const active = draftPlanDates.includes(date);
+
+                                    return (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => toggleDraftPlanDate(day)}
+                                            className={`flex min-h-12 flex-col items-center justify-center rounded-xl border text-sm font-semibold transition ${
+                                                active
+                                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-sm'
+                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
+                                            }`}
+                                        >
+                                            <span>{day}</span>
+                                            {active && <span className="text-base leading-none">○</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                                <span className="text-xs text-slate-500">Jumlah tanggal Plan dipilih</span>
+                                <span className="text-sm font-bold text-slate-800">{draftPlanDates.length} hari</span>
+                            </div>
+                            <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                                Perubahan hanya berlaku untuk {months[selectedMonth]} {selectedYear}. Jadwal otomatis pada bulan lain tidak berubah. Jika semua tanggal dihapus, bulan ini tidak memiliki Plan.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button type="button" onClick={closePlanEditor} disabled={savingPlan} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-50">Batal</button>
+                            <button type="button" onClick={savePlan} disabled={savingPlan} className="cursor-pointer rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-200 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
+                                {savingPlan ? 'Menyimpan...' : 'Simpan Plan'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

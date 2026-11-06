@@ -1,10 +1,16 @@
 
 import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import { Menu } from 'lucide-react';
+
+import SidebarMtcAdmin from './SidebarMtcAdmin';
+import SidebarMtcPimpinan from './SidebarMtcPimpinan';
 
 const ROLE_LABEL = {
     spv_produksi: 'SPV Produksi',
     operator_produksi: 'Operator Produksi',
+    admin: 'Admin Maintenance',
+    pimpinan: 'Pimpinan Maintenance',
 };
 
 const BADGE = {
@@ -32,9 +38,14 @@ export function StatusBadge({ status, label }) {
 export default function ProduksiLayout({ children }) {
     const page = usePage();
     const { auth, flash, rrfNotifications } = page.props;
-    const user = auth.user;
+    const user = auth?.user;
 
     const [notifikasiTerbuka, setNotifikasiTerbuka] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // ROLE MAINTENANCE
+    const isAdminMtc = user?.role === 'admin';
+    const isPimpinanMtc = user?.role === 'pimpinan';
 
     const jumlahBelumDibaca =
         rrfNotifications?.jumlah_belum_dibaca ?? 0;
@@ -45,14 +56,34 @@ export default function ProduksiLayout({ children }) {
     const adaNotifikasi = jumlahBelumDibaca > 0;
 
     const bacaNotifikasi = (notification) => {
-        router.post(notification.read_url, {}, {
-            preserveScroll: true,
-            onFinish: () => setNotifikasiTerbuka(false),
-        });
+        router.post(
+            notification.read_url,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setNotifikasiTerbuka(false),
+            }
+        );
     };
 
     return (
         <>
+            {/* SIDEBAR ADMIN MAINTENANCE */}
+            {isAdminMtc && (
+                <SidebarMtcAdmin
+                    open={sidebarOpen}
+                    onClose={() => setSidebarOpen(false)}
+                />
+            )}
+
+            {/* SIDEBAR PIMPINAN MAINTENANCE */}
+            {isPimpinanMtc && (
+                <SidebarMtcPimpinan
+                    open={sidebarOpen}
+                    onClose={() => setSidebarOpen(false)}
+                />
+            )}
+
             <style>{`
                 @keyframes rrfGradient {
                     0%, 100% { background-position: 0% 50%; }
@@ -88,7 +119,6 @@ export default function ProduksiLayout({ children }) {
                     }
                 }
 
-                /* ANIMASI LONCENG */
                 @keyframes rrfBellShake {
                     0%, 100% {
                         transform: rotate(0deg);
@@ -104,7 +134,6 @@ export default function ProduksiLayout({ children }) {
                     }
                 }
 
-                /* ANIMASI LINGKARAN DI BELAKANG LONCENG */
                 @keyframes rrfNotificationPulse {
                     0% {
                         transform: scale(0.8);
@@ -116,7 +145,6 @@ export default function ProduksiLayout({ children }) {
                     }
                 }
 
-                /* ANIMASI BADGE */
                 @keyframes rrfBadgePop {
                     0% {
                         transform: scale(0);
@@ -201,30 +229,31 @@ export default function ProduksiLayout({ children }) {
 
                         {/* BRAND */}
                         <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white shadow-lg">
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                    className="h-5 w-5"
-                                >
-                                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                                    <path d="M14 3v6h6" />
-                                    <path d="M8 13h8M8 17h6" />
-                                </svg>
-                            </div>
 
+                            {/* HAMBURGER KHUSUS MAINTENANCE */}
+                            {(isAdminMtc || isPimpinanMtc) && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSidebarOpen(true)}
+                                    aria-label="Buka sidebar"
+                                    title="Buka menu"
+                                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-all duration-200 hover:scale-105 hover:bg-white/20"
+                                >
+                                    <Menu className="h-5 w-5" strokeWidth={2} />
+                                </button>
+                            )}
+
+                            {/* INFORMASI USER */}
                             <div className="min-w-0">
                                 <p className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
                                     Repair Request Form
                                 </p>
 
                                 <p className="truncate text-[11px] text-white/65">
-                                    {user.name}
+                                    {user?.name}
                                     {' · '}
-                                    {ROLE_LABEL[user.role] ?? user.role}
-                                    {user.divisi ? ` · ${user.divisi}` : ''}
+                                    {ROLE_LABEL[user?.role] ?? user?.role}
+                                    {user?.divisi ? ` · ${user.divisi}` : ''}
                                 </p>
                             </div>
                         </div>
@@ -234,10 +263,11 @@ export default function ProduksiLayout({ children }) {
 
                             {/* NOTIFICATION */}
                             <div className="relative">
-
                                 <button
                                     type="button"
-                                    onClick={() => setNotifikasiTerbuka((prev) => !prev)}
+                                    onClick={() =>
+                                        setNotifikasiTerbuka((prev) => !prev)
+                                    }
                                     className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-all duration-300 hover:bg-white/20 ${
                                         adaNotifikasi
                                             ? 'border-blue-300/50 shadow-[0_0_18px_rgba(59,130,246,0.4)]'
@@ -246,16 +276,15 @@ export default function ProduksiLayout({ children }) {
                                     aria-label={`Notifikasi ${jumlahBelumDibaca} belum dibaca`}
                                     title="Notifikasi"
                                 >
-
-                                    {/* PULSE DI BELAKANG LONCENG */}
                                     {adaNotifikasi && (
                                         <span className="rrf-notification-pulse pointer-events-none absolute inset-1 rounded-xl border border-blue-300/80 bg-blue-400/20" />
                                     )}
 
-                                    {/* ICON LONCENG */}
-                                    <span className={`relative z-10 flex items-center justify-center ${
-                                        adaNotifikasi ? 'rrf-bell-shake' : ''
-                                    }`}>
+                                    <span
+                                        className={`relative z-10 flex items-center justify-center ${
+                                            adaNotifikasi ? 'rrf-bell-shake' : ''
+                                        }`}
+                                    >
                                         <svg
                                             viewBox="0 0 24 24"
                                             fill="none"
@@ -272,7 +301,6 @@ export default function ProduksiLayout({ children }) {
                                         </svg>
                                     </span>
 
-                                    {/* BADGE JUMLAH */}
                                     {adaNotifikasi && (
                                         <span
                                             key={jumlahBelumDibaca}
@@ -291,7 +319,9 @@ export default function ProduksiLayout({ children }) {
                                             type="button"
                                             aria-label="Tutup notifikasi"
                                             className="fixed inset-0 z-40 cursor-default"
-                                            onClick={() => setNotifikasiTerbuka(false)}
+                                            onClick={() =>
+                                                setNotifikasiTerbuka(false)
+                                            }
                                         />
 
                                         <div className="absolute right-0 z-50 mt-3 w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -308,7 +338,9 @@ export default function ProduksiLayout({ children }) {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() => setNotifikasiTerbuka(false)}
+                                                    onClick={() =>
+                                                        setNotifikasiTerbuka(false)
+                                                    }
                                                     className="cursor-pointer rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                                                 >
                                                     ×
@@ -343,18 +375,22 @@ export default function ProduksiLayout({ children }) {
                                                         <button
                                                             key={item.id}
                                                             type="button"
-                                                            onClick={() => bacaNotifikasi(item)}
+                                                            onClick={() =>
+                                                                bacaNotifikasi(item)
+                                                            }
                                                             className={`flex w-full cursor-pointer gap-3 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-blue-50 ${
                                                                 !item.dibaca
                                                                     ? 'bg-blue-50/70'
                                                                     : 'bg-white'
                                                             }`}
                                                         >
-                                                            <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                                                                !item.dibaca
-                                                                    ? 'bg-blue-100 text-blue-700'
-                                                                    : 'bg-slate-100 text-slate-500'
-                                                            }`}>
+                                                            <div
+                                                                className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                                                                    !item.dibaca
+                                                                        ? 'bg-blue-100 text-blue-700'
+                                                                        : 'bg-slate-100 text-slate-500'
+                                                                }`}
+                                                            >
                                                                 <svg
                                                                     viewBox="0 0 24 24"
                                                                     fill="none"

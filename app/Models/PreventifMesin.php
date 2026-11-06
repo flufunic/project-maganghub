@@ -59,6 +59,15 @@ class PreventifMesin extends Model
         );
     }
 
+    public function planOverrides(): HasMany
+    {
+        return $this->hasMany(
+            PreventifMesinPlanOverride::class,
+            'preventif_mesin_id',
+            'no'
+        );
+    }
+
     /**
      * Abnormality checksheet yang dihubungkan ke item preventif ini.
      */
