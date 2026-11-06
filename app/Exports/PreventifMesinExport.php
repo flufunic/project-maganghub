@@ -13,18 +13,32 @@ class PreventifMesinExport implements FromArray, WithColumnWidths, WithEvents
 {
     protected array $data;
     protected int $jumlahHari;
+    protected array $total;
 
     public function __construct(
         array $data,
-        int $jumlahHari
+        int $jumlahHari,
+        array $total
     ) {
         $this->data = $data;
         $this->jumlahHari = $jumlahHari;
+        $this->total = $total;
     }
 
     public function array(): array
     {
-        return $this->data;
+        $data = $this->data;
+
+        // Tambahkan baris TOTAL DOT dan HOT di paling bawah
+        $totalRow = array_fill(0, 9 + $this->jumlahHari, '');
+
+        $totalRow[0] = 'TOTAL';
+        $totalRow[6] = $this->total['dot'] ?? '';
+        $totalRow[7] = $this->total['hot'] ?? '';
+
+        $data[] = $totalRow;
+
+        return $data;
     }
 
     public function columnWidths(): array

@@ -1257,6 +1257,8 @@ class PreventifMesinController extends Controller
         }
 
         $data[] = $header;
+        $totalDot = 0;
+        $totalHot = 0;
 
         // Format angka jam, contoh: 2.50 => "2.5 jam"
         $formatJam = function ($nilai) {
@@ -1276,6 +1278,8 @@ class PreventifMesinController extends Controller
             $tanggalPlan = $this->generateTanggalPlan($preventif, $tahun, $bulan);
 
             $nilai = $this->nilaiBulanan($preventif);
+            $totalDot += (float) ($nilai['dot'] ?? 0);
+            $totalHot += (float) ($nilai['hot'] ?? 0);
 
             // ---------- PLAN ----------
             $periode = '';
@@ -1329,7 +1333,14 @@ class PreventifMesinController extends Controller
         $filename = 'Preventif_Mesin_' . $namaBulan[$bulan] . '_' . $tahun . '.xlsx';
 
         return Excel::download(
-            new PreventifMesinExport($data, $jumlahHari),
+            new PreventifMesinExport(
+                $data,
+                $jumlahHari,
+                [
+                    'dot' => $formatJam(round($totalDot, 2)),
+                    'hot' => $formatJam(round($totalHot, 2)),
+                ]
+            ),
             $filename
         );
     }

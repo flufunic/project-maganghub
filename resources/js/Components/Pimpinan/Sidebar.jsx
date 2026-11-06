@@ -24,6 +24,15 @@ const ICONS = {
             'M9 14l2 2 4-4',
         ],
     },
+    rrf: {
+        paths: [
+            'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z',
+            'M14 2v6h6',
+            'M8 13h8',
+            'M8 17h8',
+            'M8 9h2',
+        ],
+    },
     logout: {
         paths: [
             'M15 12H3',
@@ -79,6 +88,14 @@ const MENU = [
         title: 'Check Sheet Mingguan',
         desc: 'Rekap & pemeriksaan mingguan',
         match: (path) => path.startsWith('/pimpinan/check-sheet'),
+    },
+    {
+        key: 'rrf',
+        href: '/mtc/rrf',
+        icon: 'rrf',
+        title: 'RRF Maintenance',
+        desc: 'Verifikasi permintaan perbaikan',
+        match: (path) => path.startsWith('/mtc/rrf'),
     },
 ];
 

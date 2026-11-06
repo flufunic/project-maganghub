@@ -9,7 +9,9 @@ import {
     Cog,
     SlidersHorizontal,
     LogOut,
+    ClipboardCheck,
 } from "lucide-react";
+
 
 const ICONS = {
     close: X,
@@ -20,6 +22,7 @@ const ICONS = {
     overhaul: Cog,
     joken: SlidersHorizontal,
     logout: LogOut,
+    rrf: ClipboardCheck,
 };
 
 function Icon({ type, className = "h-5 w-5" }) {
@@ -62,6 +65,12 @@ const MENUS = [
         icon: "joken",
         label: "Joken Mesin",
         desc: "Standarisasi setting mesin",
+    },
+    {
+        href: "/mtc/rrf",
+        icon: "rrf",
+        label: "Repair Request Form",
+        desc: "Request perbaikan mesin",
     },
 ];
 

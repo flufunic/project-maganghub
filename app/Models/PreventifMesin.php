@@ -151,7 +151,7 @@ class PreventifMesin extends Model
         $usedCodes = static::query()
             ->whereNotNull('kode_schedule')
             ->pluck('kode_schedule')
-            ->map(fn ($code) => strtoupper(trim($code)))
+            ->map(fn ($code) => \Illuminate\Support\Str::upper(\trim($code)))
             ->flip();
 
         $number = 1;

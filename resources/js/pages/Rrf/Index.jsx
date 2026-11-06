@@ -1,6 +1,84 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import ProduksiLayout, { StatusBadge } from '../../Components/ProduksiLayout';
+
+const aksiBtn =
+    'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition';
+
+const aksiEdit = `${aksiBtn} cursor-pointer border-blue-200 bg-blue-50 text-blue-600 hover:border-blue-300 hover:bg-blue-100`;
+const aksiHapus = `${aksiBtn} cursor-pointer border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100`;
+const aksiMati = `${aksiBtn} cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300`;
+
+/* ---------- Dialog konfirmasi hapus ---------- */
+function ConfirmHapus({ rrf, processing, error, onCancel, onConfirm }) {
+    if (!rrf) {
+        return null;
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget && !processing) {
+                    onCancel();
+                }
+            }}
+        >
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl shadow-slate-950/40"
+            >
+                <div className="px-5 pb-4 pt-5">
+                    <div className="flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                            <AlertTriangle className="h-5 w-5" strokeWidth={1.75} />
+                        </span>
+
+                        <div className="min-w-0">
+                            <h2 className="text-base font-bold text-slate-900">
+                                Hapus RRF?
+                            </h2>
+
+                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                                Apakah kamu yakin ingin menghapus RRF{' '}
+                                <b className="text-slate-800">{rrf.rrf_no}</b>? RRF
+                                yang sudah dihapus tidak akan muncul lagi di daftar.
+                            </p>
+
+                            {error && (
+                                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                                    {error}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={processing}
+                        className="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-60"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={processing}
+                        className="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {processing ? 'Menghapus...' : 'Ya, Hapus'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function Index({
     rrfs,
@@ -9,6 +87,10 @@ export default function Index({
     jumlahMenunggu = 0,
     jumlahDitolak = 0,
 }) {
+    const [hapusTarget, setHapusTarget] = useState(null);
+    const [menghapus, setMenghapus] = useState(false);
+    const [errorHapus, setErrorHapus] = useState('');
+
     const pilihStatus = (status) => {
         router.get(
             '/rrf',
@@ -16,6 +98,53 @@ export default function Index({
             { preserveState: true, replace: true }
         );
     };
+
+    const bukaHapus = (rrf) => {
+        setErrorHapus('');
+        setHapusTarget(rrf);
+    };
+
+    const tutupHapus = () => {
+        if (menghapus) {
+            return;
+        }
+
+        setHapusTarget(null);
+        setErrorHapus('');
+    };
+
+    const konfirmasiHapus = () => {
+        if (!hapusTarget) {
+            return;
+        }
+
+        router.delete(`/rrf/${hapusTarget.id}`, {
+            preserveScroll: true,
+            onStart: () => setMenghapus(true),
+            onFinish: () => setMenghapus(false),
+            onSuccess: () => setHapusTarget(null),
+            onError: (errs) =>
+                setErrorHapus(Object.values(errs)[0] ?? 'RRF gagal dihapus.'),
+        });
+    };
+
+    // Tombol Esc menutup dialog
+    useEffect(() => {
+        if (!hapusTarget) {
+            return undefined;
+        }
+
+        const onKey = (e) => {
+            if (e.key === 'Escape' && !menghapus) {
+                setHapusTarget(null);
+                setErrorHapus('');
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [hapusTarget, menghapus]);
 
     return (
         <ProduksiLayout>
@@ -85,7 +214,7 @@ export default function Index({
 
                 {/* TABLE */}
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1050px] border-separate border-spacing-0 text-sm">
+                    <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-sm">
                         <thead>
                             <tr className="bg-[#0a1a4d] text-white">
                                 {[
@@ -97,10 +226,15 @@ export default function Index({
                                     'Jenis',
                                     'Pembuat',
                                     'Status',
+                                    'Aksi',
                                 ].map((judul) => (
                                     <th
                                         key={judul}
-                                        className="whitespace-nowrap border-r border-white/10 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider last:border-r-0"
+                                        className={`whitespace-nowrap border-r border-white/10 px-4 py-3 text-[10px] font-bold uppercase tracking-wider last:border-r-0 ${
+                                            judul === 'Aksi'
+                                                ? 'text-center'
+                                                : 'text-left'
+                                        }`}
                                     >
                                         {judul}
                                     </th>
@@ -112,7 +246,7 @@ export default function Index({
                             {rrfs.data.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={9}
                                         className="px-4 py-14 text-center"
                                     >
                                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl text-slate-400">
@@ -180,11 +314,71 @@ export default function Index({
                                         {r.pembuat}
                                     </td>
 
-                                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5">
+                                    <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3.5">
                                         <StatusBadge
                                             status={r.status}
                                             label={r.status_label}
                                         />
+                                    </td>
+
+                                    {/* AKSI: edit & hapus */}
+                                    <td className="border-b border-slate-100 px-4 py-3.5">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            {r.bisa_edit ? (
+                                                <Link
+                                                    href={`/rrf/${r.id}/edit`}
+                                                    title="Edit RRF"
+                                                    className={aksiEdit}
+                                                >
+                                                    <Pencil
+                                                        className="h-4 w-4"
+                                                        strokeWidth={1.75}
+                                                    />
+                                                </Link>
+                                            ) : (
+                                                <span title={r.alasan_edit ?? ''}>
+                                                    <button
+                                                        type="button"
+                                                        disabled
+                                                        aria-label="Edit tidak tersedia"
+                                                        className={aksiMati}
+                                                    >
+                                                        <Pencil
+                                                            className="h-4 w-4"
+                                                            strokeWidth={1.75}
+                                                        />
+                                                    </button>
+                                                </span>
+                                            )}
+
+                                            {r.bisa_hapus ? (
+                                                <button
+                                                    type="button"
+                                                    title="Hapus RRF"
+                                                    onClick={() => bukaHapus(r)}
+                                                    className={aksiHapus}
+                                                >
+                                                    <Trash2
+                                                        className="h-4 w-4"
+                                                        strokeWidth={1.75}
+                                                    />
+                                                </button>
+                                            ) : (
+                                                <span title={r.alasan_hapus ?? ''}>
+                                                    <button
+                                                        type="button"
+                                                        disabled
+                                                        aria-label="Hapus tidak tersedia"
+                                                        className={aksiMati}
+                                                    >
+                                                        <Trash2
+                                                            className="h-4 w-4"
+                                                            strokeWidth={1.75}
+                                                        />
+                                                    </button>
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -227,6 +421,15 @@ export default function Index({
                     )}
                 </div>
             </div>
+
+            {/* DIALOG KONFIRMASI HAPUS */}
+            <ConfirmHapus
+                rrf={hapusTarget}
+                processing={menghapus}
+                error={errorHapus}
+                onCancel={tutupHapus}
+                onConfirm={konfirmasiHapus}
+            />
         </ProduksiLayout>
     );
 }

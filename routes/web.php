@@ -22,6 +22,7 @@ use App\Http\Controllers\SchedulePreventifController;
 use App\Http\Controllers\JokenController;
 use App\Http\Controllers\RrfController;
 use App\Http\Controllers\RrfNotificationController;
+use App\Http\Controllers\MtcRrfController;
 
 /*
 |--------------------------------------------------------------------------
@@ -528,11 +529,8 @@ Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])
             ->whereNumber('rrf')->name('edit');
         Route::put('/{rrf}', [RrfController::class, 'update'])
             ->whereNumber('rrf')->name('update');
-
-        Route::post(
-            '/notifikasi/{notification}/baca',
-            [RrfNotificationController::class, 'baca']
-        )->name('notifikasi.baca');
+        Route::delete('/{rrf}', [RrfController::class, 'destroy'])
+            ->whereNumber('rrf')->name('destroy');
 
         // Hanya SPV produksi
         Route::middleware('role:spv_produksi')->group(function () {
@@ -545,17 +543,62 @@ Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])
 
 /*
 |--------------------------------------------------------------------------
+| Notifikasi RRF (semua role yang memakai menu RRF)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'role:admin,pimpinan,spv_produksi,operator_produksi'])
+    ->group(function () {
+        Route::post('/notifikasi/{notification}/baca', [
+            RrfNotificationController::class,
+            'baca',
+        ])->name('notifikasi.baca');
+
+        // Alamat lama dipertahankan supaya lonceng yang sudah ada tidak rusak
+        Route::post('/rrf/notifikasi/{notification}/baca', [
+            RrfNotificationController::class,
+            'baca',
+        ])->name('rrf.notifikasi.baca');
+    });
+
+/*
+|--------------------------------------------------------------------------
 | RRF sisi Maintenance
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
-    Route::get('/mtc/rrf', function () {
-        return Inertia::render('Rrf/MtcIndex');
-    })->name('mtc.rrf.index');
+// Daftar dan detail: Admin dan Pimpinan
+Route::middleware(['auth', 'role:admin,pimpinan'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
+    ->group(function () {
+        Route::get('/', [MtcRrfController::class, 'index'])->name('index');
+        Route::get('/{rrf}', [MtcRrfController::class, 'show'])
+            ->whereNumber('rrf')->name('show');
+    });
 
-    Route::post(
-        '/notifikasi/{notification}/baca',
-        [RrfNotificationController::class, 'baca']
-    )->name('notifikasi.baca');
-});
+// Aksi Admin
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
+    ->group(function () {
+        Route::post('/{rrf}/terima', [MtcRrfController::class, 'terima'])
+            ->whereNumber('rrf')->name('terima');
+        Route::post('/{rrf}/tolak', [MtcRrfController::class, 'tolak'])
+            ->whereNumber('rrf')->name('tolak');
+        Route::post('/{rrf}/mulai', [MtcRrfController::class, 'mulai'])
+            ->whereNumber('rrf')->name('mulai');
+        Route::post('/{rrf}/penanganan', [MtcRrfController::class, 'simpan'])
+            ->whereNumber('rrf')->name('penanganan');
+    });
+
+// Aksi Pimpinan
+Route::middleware(['auth', 'role:pimpinan'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
+    ->group(function () {
+        Route::post('/{rrf}/close', [MtcRrfController::class, 'close'])
+            ->whereNumber('rrf')->name('close');
+        Route::post('/{rrf}/kembalikan', [MtcRrfController::class, 'kembalikan'])
+            ->whereNumber('rrf')->name('kembalikan');
+    });
