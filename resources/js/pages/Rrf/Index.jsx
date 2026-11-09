@@ -43,8 +43,8 @@ function ConfirmHapus({ rrf, processing, error, onCancel, onConfirm }) {
 
                             <p className="mt-1 text-sm leading-relaxed text-slate-500">
                                 Apakah kamu yakin ingin menghapus RRF{' '}
-                                <b className="text-slate-800">{rrf.rrf_no}</b>? RRF
-                                yang sudah dihapus tidak akan muncul lagi di daftar.
+                                <b className="text-slate-800">{rrf.rrf_no}</b>? RRF tidak akan muncul
+                                lagi di daftar.
                             </p>
 
                             {error && (
@@ -330,54 +330,30 @@ export default function Index({
                                                     title="Edit RRF"
                                                     className={aksiEdit}
                                                 >
-                                                    <Pencil
-                                                        className="h-4 w-4"
-                                                        strokeWidth={1.75}
-                                                    />
+                                                    <Pencil className="h-4 w-4" strokeWidth={1.75} />
                                                 </Link>
                                             ) : (
-                                                <span title={r.alasan_edit ?? ''}>
+                                                <span title={r.alasan_edit ?? 'RRF sudah diproses, tidak bisa diedit'}>
                                                     <button
                                                         type="button"
                                                         disabled
                                                         aria-label="Edit tidak tersedia"
                                                         className={aksiMati}
                                                     >
-                                                        <Pencil
-                                                            className="h-4 w-4"
-                                                            strokeWidth={1.75}
-                                                        />
+                                                        <Pencil className="h-4 w-4" strokeWidth={1.75} />
                                                     </button>
                                                 </span>
                                             )}
 
-                                            {r.bisa_hapus ? (
-                                                <button
-                                                    type="button"
-                                                    title="Hapus RRF"
-                                                    onClick={() => bukaHapus(r)}
-                                                    className={aksiHapus}
-                                                >
-                                                    <Trash2
-                                                        className="h-4 w-4"
-                                                        strokeWidth={1.75}
-                                                    />
-                                                </button>
-                                            ) : (
-                                                <span title={r.alasan_hapus ?? ''}>
-                                                    <button
-                                                        type="button"
-                                                        disabled
-                                                        aria-label="Hapus tidak tersedia"
-                                                        className={aksiMati}
-                                                    >
-                                                        <Trash2
-                                                            className="h-4 w-4"
-                                                            strokeWidth={1.75}
-                                                        />
-                                                    </button>
-                                                </span>
-                                            )}
+                                            {/* Hapus: selalu tersedia */}
+                                            <button
+                                                type="button"
+                                                title="Hapus RRF"
+                                                onClick={() => bukaHapus(r)}
+                                                className={aksiHapus}
+                                            >
+                                                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use App\Models\RrfNotification;
 
 class MtcRrfController extends Controller
 {
@@ -677,6 +678,41 @@ class MtcRrfController extends Controller
         return back()->with('success', 'RRF dikembalikan ke Maintenance.');
     }
 
+    /* ================================================================
+    | HAPUS (soft delete), Admin dan Pimpinan, semua status
+    ================================================================ */
+
+    public function destroy(Request $request, Rrf $rrf)
+    {
+        $user = $request->user();
+
+        abort_unless(
+            in_array($user->role, ['admin', 'pimpinan'], true),
+            403
+        );
+
+        $nomor = $rrf->rrf_no;
+
+        DB::transaction(function () use ($rrf, $user) {
+            $fresh = Rrf::whereKey($rrf->id)->lockForUpdate()->firstOrFail();
+
+            $this->catat(
+                $fresh,
+                $fresh->status,
+                $fresh->status,
+                $user->id,
+                "RRF dihapus oleh {$user->name} ({$user->role})"
+            );
+
+            RrfNotification::where('rrf_id', $fresh->id)->delete();
+
+            $fresh->delete();
+        });
+
+        return redirect()
+            ->route('mtc.rrf.index')
+            ->with('success', "RRF {$nomor} berhasil dihapus.");
+    }
     /* ================================================================
      | PEMBANTU
      ================================================================ */

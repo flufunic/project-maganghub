@@ -157,10 +157,16 @@ function DikembalikanInfo({ info }) {
 function KeputusanPanel({ rrf }) {
     const terima = useForm({});
     const tolak = useForm({ catatan: '' });
-    const [konfirmasi, setKonfirmasi] = useState(null);
+    const [konfirmasi, setKonfirmasi] = useState(null); // 'terima' | 'tolak' | null
 
     const bisaTolak = tolak.data.catatan.trim().length >= 5;
     const proses = terima.processing || tolak.processing;
+
+    const batal = () => {
+        tolak.reset('catatan');
+        tolak.clearErrors();
+        setKonfirmasi(null);
+    };
 
     const kirim = () => {
         if (konfirmasi === 'terima') {
@@ -169,9 +175,9 @@ function KeputusanPanel({ rrf }) {
                 onError: () => setKonfirmasi(null),
             });
         } else {
+            // kalau gagal validasi, form tetap terbuka supaya pesan error terlihat
             tolak.post(`/mtc/rrf/${rrf.id}/tolak`, {
                 preserveScroll: true,
-                onError: () => setKonfirmasi(null),
             });
         }
     };
@@ -182,29 +188,9 @@ function KeputusanPanel({ rrf }) {
             judul="Menunggu keputusan Maintenance"
             catatan="Periksa data permintaan di atas. Kalau diterima, Anda melengkapi data penanganan di langkah berikutnya. Kalau ditolak, RRF dikembalikan ke produksi beserta alasannya."
         >
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Alasan penolakan{' '}
-                <span className="font-normal text-slate-500">
-                    (wajib diisi kalau menolak)
-                </span>
-            </label>
-
-            <textarea
-                rows={3}
-                value={tolak.data.catatan}
-                onChange={(e) => tolak.setData('catatan', e.target.value)}
-                placeholder="Contoh: Foto kurang jelas, mohon sertakan foto bagian mesin yang bermasalah."
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-            />
-
-            {tolak.errors.catatan && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                    {tolak.errors.catatan}
-                </p>
-            )}
-
-            {konfirmasi === null ? (
-                <div className="mt-4 flex flex-wrap gap-3">
+            {/* LANGKAH 1: pilih keputusan */}
+            {konfirmasi === null && (
+                <div className="flex flex-wrap gap-3">
                     <button
                         type="button"
                         onClick={() => setKonfirmasi('terima')}
@@ -216,29 +202,22 @@ function KeputusanPanel({ rrf }) {
                     <button
                         type="button"
                         onClick={() => setKonfirmasi('tolak')}
-                        disabled={!bisaTolak}
-                        title={
-                            bisaTolak
-                                ? ''
-                                : 'Isi alasan penolakan minimal 5 karakter.'
-                        }
-                        className="inline-flex h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700"
                     >
                         ✕ Tolak RRF
                     </button>
                 </div>
-            ) : (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            )}
+
+            {/* LANGKAH 2a: konfirmasi terima */}
+            {konfirmasi === 'terima' && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="text-sm font-bold text-slate-800">
-                        {konfirmasi === 'terima'
-                            ? 'Yakin menerima RRF ini?'
-                            : 'Yakin menolak RRF ini?'}
+                        Yakin menerima RRF ini?
                     </p>
 
                     <p className="mt-1 text-xs text-slate-500">
-                        {konfirmasi === 'terima'
-                            ? 'Status berubah menjadi Diterima MTC, lalu Anda mengisi data penanganan.'
-                            : 'RRF dikembalikan ke produksi dan keluar dari daftar Maintenance.'}
+                        Status berubah menjadi Diterima MTC, lalu Anda mengisi data penanganan.
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -246,19 +225,76 @@ function KeputusanPanel({ rrf }) {
                             type="button"
                             disabled={proses}
                             onClick={kirim}
-                            className={`rounded-xl px-4 py-2.5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                konfirmasi === 'terima'
-                                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                                    : 'bg-red-600 hover:bg-red-700'
-                            }`}
+                            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {proses ? 'Memproses...' : 'Ya, lanjutkan'}
+                            {proses ? 'Memproses...' : 'Ya, terima'}
                         </button>
 
                         <button
                             type="button"
                             disabled={proses}
-                            onClick={() => setKonfirmasi(null)}
+                            onClick={batal}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* LANGKAH 2b: tolak -> baru isi alasan */}
+            {konfirmasi === 'tolak' && (
+                <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-bold text-slate-800">
+                        Tolak RRF ini
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                        RRF dikembalikan ke produksi dan keluar dari daftar Maintenance.
+                        Tuliskan alasannya di bawah.
+                    </p>
+
+                    <label className="mb-1.5 mt-3 block text-sm font-semibold text-slate-700">
+                        Alasan penolakan{' '}
+                        <span className="font-normal text-slate-500">
+                            (wajib, minimal 5 karakter)
+                        </span>
+                    </label>
+
+                    <textarea
+                        rows={3}
+                        autoFocus
+                        value={tolak.data.catatan}
+                        onChange={(e) => tolak.setData('catatan', e.target.value)}
+                        placeholder="Contoh: Foto kurang jelas, mohon sertakan foto bagian mesin yang bermasalah."
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    />
+
+                    {tolak.errors.catatan && (
+                        <p className="mt-1 text-xs font-medium text-red-600">
+                            {tolak.errors.catatan}
+                        </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                            type="button"
+                            disabled={proses || !bisaTolak}
+                            onClick={kirim}
+                            title={
+                                bisaTolak
+                                    ? ''
+                                    : 'Isi alasan penolakan minimal 5 karakter.'
+                            }
+                            className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {proses ? 'Memproses...' : 'Ya, tolak RRF'}
+                        </button>
+
+                        <button
+                            type="button"
+                            disabled={proses}
+                            onClick={batal}
                             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                         >
                             Batal
@@ -753,16 +789,29 @@ function PenangananForm({ rrf, penanganan, shiftOptions, pembagi, mode }) {
 }
 
 /* ---------- selesai: Pimpinan memverifikasi ---------- */
+/* ---------- selesai: Pimpinan memverifikasi ---------- */
 function VerifikasiPanel({ rrf, verifikasi }) {
-    const { data, setData, post, processing, errors } = useForm({ catatan: '' });
+    const { data, setData, post, processing, errors, reset, clearErrors } =
+        useForm({ catatan: '' });
     const [konfirmasi, setKonfirmasi] = useState(null); // 'close' | 'kembalikan' | null
 
     const bisaKembalikan = data.catatan.trim().length >= 5;
 
+    const batal = () => {
+        reset('catatan');
+        clearErrors();
+        setKonfirmasi(null);
+    };
+
     const kirim = () => {
         post(`/mtc/rrf/${rrf.id}/${konfirmasi}`, {
             preserveScroll: true,
-            onFinish: () => setKonfirmasi(null),
+            // kalau gagal validasi saat kembalikan, form tetap terbuka
+            onError: () => {
+                if (konfirmasi === 'close') {
+                    setKonfirmasi(null);
+                }
+            },
         });
     };
 
@@ -795,29 +844,9 @@ function VerifikasiPanel({ rrf, verifikasi }) {
                 ))}
             </div>
 
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Catatan{' '}
-                <span className="font-normal text-slate-500">
-                    (wajib diisi kalau mengembalikan ke Maintenance)
-                </span>
-            </label>
-
-            <textarea
-                rows={3}
-                value={data.catatan}
-                onChange={(e) => setData('catatan', e.target.value)}
-                placeholder="Contoh: Foto after belum menunjukkan bagian yang diganti, mohon dilengkapi."
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-            />
-
-            {errors.catatan && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                    {errors.catatan}
-                </p>
-            )}
-
-            {konfirmasi === null ? (
-                <div className="mt-4 flex flex-wrap gap-3">
+            {/* LANGKAH 1: pilih keputusan */}
+            {konfirmasi === null && (
+                <div className="flex flex-wrap gap-3">
                     <button
                         type="button"
                         onClick={() => setKonfirmasi('close')}
@@ -829,29 +858,22 @@ function VerifikasiPanel({ rrf, verifikasi }) {
                     <button
                         type="button"
                         onClick={() => setKonfirmasi('kembalikan')}
-                        disabled={!bisaKembalikan}
-                        title={
-                            bisaKembalikan
-                                ? ''
-                                : 'Isi alasan minimal 5 karakter untuk mengembalikan.'
-                        }
-                        className="inline-flex h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700"
                     >
                         ↩ Kembalikan ke Maintenance
                     </button>
                 </div>
-            ) : (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            )}
+
+            {/* LANGKAH 2a: konfirmasi verifikasi & close */}
+            {konfirmasi === 'close' && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="text-sm font-bold text-slate-800">
-                        {konfirmasi === 'close'
-                            ? 'Yakin memverifikasi dan menutup RRF ini?'
-                            : 'Yakin mengembalikan RRF ini ke Maintenance?'}
+                        Yakin memverifikasi dan menutup RRF ini?
                     </p>
 
                     <p className="mt-1 text-xs text-slate-500">
-                        {konfirmasi === 'close'
-                            ? 'Status berubah menjadi Closed dan tidak bisa dibuka kembali.'
-                            : 'Status kembali menjadi Sedang dikerjakan. Admin Maintenance bisa mengedit datanya lagi, lalu mengirim ulang.'}
+                        Status berubah menjadi Closed dan tidak bisa dibuka kembali.
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -859,19 +881,77 @@ function VerifikasiPanel({ rrf, verifikasi }) {
                             type="button"
                             disabled={processing}
                             onClick={kirim}
-                            className={`rounded-xl px-4 py-2.5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                konfirmasi === 'close'
-                                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                                    : 'bg-red-600 hover:bg-red-700'
-                            }`}
+                            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {processing ? 'Memproses...' : 'Ya, lanjutkan'}
+                            {processing ? 'Memproses...' : 'Ya, verifikasi & close'}
                         </button>
 
                         <button
                             type="button"
                             disabled={processing}
-                            onClick={() => setKonfirmasi(null)}
+                            onClick={batal}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* LANGKAH 2b: kembalikan -> baru isi catatan */}
+            {konfirmasi === 'kembalikan' && (
+                <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-bold text-slate-800">
+                        Kembalikan RRF ini ke Maintenance
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                        Status kembali menjadi Sedang dikerjakan. Admin Maintenance bisa
+                        mengedit datanya lagi, lalu mengirim ulang. Tuliskan alasannya
+                        di bawah.
+                    </p>
+
+                    <label className="mb-1.5 mt-3 block text-sm font-semibold text-slate-700">
+                        Catatan{' '}
+                        <span className="font-normal text-slate-500">
+                            (wajib, minimal 5 karakter)
+                        </span>
+                    </label>
+
+                    <textarea
+                        rows={3}
+                        autoFocus
+                        value={data.catatan}
+                        onChange={(e) => setData('catatan', e.target.value)}
+                        placeholder="Contoh: Foto after belum menunjukkan bagian yang diganti, mohon dilengkapi."
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    />
+
+                    {errors.catatan && (
+                        <p className="mt-1 text-xs font-medium text-red-600">
+                            {errors.catatan}
+                        </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                            type="button"
+                            disabled={processing || !bisaKembalikan}
+                            onClick={kirim}
+                            title={
+                                bisaKembalikan
+                                    ? ''
+                                    : 'Isi alasan minimal 5 karakter untuk mengembalikan.'
+                            }
+                            className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {processing ? 'Memproses...' : 'Ya, kembalikan'}
+                        </button>
+
+                        <button
+                            type="button"
+                            disabled={processing}
+                            onClick={batal}
                             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                         >
                             Batal

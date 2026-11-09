@@ -60,6 +60,7 @@ export default function Create({
 
     const { data, setData, post, processing, errors } = useForm({
         _method: edit ? 'put' : 'post',
+        rrf_no: '',
         divisi_pelapor: rrf?.divisi_pelapor ?? divisiDefault ?? '',
         lokasi: rrf?.lokasi ?? '',
         nama_mesin: rrf?.nama_mesin ?? '',
@@ -160,7 +161,13 @@ export default function Create({
     return (
         <ProduksiLayout>
             <Head title={judul} />
-
+            <Link
+                href="/rrf"
+                className="mb-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white backdrop-blur-lg transition hover:bg-white/20"
+            >
+                <span>←</span>
+                Kembali ke daftar
+            </Link>
             <div className="mb-5">
                 <div className="flex items-center gap-2">
                     <div className="h-8 w-1 rounded-full bg-gradient-to-b from-blue-400 to-indigo-600" />
@@ -191,7 +198,22 @@ export default function Create({
                 {/* IDENTITAS */}
                 <section className={`${cardCls} space-y-4`}>
                     <h2 className={judulCls}>Identitas</h2>
-
+                    {!edit && (
+                        <Field
+                            label="No. RRF"
+                            error={errors.rrf_no}
+                            hint="Wajib diisi, contoh: RRF/HR/2026/0005. Nomor tidak boleh sama dengan RRF lain yang masih ada."
+                        >
+                            <input
+                                value={data.rrf_no}
+                                onChange={(e) => setData('rrf_no', e.target.value)}
+                                placeholder="RRF/HR/2026/0005"
+                                maxLength={100}
+                                required
+                                className={inputCls}
+                            />
+                        </Field>
+                    )}
                     <Field
                         label="Division pelapor"
                         error={errors.divisi_pelapor}

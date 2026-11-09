@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
 import {
+    AlertTriangle,
     ArrowRight,
     CheckCircle2,
     ClipboardList,
@@ -13,6 +14,7 @@ import {
     Lock,
     RotateCcw,
     ShieldCheck,
+    Trash2,
     Wrench,
     X,
 } from 'lucide-react';
@@ -69,6 +71,77 @@ const TEMA = {
 
 const temaDari = (kode) => TEMA[kode] ?? TEMA.semua;
 
+/* ---------- Dialog konfirmasi hapus ---------- */
+function ConfirmHapus({ rrf, processing, error, onCancel, onConfirm }) {
+    if (!rrf) {
+        return null;
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget && !processing) {
+                    onCancel();
+                }
+            }}
+        >
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl shadow-slate-950/40"
+            >
+                <div className="px-5 pb-4 pt-5">
+                    <div className="flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                            <AlertTriangle className="h-5 w-5" strokeWidth={1.75} />
+                        </span>
+
+                        <div className="min-w-0">
+                            <h2 className="text-base font-bold text-slate-900">
+                                Hapus RRF?
+                            </h2>
+
+                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                                Apakah kamu yakin ingin menghapus RRF{' '}
+                                <b className="text-slate-800">{rrf.rrf_no}</b>? RRF
+                                tidak akan muncul lagi di daftar, tetapi datanya
+                                tetap tersimpan sebagai arsip.
+                            </p>
+
+                            {error && (
+                                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                                    {error}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={processing}
+                        className="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-60"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={processing}
+                        className="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {processing ? 'Menghapus...' : 'Ya, Hapus'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function MtcIndex({
     rrfs,
     filters = {},
@@ -82,6 +155,56 @@ export default function MtcIndex({
     const peran = role ?? auth?.user?.role;
     const isPimpinan = peran === 'pimpinan';
     const isAdmin = peran === 'admin';
+    const [hapusTarget, setHapusTarget] = useState(null);
+    const [menghapus, setMenghapus] = useState(false);
+    const [errorHapus, setErrorHapus] = useState('');
+
+    const bukaHapus = (rrf) => {
+        setErrorHapus('');
+        setHapusTarget(rrf);
+    };
+
+    const tutupHapus = () => {
+        if (menghapus) {
+            return;
+        }
+
+        setHapusTarget(null);
+        setErrorHapus('');
+    };
+
+    const konfirmasiHapus = () => {
+        if (!hapusTarget) {
+            return;
+        }
+
+        router.delete(`/mtc/rrf/${hapusTarget.id}`, {
+            preserveScroll: true,
+            onStart: () => setMenghapus(true),
+            onFinish: () => setMenghapus(false),
+            onSuccess: () => setHapusTarget(null),
+            onError: (errs) =>
+                setErrorHapus(Object.values(errs)[0] ?? 'RRF gagal dihapus.'),
+        });
+    };
+
+    // Tombol Esc menutup dialog
+    useEffect(() => {
+        if (!hapusTarget) {
+            return undefined;
+        }
+
+        const onKey = (e) => {
+            if (e.key === 'Escape' && !menghapus) {
+                setHapusTarget(null);
+                setErrorHapus('');
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [hapusTarget, menghapus]);
 
     const opsi = {
         preserveState: true,
@@ -170,7 +293,7 @@ export default function MtcIndex({
             </div>
 
             {/* BANNER PIMPINAN */}
-            {isPimpinan && (antrean.verifikasi ?? 0) > 0 && (
+            {/* {isPimpinan && (antrean.verifikasi ?? 0) > 0 && (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 px-4 py-3 shadow-lg shadow-amber-950/10">
                     <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
@@ -197,7 +320,7 @@ export default function MtcIndex({
                         Lihat antrean
                     </button>
                 </div>
-            )}
+            )} */}
 
             {/* BANNER ADMIN */}
             {isAdmin && (antrean.dikembalikan ?? 0) > 0 && (
@@ -456,10 +579,10 @@ export default function MtcIndex({
                                             </td>
 
                                             <td className="border-b border-slate-100 px-4 py-3.5">
-                                                <div className="flex justify-center">
+                                                <div className="flex items-center justify-center gap-1.5">
                                                     <Link
                                                         href={`/mtc/rrf/${r.id}`}
-                                                        className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-bold text-white shadow-sm transition group-hover:shadow-md ${
+                                                        className={`inline-flex h-8 w-[112px] items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-bold text-white shadow-sm transition group-hover:shadow-md ${
                                                             perluVerifikasi
                                                                 ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700'
                                                                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
@@ -470,11 +593,19 @@ export default function MtcIndex({
                                                         ) : (
                                                             <Eye className="h-3.5 w-3.5" />
                                                         )}
-                                                        {perluVerifikasi
-                                                            ? 'Verifikasi'
-                                                            : 'Detail'}
+                                                        {perluVerifikasi ? 'Verifikasi' : 'Detail'}
                                                         <ArrowRight className="h-3 w-3" />
                                                     </Link>
+
+                                                    {/* Hapus: tersedia di semua status */}
+                                                    <button
+                                                        type="button"
+                                                        title="Hapus RRF"
+                                                        onClick={() => bukaHapus(r)}
+                                                        className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -526,6 +657,14 @@ export default function MtcIndex({
                     )}
                 </div>
             </div>
+            {/* DIALOG KONFIRMASI HAPUS */}
+            <ConfirmHapus
+                rrf={hapusTarget}
+                processing={menghapus}
+                error={errorHapus}
+                onCancel={tutupHapus}
+                onConfirm={konfirmasiHapus}
+            />
         </ProduksiLayout>
     );
 }

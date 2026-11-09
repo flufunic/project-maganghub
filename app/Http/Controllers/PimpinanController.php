@@ -244,6 +244,23 @@ class PimpinanController extends Controller
             );
     }
 
+    public function batalkanVerifikasi(PreventifPengiriman $pengiriman)
+    {
+        // Hanya yang sudah diperiksa yang bisa dibatalkan
+        if ($pengiriman->status !== 'diperiksa') {
+            return back()->with('error', 'Hanya data yang sudah diperiksa yang bisa dibatalkan.');
+        }
+
+        $pengiriman->update([
+            'status' => 'ditolak',
+            'alasan_penolakan' => 'Verifikasi dibatalkan oleh pimpinan. Mohon periksa data dan kirim ulang.',
+        ]);
+
+        return redirect()
+            ->route('pimpinan.index')
+            ->with('success', 'Verifikasi dibatalkan. Admin perlu mengirim ulang data.');
+    }
+
     private function formatRevisi(PreventifRevisi $revisi): array
     {
         return [

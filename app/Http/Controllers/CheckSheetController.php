@@ -198,7 +198,7 @@ class CheckSheetController extends Controller
             'kode' => ['required', 'string', 'max:100'],
         ]);
 
-        $line = Line::where('kode', strtoupper(trim($data['kode'])))->first();
+        $line = Line::where('kode', Str::upper(trim($data['kode'])))->first();
 
         if (! $line) {
             return back()->withErrors([
@@ -214,7 +214,7 @@ class CheckSheetController extends Controller
     // Dipakai kamera bawaan HP (GET, QR berisi URL /s/{kode})
     public function unlock(string $kode)
     {
-        $line = Line::where('kode', strtoupper(trim($kode)))->first();
+        $line = Line::where('kode', Str::upper(trim($kode)))->first();
 
         if (! $line) {
             return redirect()->route('check-sheets.index')

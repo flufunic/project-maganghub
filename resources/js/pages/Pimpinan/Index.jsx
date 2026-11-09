@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/Components/Pimpinan/Sidebar';
+import { Head, Link, router } from '@inertiajs/react';
 
 /* ------------------------------------------------------------------
 | ICON  (UI saja, tidak ada logic)
@@ -12,6 +12,11 @@ const ICONS = {
             'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z',
             'M14 3v5h5',
         ],
+    },
+    undo: { sw: 2, paths: ['M3 10h10a5 5 0 0 1 0 10H9', 'M7 6 3 10l4 4'] },
+    warning: {
+        sw: 2,
+        paths: ['M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z'],
     },
     plus: { paths: ['M12 6v12m6-6H6'] },
     clock: { paths: ['M12 7v5l3 2'], circle: true },
@@ -66,6 +71,9 @@ function Icon({ type, className = 'h-5 w-5', strokeWidth }) {
 const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
+const thClass =
+    'px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500';
+
 export default function Index({
     user,
     pengirimans = [],
@@ -74,6 +82,10 @@ export default function Index({
 
     // semua | menunggu | diperiksa
     const [filter, setFilter] = useState('semua');
+
+    // Modal batalkan verifikasi
+    const [itemBatal, setItemBatal] = useState(null);
+    const [memproses, setMemproses] = useState(false);
 
     const totalPengiriman = pengirimans.length;
 
@@ -96,6 +108,46 @@ export default function Index({
             sekarang === nilai || nilai === 'semua' ? 'semua' : nilai
         );
     };
+
+    const batalkanVerifikasi = (item) => {
+        setItemBatal(item);
+    };
+
+    const tutupModal = () => {
+        if (memproses) return;
+        setItemBatal(null);
+    };
+
+    const konfirmasiBatal = () => {
+        if (!itemBatal || memproses) return;
+
+        router.post(
+            `/pimpinan/pengiriman/${itemBatal.id}/batalkan`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setMemproses(true),
+                onFinish: () => {
+                    setMemproses(false);
+                    setItemBatal(null);
+                },
+            }
+        );
+    };
+
+    // Tutup modal dengan tombol Esc
+    useEffect(() => {
+        if (!itemBatal) return;
+
+        const onKey = (e) => {
+            if (e.key === 'Escape' && !memproses) {
+                setItemBatal(null);
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [itemBatal, memproses]);
 
     const judulTabel =
         filter === 'menunggu'
@@ -205,9 +257,7 @@ export default function Index({
 
             <div className="relative flex min-h-screen flex-col overflow-x-hidden">
 
-                {/* =====================================================
-                    BACKGROUND
-                ====================================================== */}
+                {/* BACKGROUND */}
                 <div className="fixed inset-0 -z-20 overflow-hidden">
                     <div className="pmp-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
 
@@ -216,15 +266,10 @@ export default function Index({
                     <div className="pmp-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
                 </div>
 
-                {/* =====================================================
-                    HEADER (TRANSPARAN)
-                ====================================================== */}
+                {/* HEADER */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
                     <div className="mx-auto flex max-w-7xl items-center px-4 py-3 sm:px-6">
-
                         <div className="flex items-center gap-3">
-
-                            {/* HAMBURGER */}
                             <button
                                 type="button"
                                 onClick={() => setSidebarOpen(true)}
@@ -234,10 +279,9 @@ export default function Index({
                                 <Icon type="menu" className="h-5 w-5" />
                             </button>
 
-                            {/* JUDUL */}
                             <div>
                                 <h1 className="text-lg font-bold tracking-tight text-white">
-                                    Schedule Preventif 
+                                    Schedule Preventif
                                 </h1>
 
                                 <p className="hidden text-xs text-white/65 sm:block">
@@ -248,31 +292,21 @@ export default function Index({
                     </div>
                 </header>
 
-                {/* =====================================================
-                    CONTENT
-                ====================================================== */}
+                {/* CONTENT */}
                 <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
 
-                    {/* =================================================
-                        JUDUL DATA
-                    ================================================== */}
+                    {/* JUDUL DATA */}
                     <div className="mb-5">
-                        <div className="flex items-center gap-3">
-                            <div>
-                                <h2 className="text-xl font-bold text-white">
-                                    Data Preventif Mesin
-                                </h2>
+                        <h2 className="text-xl font-bold text-white">
+                            Data Preventif Mesin
+                        </h2>
 
-                                <p className="mt-0.5 text-sm text-blue-100/90">
-                                    Data yang telah dikirim oleh Admin untuk diperiksa.
-                                </p>
-                            </div>
-                        </div>
+                        <p className="mt-0.5 text-sm text-blue-100/90">
+                            Data yang telah dikirim oleh Admin untuk diperiksa.
+                        </p>
                     </div>
 
-                    {/* =================================================
-                        STAT CARDS (bisa diklik untuk filter)
-                    ================================================== */}
+                    {/* STAT CARDS (bisa diklik untuk filter) */}
                     <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-3">
                         {statCards.map((card) => {
                             const aktif = filter === card.key;
@@ -328,16 +362,13 @@ export default function Index({
                         })}
                     </div>
 
-                    {/* =================================================
-                        RIWAYAT PENGIRIMAN
-                    ================================================== */}
+                    {/* RIWAYAT PENGIRIMAN */}
                     <div className={`overflow-hidden rounded-3xl ${glassCard}`}>
 
                         {/* TABLE HEADER */}
                         <div className="flex flex-col gap-3 border-b border-slate-200/70 bg-gradient-to-r from-blue-50/70 via-white/40 to-white/40 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
 
                             <div className="flex items-center gap-3">
-
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
                                     <Icon type="calendar" className="h-5 w-5" />
                                 </div>
@@ -361,9 +392,7 @@ export default function Index({
 
                         {/* EMPTY STATE */}
                         {daftar.length === 0 ? (
-
                             <div className="px-6 py-16 text-center">
-
                                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
                                     <Icon
                                         type="document"
@@ -381,37 +410,17 @@ export default function Index({
                                         : 'Tidak ada data pada kategori ini.'}
                                 </p>
                             </div>
-
                         ) : (
-
                             /* TABLE */
                             <div className="pmp-scroll overflow-x-auto">
-
                                 <table className="w-full min-w-[850px] text-sm">
-
                                     <thead>
                                         <tr className="bg-slate-50/80">
-
-                                            <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                No
-                                            </th>
-
-                                            <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Tanggal
-                                            </th>
-
-                                            <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Dikirim Oleh
-                                            </th>
-
-                                            <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Waktu Pengiriman
-                                            </th>
-
-                                            <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Status
-                                            </th>
-
+                                            <th className={thClass}>No</th>
+                                            <th className={thClass}>Tanggal</th>
+                                            <th className={thClass}>Dikirim Oleh</th>
+                                            <th className={thClass}>Waktu Pengiriman</th>
+                                            <th className={thClass}>Status</th>
                                             <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
                                                 Aksi
                                             </th>
@@ -419,14 +428,11 @@ export default function Index({
                                     </thead>
 
                                     <tbody className="divide-y divide-slate-200/60">
-
                                         {daftar.map((item, index) => (
-
                                             <tr
                                                 key={item.id}
                                                 className="group transition-colors duration-200 hover:bg-blue-50/60"
                                             >
-
                                                 {/* NO */}
                                                 <td className="px-6 py-4">
                                                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 transition group-hover:bg-blue-100 group-hover:text-blue-600">
@@ -442,7 +448,6 @@ export default function Index({
                                                 {/* DIKIRIM OLEH */}
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2.5">
-
                                                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
                                                             {(item.dikirim_oleh || 'A')
                                                                 .charAt(0)
@@ -462,42 +467,32 @@ export default function Index({
 
                                                 {/* STATUS + REVISI */}
                                                 <td className="px-6 py-4">
-
                                                     <div className="flex flex-col items-start gap-2">
 
                                                         {item.status === 'diperiksa' ? (
-
                                                             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                                                                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
                                                                     <Icon type="tick" className="h-2.5 w-2.5" />
                                                                 </span>
-
                                                                 Sudah Diperiksa
                                                             </span>
-
                                                         ) : item.status === 'ditolak' ? (
-
                                                             <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
                                                                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white">
                                                                     <Icon type="x" className="h-2.5 w-2.5" />
                                                                 </span>
-
                                                                 Ditolak
                                                             </span>
-
                                                         ) : (
-
                                                             <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
                                                                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white">
                                                                     <Icon type="clockSmall" className="h-2.5 w-2.5" />
                                                                 </span>
-
                                                                 Menunggu Diperiksa
                                                             </span>
-
                                                         )}
 
-                                                        {/* BADGE REVISI (hanya kalau ada revisi) */}
+                                                        {/* BADGE REVISI */}
                                                         {(item.jumlah_revisi ?? 0) > 0 && (
                                                             <div>
                                                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
@@ -524,20 +519,31 @@ export default function Index({
 
                                                 {/* AKSI */}
                                                 <td className="px-6 py-4 text-center">
-                                                    <Link
-                                                        href={`/pimpinan/pengiriman/${item.id}`}
-                                                        className="group/btn inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-300/50 transition-all duration-200 hover:from-blue-700 hover:to-indigo-800 hover:shadow-md"
-                                                    >
-                                                        Lihat Data
+                                                    <div className="inline-flex items-center gap-2">
+                                                        <Link
+                                                            href={`/pimpinan/pengiriman/${item.id}`}
+                                                            className="group/btn inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-300/50 transition-all duration-200 hover:from-blue-700 hover:to-indigo-800 hover:shadow-md"
+                                                        >
+                                                            Lihat Data
+                                                            <Icon
+                                                                type="chevron"
+                                                                className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                                                            />
+                                                        </Link>
 
-                                                        <Icon
-                                                            type="chevron"
-                                                            className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5"
-                                                        />
-                                                    </Link>
+                                                        {item.status === 'diperiksa' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => batalkanVerifikasi(item)}
+                                                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700 transition-colors duration-200 hover:bg-red-100"
+                                                            >
+                                                                <Icon type="undo" className="h-4 w-4" />
+                                                                Batalkan
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
-
                                         ))}
                                     </tbody>
                                 </table>
@@ -546,9 +552,7 @@ export default function Index({
                     </div>
                 </main>
 
-                {/* =====================================================
-                    FOOTER (TRANSPARAN)
-                ====================================================== */}
+                {/* FOOTER */}
                 <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
                     <div className="mx-auto flex min-h-[60px] max-w-7xl items-center justify-center px-4 py-4 sm:px-6">
                         <p className="text-xs font-medium text-white/70">
@@ -557,6 +561,70 @@ export default function Index({
                     </div>
                 </footer>
             </div>
+
+            {/* =====================================================
+                MODAL BATALKAN VERIFIKASI
+            ====================================================== */}
+            {itemBatal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm"
+                    onClick={tutupModal}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="judul-modal-batal"
+                >
+                    <div
+                        className="w-full max-w-md overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(2,6,23,0.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 pb-2 pt-6 text-center">
+                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                                <Icon type="warning" className="h-7 w-7" />
+                            </div>
+
+                            <h3
+                                id="judul-modal-batal"
+                                className="text-lg font-bold text-slate-800"
+                            >
+                                Batalkan Verifikasi?
+                            </h3>
+
+                            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                                Data pengiriman tanggal{' '}
+                                <span className="font-semibold text-slate-700">
+                                    {itemBatal.tanggal_format}
+                                </span>{' '}
+                                akan dikembalikan ke status belum terverifikasi, dan Admin
+                                harus mengirim ulang data.
+                            </p>
+
+                            <p className="mt-2 text-xs text-slate-400">
+                                Data checklist, durasi, DOT, dan HOT tidak dihapus.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3 px-6 pb-6 pt-5">
+                            <button
+                                type="button"
+                                onClick={tutupModal}
+                                disabled={memproses}
+                                className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Tidak, Kembali
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={konfirmasiBatal}
+                                disabled={memproses}
+                                className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-300/50 transition-all duration-200 hover:from-red-600 hover:to-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {memproses ? 'Memproses...' : 'Ya, Batalkan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

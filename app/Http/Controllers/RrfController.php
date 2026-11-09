@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Illuminate\Validation\Rule;
 
 class RrfController extends Controller
 {
@@ -48,7 +49,6 @@ class RrfController extends Controller
 
         $rrfs = $query->paginate(15)->withQueryString()->through(function (Rrf $r) use ($user) {
             $alasanEdit = $this->alasanTerkunci($user, $r);
-            $bolehHapus = $this->bolehHapus($user, $r);
 
             return [
                 'id'               => $r->id,
@@ -66,8 +66,7 @@ class RrfController extends Controller
                 // Hak aksi untuk user yang sedang login
                 'bisa_edit'        => $alasanEdit === null,
                 'alasan_edit'      => $alasanEdit,
-                'bisa_hapus'       => $bolehHapus,
-                'alasan_hapus'     => $bolehHapus ? null : 'Hanya pembuat RRF yang bisa menghapus.',
+                'bisa_hapus'       => true,
             ];
         });
 
@@ -109,7 +108,24 @@ class RrfController extends Controller
         $user = $request->user();
         $this->pastikanPunyaDivisi($user);
 
-        $data = $request->validate($this->aturan(), $this->pesan());
+        // rapikan ketikan nomor: spasi di pinggir dan spasi ganda dibuang
+        $request->merge([
+            'rrf_no' => trim(preg_replace('/\s+/', ' ', (string) $request->input('rrf_no', ''))),
+        ]);
+
+        $data = $request->validate($this->aturan() + [
+            // whereNull('deleted_at'): RRF yang sudah dihapus tidak dihitung, nomornya boleh dipakai lagi
+            'rrf_no' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('rrf', 'rrf_no')->whereNull('deleted_at'),
+            ],
+        ], $this->pesan() + [
+            'rrf_no.required' => 'No. RRF harus diisi.',
+            'rrf_no.unique'   => 'No. RRF ini sudah dipakai RRF lain.',
+            'rrf_no.max'      => 'No. RRF maksimal 100 karakter.',
+        ]);
 
         $divisiPelapor = $this->rapikanDivisi($data['divisi_pelapor'], $user->divisi_id);
         $lokasi        = $this->rapikan($data['lokasi'], 'lokasi', $user->divisi_id);
@@ -126,7 +142,7 @@ class RrfController extends Controller
         try {
             $rrf = DB::transaction(function () use ($data, $divisiPelapor, $lokasi, $mesin, $parts, $jadwal, $request, $user, $otomatis, $status, &$stored) {
                 $rrf = Rrf::create([
-                    'rrf_no'           => $this->buatNomor($user->divisi),
+                    'rrf_no'           => $data['rrf_no'],
                     'divisi_id'        => $user->divisi_id,
                     'divisi_pelapor'   => $divisiPelapor,
                     'lokasi'           => $lokasi,
@@ -426,14 +442,16 @@ class RrfController extends Controller
      | HAPUS (soft delete, apa pun statusnya, hanya pembuat)
      ================================================================ */
 
+    /* ================================================================
+    | HAPUS (soft delete, apa pun statusnya, semua anggota divisi)
+    ================================================================ */
+
     public function destroy(Request $request, Rrf $rrf)
     {
         $user = $request->user();
-        $this->pastikanBolehLihat($user, $rrf);
 
-        if (!$this->bolehHapus($user, $rrf)) {
-            abort(403, 'Hanya pembuat RRF yang bisa menghapusnya.');
-        }
+        // pastikan RRF ini milik divisi user (404 kalau bukan)
+        $this->pastikanBolehLihat($user, $rrf);
 
         $nomor = $rrf->rrf_no;
 
@@ -445,13 +463,13 @@ class RrfController extends Controller
                 'status_lama' => $terkunci->status,
                 'status_baru' => $terkunci->status,
                 'user_id'     => $user->id,
-                'catatan'     => 'RRF dihapus oleh pembuat',
+                'catatan'     => "RRF dihapus oleh {$user->name} ({$user->role})",
             ]);
 
-            // Notifikasi lama dibuang supaya tidak mengarah ke RRF yang sudah tidak ada
+            // Notifikasi lama dibuang supaya tidak mengarah ke RRF yang sudah tidak tampil
             RrfNotification::where('rrf_id', $terkunci->id)->delete();
 
-            // Soft delete: barisnya tetap ada di database, foto tetap ada di storage
+            // Soft delete: baris, foto, dan log tetap tersimpan
             $terkunci->delete();
         });
 
@@ -698,12 +716,12 @@ class RrfController extends Controller
         return $this->alasanTerkunci($user, $rrf) === null;
     }
 
-    /** Hapus tidak terikat status, hanya pembuat RRF yang boleh. */
+   /** Hapus tidak terikat status. Batasan divisi sudah dijaga pastikanBolehLihat(). */
     private function bolehHapus(User $user, Rrf $rrf): bool
     {
-        return (int) $rrf->created_by === (int) $user->id;
+        return (int) $rrf->divisi_id === (int) $user->divisi_id;
     }
-
+    
     private function penolakanTerakhir(Rrf $rrf): ?array
     {
         $rrf->loadMissing('statusLogs.user');

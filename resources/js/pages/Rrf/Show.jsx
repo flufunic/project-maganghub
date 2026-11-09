@@ -397,40 +397,21 @@ export default function Show({ rrf }) {
 
                 </div>
 
-
-
                 {/* STATUS + HAPUS */}
-
                 <div className="flex flex-wrap items-center gap-2 pt-1">
-
                     <StatusBadge status={rrf.status} label={rrf.status_label} />
 
-
-
-                    {/* {rrf.bisa_hapus && (
-
-                        <button
-
-                            type="button"
-
-                            onClick={bukaHapus}
-
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-red-200 bg-white/95 px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition hover:bg-red-50"
-
-                        >
-
-                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
-
-                            Hapus RRF
-
-                        </button>
-
-                    )} */}
-
+                    <button
+                        type="button"
+                        onClick={bukaHapus}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-red-200 bg-white/95 px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition hover:bg-red-50"
+                    >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                        Hapus RRF
+                    </button>
                 </div>
 
             </div>
-
 
 
             <div className="space-y-5">

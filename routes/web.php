@@ -489,6 +489,10 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
         PimpinanController::class,
         'tolak',
     ])->name('pimpinan.pengiriman.tolak');
+    Route::post('/pimpinan/pengiriman/{pengiriman}/batalkan', [
+        PimpinanController::class,
+        'batalkanVerifikasi',
+    ])->name('pimpinan.batalkan');
 
 
     // Pengiriman Check Sheet
@@ -576,7 +580,7 @@ Route::middleware(['auth', 'role:admin,pimpinan,spv_produksi,operator_produksi']
 |--------------------------------------------------------------------------
 */
 
-// Daftar dan detail: Admin dan Pimpinan
+// Daftar, detail, dan hapus: Admin dan Pimpinan
 Route::middleware(['auth', 'role:admin,pimpinan'])
     ->prefix('mtc/rrf')
     ->name('mtc.rrf.')
@@ -584,6 +588,8 @@ Route::middleware(['auth', 'role:admin,pimpinan'])
         Route::get('/', [MtcRrfController::class, 'index'])->name('index');
         Route::get('/{rrf}', [MtcRrfController::class, 'show'])
             ->whereNumber('rrf')->name('show');
+        Route::delete('/{rrf}', [MtcRrfController::class, 'destroy'])
+            ->whereNumber('rrf')->name('destroy');
     });
 
 // Aksi Admin
