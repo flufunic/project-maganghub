@@ -1162,6 +1162,7 @@ export default function Show({
     line,
     prevActuals = {},
     preventifOptions = [],
+    isPimpinan = false,
 }) {
     // Flash message dari backend
     const { flash } = usePage().props;
@@ -1759,6 +1760,60 @@ export default function Show({
     });
 
     // =====================================================
+    // CENTANG SEMUA (khusus pimpinan, skip Sabtu/Minggu & tanggal mendatang)
+    // Hanya untuk item yang sedang tampil (ikut filter Shift).
+    // =====================================================
+
+    const bisaCentangSemua =
+        isPimpinan && !pakaiActual && filteredItems.length > 0;
+
+    const jumlahHariKerja = (() => {
+        const hariIni = new Date();
+        hariIni.setHours(0, 0, 0, 0);
+
+        return tanggal.filter((t) => {
+            const [y, m, d] = getTanggalLengkap(t, bulan, tahun)
+                .split('-')
+                .map(Number);
+            const tgl = new Date(y, m - 1, d);
+            const hari = tgl.getDay(); // 0 = Minggu, 6 = Sabtu
+
+            return hari !== 0 && hari !== 6 && tgl <= hariIni;
+        }).length;
+    })();
+
+    const centangSemua = (kolom = 'status') => {
+        const labelKolom = kolom === 'plan' ? 'Plan' : duaBaris ? 'Act' : 'centang';
+
+        setConfirmDialog({
+            title: `Centang semua ${labelKolom}?`,
+            message: `${filteredItems.length} item × ${jumlahHariKerja} hari kerja akan dicentang untuk ${namaBulan[bulan - 1]} ${tahun}. Sabtu, Minggu, dan tanggal yang belum datang dilewati.`,
+            confirmLabel: 'Ya, Centang Semua',
+            tone: 'blue',
+            icon: 'check',
+            onConfirm: () => {
+                setConfirmDialog(null);
+
+                router.post(
+                    `/check-sheets/${checkSheet.id}/checklist/centang-semua`,
+                    {
+                        bulan,
+                        tahun,
+                        kolom,
+                        line_id: line?.id ?? null,
+                        item_ids: filteredItems.map((i) => i.id),
+                    },
+                    {
+                        preserveScroll: true,
+                        onError: () =>
+                            notify('Gagal mencentang semua. Coba lagi.', 'error'),
+                    }
+                );
+            },
+        });
+    };
+
+    // =====================================================
     // BUKA FORM EDIT
     // =====================================================
 
@@ -2121,6 +2176,30 @@ export default function Show({
                             count={`${filteredItems.length} item`}
                             action={
                                 <div className="flex flex-wrap gap-2">
+                                    {bisaCentangSemua && (
+                                        <>
+                                            {pakaiPlanAct && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => centangSemua('plan')}
+                                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                                                >
+                                                    <Icon type="check" className="h-3.5 w-3.5" />
+                                                    Centang Semua Plan
+                                                </button>
+                                            )}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => centangSemua('status')}
+                                                className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                            >
+                                                <Icon type="check" className="h-3.5 w-3.5" />
+                                                {pakaiPlanAct ? 'Centang Semua Act' : 'Centang Semua'}
+                                            </button>
+                                        </>
+                                    )}
+
                                     <button
                                         type="button"
                                         onClick={() => setShowImportModal(true)}

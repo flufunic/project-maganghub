@@ -305,6 +305,12 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         'storeChecklist',
     ])->name('check-sheets.checklist.store');
 
+    Route::post('/check-sheets/{checkSheet}/checklist/centang-semua', [
+        CheckSheetController::class,
+        'centangSemua',
+    ])->middleware('role:pimpinan')
+    ->name('check-sheets.checklist.centang-semua');
+
     Route::post('/check-sheets/{checkSheet}/nilai', [
         CheckSheetController::class,
         'storeNilai',

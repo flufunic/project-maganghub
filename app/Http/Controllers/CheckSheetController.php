@@ -571,6 +571,7 @@ class CheckSheetController extends Controller
             'tahun'       => $tahun,
             'tanggal'     => $tanggal,
             'line'        => $line,
+            'isPimpinan'  => $request->user()?->role === 'pimpinan',
             'prevActuals' => $checkSheet->pakai_actual
                 ? $this->actualSebelumBulan($checkSheet, $awalBulan, $lineId)
                 : (object) [],
@@ -710,6 +711,99 @@ class CheckSheetController extends Controller
         );
 
         return back();
+    }
+
+    // =====================================================
+    // CENTANG SEMUA (khusus pimpinan)
+    // Satu bulan penuh, SKIP Sabtu, Minggu, dan tanggal yang belum datang.
+    // =====================================================
+
+    public function centangSemua(Request $request, CheckSheet $checkSheet)
+    {
+        $validated = $request->validate([
+            'bulan'      => ['required', 'integer', 'between:1,12'],
+            'tahun'      => ['required', 'integer', 'between:2020,2040'],
+            'kolom'      => ['required', 'in:status,plan'],
+            'line_id'    => ['nullable', 'integer'],
+            'item_ids'   => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['integer'],
+        ]);
+
+        if ($checkSheet->pakai_actual) {
+            throw ValidationException::withMessages([
+                'kolom' => 'Check sheet ini memakai nilai Actual, tidak bisa dicentang semua.',
+            ]);
+        }
+
+        if ($validated['kolom'] === 'plan' && ! $checkSheet->pakai_plan_act) {
+            throw ValidationException::withMessages([
+                'kolom' => 'Check sheet ini tidak memakai kolom Plan.',
+            ]);
+        }
+
+        $kolom = $validated['kolom'];
+        $line  = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+
+        // Daftar tanggal: bukan Sabtu/Minggu dan tidak melebihi hari ini
+        $awal  = Carbon::create((int) $validated['tahun'], (int) $validated['bulan'], 1)->startOfDay();
+        $akhir = $awal->copy()->endOfMonth()->startOfDay();
+        $batas = now()->startOfDay();
+
+        $tanggalList = [];
+
+        for ($d = $awal->copy(); $d->lte($akhir); $d->addDay()) {
+            if ($d->isSaturday() || $d->isSunday()) {
+                continue;
+            }
+
+            if ($d->gt($batas)) {
+                continue; // tanggal yang belum datang
+            }
+
+            $tanggalList[] = $d->toDateString();
+        }
+
+        if (empty($tanggalList)) {
+            return back()->with('success', 'Tidak ada hari kerja yang bisa dicentang pada periode ini.');
+        }
+
+        $items = $checkSheet->items()
+            ->whereIn('id', $validated['item_ids'])
+            ->get();
+
+        $jumlah = 0;
+
+        DB::transaction(function () use ($items, $line, $kolom, $tanggalList, &$jumlah) {
+            foreach ($items as $item) {
+                // Tanggal yang sudah tercentang tidak disentuh lagi
+                $sudah = $item->checklists()
+                    ->when(
+                        $line,
+                        fn ($q) => $q->where('line_id', $line->id),
+                        fn ($q) => $q->whereNull('line_id')
+                    )
+                    ->whereIn('tanggal', $tanggalList)
+                    ->where($kolom, true)
+                    ->pluck('tanggal')
+                    ->map(fn ($t) => substr((string) $t, 0, 10))
+                    ->all();
+
+                foreach (array_diff($tanggalList, $sudah) as $tgl) {
+                    $item->checklists()->updateOrCreate(
+                        ['line_id' => $line?->id, 'tanggal' => $tgl],
+                        [$kolom => true]
+                    );
+
+                    $jumlah++;
+                }
+            }
+        });
+
+        return back()->with(
+            'success',
+            "Berhasil mencentang {$jumlah} kotak ({$items->count()} item, "
+            . count($tanggalList) . ' hari kerja, Sabtu & Minggu dilewati).'
+        );
     }
 
     // =====================================================
