@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import {
     X,
     ChevronRight,
@@ -11,6 +11,8 @@ import {
     LogOut,
     ClipboardCheck,
 } from "lucide-react";
+
+import SidebarPimpinan from "./Pimpinan/Sidebar";
 
 
 const ICONS = {
@@ -73,8 +75,7 @@ const MENUS = [
         desc: "Request perbaikan mesin",
     },
 ];
-
-export default function Sidebar({ open, onClose }) {
+function SidebarAdmin({ open, onClose }) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const currentPath =
@@ -291,4 +292,14 @@ export default function Sidebar({ open, onClose }) {
             )}
         </>
     );
+
+}
+export default function Sidebar(props) {
+    const { auth } = usePage().props;
+
+    if (auth?.user?.role === "pimpinan") {
+        return <SidebarPimpinan {...props} />;
+    }
+
+    return <SidebarAdmin {...props} />;
 }

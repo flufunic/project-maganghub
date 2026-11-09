@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Divisi;
 use App\Models\Rrf;
 use App\Models\RrfApproval;
-use App\Models\RrfNotification;
 use App\Models\RrfStatusLog;
 use App\Models\User;
 use App\Support\RrfDurasi;
+use App\Support\RrfNotifier;
 use App\Support\RrfPayload;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -37,6 +37,14 @@ class MtcRrfController extends Controller
         Rrf::STATUS_CLOSED,
     ];
 
+    /**
+     * Status yang tampil untuk Pimpinan: menunggu verifikasi + riwayat yang sudah closed.
+     */
+    private const STATUS_PIMPINAN = [
+        Rrf::STATUS_SELESAI,
+        Rrf::STATUS_CLOSED,
+    ];
+
     /* ================================================================
      | DAFTAR dan DETAIL (Admin dan Pimpinan)
      ================================================================ */
@@ -52,17 +60,11 @@ class MtcRrfController extends Controller
 
         $isAdmin = $user->role === 'admin';
 
-        $q = trim((string) $request->query('q', ''));
-        $divisi = $request->query('divisi');
-        $antrean = $isAdmin
-            ? $request->query('antrean')
-            : null;
+        // Status yang boleh dilihat role ini
+        $statusBoleh = $isAdmin ? self::STATUS_MTC : self::STATUS_PIMPINAN;
 
-        // Admin bisa memfilter status.
-        // Pimpinan hanya melihat RRF yang menunggu verifikasi.
-        $status = $isAdmin
-            ? $request->query('status')
-            : Rrf::STATUS_SELESAI;
+        $status  = $request->query('status');
+        $antrean = $isAdmin ? $request->query('antrean') : null;
 
         $query = Rrf::query()
             ->with(['kelas', 'creator:id,name'])
@@ -70,39 +72,29 @@ class MtcRrfController extends Controller
                 'statusLogs as dikembalikan' => fn ($l) =>
                     $this->saringPengembalian($l),
             ])
-            ->latest('id');
+            ->whereIn('status', $statusBoleh);
 
-        if ($isAdmin) {
-            $query->whereIn('status', self::STATUS_MTC);
-
-            if ($status && in_array($status, self::STATUS_MTC, true)) {
-                $query->where('status', $status);
-            }
-
-            if ($antrean === 'dikembalikan') {
-                $query->where('status', Rrf::STATUS_DIKERJAKAN)
-                    ->whereHas(
-                        'statusLogs',
-                        fn ($l) => $this->saringPengembalian($l)
-                    );
-            }
-        } else {
-            $query->where('status', Rrf::STATUS_SELESAI);
+        if ($status && in_array($status, $statusBoleh, true)) {
+            $query->where('status', $status);
         }
 
-        if ($divisi) {
-            $query->where('divisi_id', (int) $divisi);
+        if ($antrean === 'dikembalikan') {
+            $query->where('status', Rrf::STATUS_DIKERJAKAN)
+                ->whereHas(
+                    'statusLogs',
+                    fn ($l) => $this->saringPengembalian($l)
+                );
         }
 
-        if ($q !== '') {
-            $like = '%' . addcslashes($q, '%_\\') . '%';
-
-            $query->where(function ($w) use ($like) {
-                $w->where('rrf_no', 'like', $like)
-                    ->orWhere('nama_mesin', 'like', $like)
-                    ->orWhere('lokasi', 'like', $like);
-            });
+        // Pimpinan: yang menunggu verifikasi tampil paling atas, lalu riwayat closed
+        if (!$isAdmin) {
+            $query->orderByRaw(
+                'CASE WHEN status = ? THEN 0 ELSE 1 END',
+                [Rrf::STATUS_SELESAI]
+            );
         }
+
+        $query->latest('id');
 
         $rrfs = $query
             ->paginate(15)
@@ -129,82 +121,45 @@ class MtcRrfController extends Controller
                 ];
             });
 
-        /*
-        |--------------------------------------------------------------------------
-        | Ringkasan dan status
-        |--------------------------------------------------------------------------
-        */
+        // Ringkasan jumlah per status (sesuai status yang boleh dilihat role ini)
+        $ringkasan = Rrf::query()
+            ->whereIn('status', $statusBoleh)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
 
-        if ($isAdmin) {
-            $ringkasan = Rrf::query()
-                ->whereIn('status', self::STATUS_MTC)
-                ->selectRaw('status, COUNT(*) as total')
-                ->groupBy('status')
-                ->pluck('total', 'status');
+        $statuses = collect(Rrf::STATUS_LABEL)
+            ->only($statusBoleh)
+            ->map(fn ($label, $kode) => $kode === Rrf::STATUS_SELESAI
+                ? 'Menunggu Verifikasi'
+                : $label)
+            ->all();
 
-            $statuses = collect(Rrf::STATUS_LABEL)
-                ->only(self::STATUS_MTC)
-                ->map(function ($label, $kode) {
-                    return $kode === Rrf::STATUS_SELESAI
-                        ? 'Menunggu Verifikasi'
-                        : $label;
-                })
-                ->all();
+        $antreanData = [
+            'verifikasi' => (int) ($ringkasan[Rrf::STATUS_SELESAI] ?? 0),
 
-            $antreanData = [
-                'verifikasi' => Rrf::where(
-                    'status',
-                    Rrf::STATUS_SELESAI
-                )->count(),
-
-                'dikembalikan' => Rrf::where(
-                    'status',
-                    Rrf::STATUS_DIKERJAKAN
-                )
+            'dikembalikan' => $isAdmin
+                ? Rrf::where('status', Rrf::STATUS_DIKERJAKAN)
                     ->whereHas(
                         'statusLogs',
                         fn ($l) => $this->saringPengembalian($l)
                     )
-                    ->count(),
-            ];
-        } else {
-            $jumlahVerifikasi = Rrf::where(
-                'status',
-                Rrf::STATUS_SELESAI
-            )->count();
-
-            $ringkasan = collect([
-                Rrf::STATUS_SELESAI => $jumlahVerifikasi,
-            ]);
-
-            $statuses = [
-                Rrf::STATUS_SELESAI => 'Menunggu Verifikasi',
-            ];
-
-            $antreanData = [
-                'verifikasi'   => $jumlahVerifikasi,
-                'dikembalikan' => 0,
-            ];
-        }
+                    ->count()
+                : 0,
+        ];
 
         return Inertia::render('Rrf/MtcIndex', [
             'rrfs' => $rrfs,
 
             'filters' => [
-                'q'       => $q,
                 'status'  => $status,
-                'divisi'  => $divisi,
                 'antrean' => $antrean,
             ],
 
             'statuses'  => $statuses,
             'ringkasan' => $ringkasan,
             'antrean'   => $antreanData,
-
-            'divisis' => Divisi::orderBy('nama_divisi')
-                ->get(['id', 'nama_divisi']),
-
-            'role' => $user->role,
+            'role'      => $user->role,
         ]);
     }
 
@@ -218,15 +173,8 @@ class MtcRrfController extends Controller
         abort_unless($admin || $pimpinan, 403);
 
         /*
-        |--------------------------------------------------------------------------
-        | Pembatasan akses detail
-        |--------------------------------------------------------------------------
-        | Admin:
-        | Bisa membuka seluruh RRF dalam antrean Maintenance.
-        |
-        | Pimpinan:
-        | Hanya bisa membuka RRF yang menunggu verifikasi.
-        |--------------------------------------------------------------------------
+        | Admin: bisa membuka seluruh RRF dalam antrean Maintenance.
+        | Pimpinan: hanya bisa membuka RRF yang menunggu verifikasi.
         */
 
         if ($admin) {
@@ -235,8 +183,9 @@ class MtcRrfController extends Controller
                 404
             );
         } else {
+            // Pimpinan: boleh membuka yang menunggu verifikasi dan yang sudah closed
             abort_unless(
-                $rrf->status === Rrf::STATUS_SELESAI,
+                in_array($rrf->status, self::STATUS_PIMPINAN, true),
                 404
             );
         }
@@ -334,7 +283,7 @@ class MtcRrfController extends Controller
     }
 
     /* ================================================================
-     | AKSI ADMIN
+     | AKSI ADMIN  ->  notifikasi ke SPV + semua operator divisi RRF
      ================================================================ */
 
     /** disetujui -> diterima */
@@ -359,18 +308,18 @@ class MtcRrfController extends Controller
                 'RRF diterima Maintenance'
             );
 
-            $this->notif(
+            RrfNotifier::keProduksi(
                 $fresh,
-                [$fresh->created_by],
                 'RRF Diterima Maintenance',
-                "RRF {$fresh->rrf_no} sudah diterima Maintenance dan akan segera ditangani."
+                "RRF {$fresh->rrf_no} sudah diterima Maintenance dan akan segera ditangani.",
+                $user->id
             );
         });
 
         return back()->with('success', 'RRF diterima. Silakan lengkapi data penanganan.');
     }
 
-    /** disetujui -> ditolak (kembali ke pembuatnya) */
+    /** disetujui -> ditolak (kembali ke produksi) */
     public function tolak(Request $request, Rrf $rrf)
     {
         $user = $request->user();
@@ -406,11 +355,11 @@ class MtcRrfController extends Controller
                 "Ditolak Maintenance. Alasan: {$alasan}"
             );
 
-            $this->notif(
+            RrfNotifier::keProduksi(
                 $fresh,
-                array_merge([$fresh->created_by], $this->idSpv((int) $fresh->divisi_id)),
                 'RRF Ditolak Maintenance',
-                "RRF {$fresh->rrf_no} ditolak Maintenance. Alasan: {$alasan}"
+                "RRF {$fresh->rrf_no} ditolak Maintenance. Alasan: {$alasan}",
+                $user->id
             );
         });
 
@@ -474,11 +423,11 @@ class MtcRrfController extends Controller
                     "Perbaikan dimulai. PIC MTC: {$pic}. Serv. schedule " . $serv->format('d/m/Y H:i')
                 );
 
-                $this->notif(
+                RrfNotifier::keProduksi(
                     $fresh,
-                    [$fresh->created_by],
-                    'Perbaikan Dimulai',
-                    "Maintenance mulai mengerjakan RRF {$fresh->rrf_no}. PIC MTC: {$pic}."
+                    'RRF Sedang Dikerjakan',
+                    "Maintenance mulai mengerjakan RRF {$fresh->rrf_no}. PIC MTC: {$pic}.",
+                    $user->id
                 );
             });
         } catch (\Throwable $e) {
@@ -521,16 +470,10 @@ class MtcRrfController extends Controller
             DB::transaction(function () use ($rrf, $user, $data, $pic, $serv, $parts, $gantiPart, $hapusIds, $kirim, $request, &$stored, &$hapusPath) {
                 $fresh = $this->kunci($rrf, Rrf::STATUS_DIKERJAKAN);
 
-                $pimpinan = [];
-
-                if ($kirim) {
-                    $pimpinan = $this->idPimpinan();
-
-                    if (empty($pimpinan)) {
-                        throw ValidationException::withMessages([
-                            'aksi' => 'Belum ada akun Pimpinan yang aktif untuk menerima RRF ini.',
-                        ]);
-                    }
+                if ($kirim && empty($this->idPimpinan())) {
+                    throw ValidationException::withMessages([
+                        'aksi' => 'Belum ada akun Pimpinan yang aktif untuk menerima RRF ini.',
+                    ]);
                 }
 
                 // Total foto after setelah perubahan tidak boleh lebih dari batas
@@ -603,8 +546,7 @@ class MtcRrfController extends Controller
                         $data['kirim_catatan'] ?? null,
                         (int) $detik,
                         (int) $repair,
-                        (int) $bagi,
-                        $pimpinan
+                        (int) $bagi
                     );
                 } else {
                     $ket = $detik !== null
@@ -617,6 +559,13 @@ class MtcRrfController extends Controller
                         Rrf::STATUS_DIKERJAKAN,
                         $user->id,
                         'Data penanganan diperbarui' . $ket
+                    );
+
+                    RrfNotifier::keProduksi(
+                        $fresh,
+                        'Penanganan RRF Diperbarui',
+                        "Maintenance memperbarui data penanganan RRF {$fresh->rrf_no}. PIC MTC: {$pic}.",
+                        $user->id
                     );
                 }
             });
@@ -637,7 +586,7 @@ class MtcRrfController extends Controller
     }
 
     /* ================================================================
-     | AKSI PIMPINAN
+     | AKSI PIMPINAN  ->  notifikasi ke Admin + SPV + semua operator
      ================================================================ */
 
     /** selesai -> closed */
@@ -671,15 +620,12 @@ class MtcRrfController extends Controller
                     . ($catatan !== '' ? ". Catatan: {$catatan}" : '')
             );
 
-            $this->notif(
+            RrfNotifier::kirim(
                 $fresh,
-                array_merge(
-                    [$fresh->created_by],
-                    $this->idSpv((int) $fresh->divisi_id),
-                    $this->idAdmin()
-                ),
+                ['admin', 'spv_produksi', 'operator_produksi'],
                 'RRF Di-close',
-                "RRF {$fresh->rrf_no} sudah diverifikasi Pimpinan dan berstatus Closed."
+                "RRF {$fresh->rrf_no} sudah diverifikasi Pimpinan dan berstatus Closed.",
+                $user->id
             );
         });
 
@@ -719,11 +665,12 @@ class MtcRrfController extends Controller
                 "Dikembalikan Pimpinan ke Maintenance. Alasan: {$alasan}"
             );
 
-            $this->notif(
+            RrfNotifier::kirim(
                 $fresh,
-                $this->idAdmin(),
+                ['admin', 'spv_produksi', 'operator_produksi'],
                 'RRF Dikembalikan Pimpinan',
-                "RRF {$fresh->rrf_no} dikembalikan Pimpinan untuk diperbaiki. Alasan: {$alasan}"
+                "RRF {$fresh->rrf_no} dikembalikan Pimpinan ke Maintenance untuk diperbaiki. Alasan: {$alasan}",
+                $user->id
             );
         });
 
@@ -832,8 +779,7 @@ class MtcRrfController extends Controller
         ?string $catatan,
         int $detik,
         int $repair,
-        int $pembagi,
-        array $pimpinan
+        int $pembagi
     ): void {
         $fresh->update([
             'status'                => Rrf::STATUS_SELESAI,
@@ -855,18 +801,20 @@ class MtcRrfController extends Controller
                 . ($catatan !== '' ? ". Catatan Maintenance: {$catatan}" : '')
         );
 
-        $this->notif(
+        // Pimpinan: ada RRF yang menunggu verifikasi
+        RrfNotifier::kePimpinan(
             $fresh,
-            $pimpinan,
             'RRF Menunggu Verifikasi Anda',
-            "RRF {$fresh->rrf_no} ({$fresh->nama_mesin}) selesai dikerjakan Maintenance dan menunggu verifikasi Anda. Down time {$downtimeText}."
+            "RRF {$fresh->rrf_no} ({$fresh->nama_mesin}) selesai dikerjakan Maintenance dan menunggu verifikasi Anda. Down time {$downtimeText}.",
+            $user->id
         );
 
-        $this->notif(
+        // SPV + semua operator divisi: perbaikan selesai
+        RrfNotifier::keProduksi(
             $fresh,
-            array_merge([$fresh->created_by], $this->idSpv((int) $fresh->divisi_id)),
             'Perbaikan Selesai',
-            "Maintenance menyelesaikan RRF {$fresh->rrf_no}. Menunggu verifikasi Pimpinan."
+            "Maintenance menyelesaikan RRF {$fresh->rrf_no}. Menunggu verifikasi Pimpinan.",
+            $user->id
         );
     }
 
@@ -937,25 +885,6 @@ class MtcRrfController extends Controller
             ->all();
     }
 
-    /** @return array<int,int> */
-    private function idAdmin(): array
-    {
-        return User::where('role', 'admin')
-            ->where('is_active', true)
-            ->pluck('id')
-            ->all();
-    }
-
-    /** @return array<int,int> */
-    private function idSpv(int $divisiId): array
-    {
-        return User::where('role', 'spv_produksi')
-            ->where('divisi_id', $divisiId)
-            ->where('is_active', true)
-            ->pluck('id')
-            ->all();
-    }
-
     private function catat(
         Rrf $rrf,
         string $lama,
@@ -970,21 +899,5 @@ class MtcRrfController extends Controller
             'user_id'     => $userId,
             'catatan'     => $catatan,
         ]);
-    }
-
-    private function notif(
-        Rrf $rrf,
-        array $userIds,
-        string $judul,
-        string $pesan
-    ): void {
-        foreach (array_unique(array_filter($userIds)) as $id) {
-            RrfNotification::create([
-                'user_id' => $id,
-                'rrf_id'  => $rrf->id,
-                'judul'   => $judul,
-                'pesan'   => $pesan,
-            ]);
-        }
     }
 }

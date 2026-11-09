@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { Menu } from 'lucide-react';
-
+import FlashToast from './FlashToast';
 import SidebarMtcAdmin from './SidebarMtcAdmin';
 import SidebarMtcPimpinan from './SidebarMtcPimpinan';
 
@@ -209,7 +209,7 @@ export default function ProduksiLayout({ children }) {
                     }
                 }
             `}</style>
-
+            <FlashToast />
             <div className="relative flex min-h-screen flex-col overflow-x-hidden text-slate-800">
 
                 {/* BACKGROUND */}
@@ -464,14 +464,6 @@ export default function ProduksiLayout({ children }) {
                 {/* MAIN */}
                 <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
 
-                    {flash?.success && (
-                        <div className="rrf-rise mb-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg shadow-emerald-950/10">
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                                ✓
-                            </span>
-                            {flash.success}
-                        </div>
-                    )}
 
                     <div className="rrf-rise">
                         {children}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import ProduksiLayout, { StatusBadge } from '../../Components/ProduksiLayout';
 import RrfDetail from '../../Components/RrfDetail';
+import { ArrowLeft, Check } from 'lucide-react';
 
 const inputCls =
     'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
@@ -90,8 +91,15 @@ function Panel({ judul, catatan, tone = 'blue', children }) {
 
     return (
         <section
-            className={`overflow-hidden rounded-2xl border shadow-lg shadow-blue-950/5 ${warna}`}
+            className={`relative overflow-hidden rounded-2xl border shadow-xl shadow-blue-950/10 ${warna}`}
         >
+            <span
+                className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${
+                    tone === 'amber'
+                        ? 'from-amber-400 to-orange-500'
+                        : 'from-blue-500 to-indigo-600'
+                }`}
+            />
             <div className={`border-b px-5 py-4 ${garis}`}>
                 <h2
                     className={`text-sm font-extrabold uppercase tracking-wide ${judulWarna}`}
@@ -923,6 +931,61 @@ function RiwayatMesin({ rrf, pembagi, riwayat }) {
     );
 }
 
+const LANGKAH = [
+    ['disetujui', 'Disetujui SPV'],
+    ['diterima', 'Diterima MTC'],
+    ['dikerjakan', 'Dikerjakan'],
+    ['selesai', 'Verifikasi'],
+    ['closed', 'Closed'],
+];
+
+function Stepper({ status }) {
+    const aktif = LANGKAH.findIndex(([k]) => k === status);
+
+    return (
+        <div className="mt-3 flex items-start">
+            {LANGKAH.map(([kode, label], i) => {
+                const lewat = i < aktif || status === 'closed';
+                const sekarang = i === aktif && status !== 'closed';
+
+                return (
+                    <div key={kode} className="flex flex-1 items-start last:flex-none">
+                        <div className="flex w-14 flex-col items-center sm:w-20">
+                            <span
+                                className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-extrabold transition ${
+                                    lewat
+                                        ? 'border-emerald-400 bg-emerald-500 text-white'
+                                        : sekarang
+                                          ? 'border-blue-300 bg-blue-500 text-white shadow-[0_0_12px_rgba(96,165,250,0.7)]'
+                                          : 'border-white/25 bg-white/10 text-white/50'
+                                }`}
+                            >
+                                {lewat ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
+                            </span>
+
+                            <span
+                                className={`mt-1 text-center text-[9px] font-bold leading-tight sm:text-[10px] ${
+                                    lewat || sekarang ? 'text-white' : 'text-white/45'
+                                }`}
+                            >
+                                {label}
+                            </span>
+                        </div>
+
+                        {i < LANGKAH.length - 1 && (
+                            <div
+                                className={`mt-3 h-0.5 flex-1 rounded-full ${
+                                    lewat ? 'bg-emerald-400' : 'bg-white/20'
+                                }`}
+                            />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function MtcShow({
     rrf,
     shiftOptions = [],
@@ -1011,26 +1074,38 @@ export default function MtcShow({
         <ProduksiLayout>
             <Head title={rrf.rrf_no} />
 
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <Link
-                        href="/mtc/rrf"
-                        className="mb-3 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white backdrop-blur-lg transition hover:bg-white/20"
-                    >
-                        ← Kembali ke daftar
-                    </Link>
+            <Link
+                href="/mtc/rrf"
+                className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-lg transition hover:bg-white/20"
+            >
+                <ArrowLeft className="h-3 w-3" />
+                Kembali ke daftar
+            </Link>
 
-                    <div className="flex items-center gap-2">
-                        <div className="h-8 w-1 rounded-full bg-gradient-to-b from-blue-400 to-indigo-600" />
+            <div className="relative mb-4 overflow-hidden rounded-2xl border border-white/20 bg-white/10 px-4 py-3 shadow-xl shadow-slate-950/20 backdrop-blur-xl">
+                <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-blue-400/25 blur-3xl" />
 
-                        <h1 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-                            {rrf.rrf_no}
-                        </h1>
+                <div className="relative flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="h-7 w-1 shrink-0 rounded-full bg-gradient-to-b from-blue-400 to-indigo-600" />
+
+                        <div className="min-w-0">
+                            <h1 className="truncate text-base font-black tracking-tight text-white sm:text-lg">
+                                {rrf.rrf_no}
+                            </h1>
+                            {rrf.mesin && (
+                                <p className="truncate text-[11px] font-semibold text-blue-100/75">
+                                    {rrf.mesin}
+                                </p>
+                            )}
+                        </div>
                     </div>
+
+                    <StatusBadge status={rrf.status} label={rrf.status_label} />
                 </div>
 
-                <div className="pt-1">
-                    <StatusBadge status={rrf.status} label={rrf.status_label} />
+                <div className="relative">
+                    <Stepper status={rrf.status} />
                 </div>
             </div>
 

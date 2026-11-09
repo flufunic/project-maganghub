@@ -1,101 +1,129 @@
 import React, { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
+import {
+    X,
+    ChevronRight,
+    LogOut,
+    LayoutDashboard,
+    ClipboardList,
+    ClipboardCheck,
+    Wrench,
+    CalendarClock,
+    Activity,
+    Cog,
+    SlidersHorizontal,
+} from 'lucide-react';
 
-/* ------------------------------------------------------------------
-| ICON  (UI saja, tidak ada logic)
------------------------------------------------------------------- */
 const ICONS = {
-    logo: {
-        paths: ['M3 21h18M5 21V7l7-4 7 4v14M9 21v-7h6v7M9 10h.01M15 10h.01'],
-    },
-    close: { sw: 2, paths: ['M6 18L18 6M6 6l12 12'] },
-    chevron: { sw: 2, paths: ['M9 5l7 7-7 7'] },
-    dashboard: {
-        paths: [
-            'M4 19V5a1 1 0 011-1h14a1 1 0 011 1v14',
-            'M4 19h16',
-            'M8 15v-3M12 15V8M16 15v-5',
-        ],
-    },
-    checksheet: {
-        paths: [
-            'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2',
-            'M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-            'M9 14l2 2 4-4',
-        ],
-    },
-    rrf: {
-        paths: [
-            'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z',
-            'M14 2v6h6',
-            'M8 13h8',
-            'M8 17h8',
-            'M8 9h2',
-        ],
-    },
-    logout: {
-        paths: [
-            'M15 12H3',
-            'M8 7l-5 5 5 5',
-            'M21 19V5a2 2 0 00-2-2h-6a2 2 0 00-2 2v2',
-        ],
-    },
+    close: X,
+    chevron: ChevronRight,
+    logout: LogOut,
+    approval: LayoutDashboard,
+    checksheetMingguan: ClipboardList,
+    rrfVerifikasi: ClipboardCheck,
+    preventif: Wrench,
+    schedule: CalendarClock,
+    checksheet: Activity,
+    overhaul: Cog,
+    joken: SlidersHorizontal,
 };
 
 function Icon({ type, className = 'h-5 w-5' }) {
-    const icon = ICONS[type];
+    const Comp = ICONS[type];
 
-    if (!icon) {
+    if (!Comp) {
         return null;
     }
 
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={icon.sw ?? 1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {icon.paths.map((d, i) => (
-                <path key={i} d={d} />
-            ))}
-        </svg>
-    );
+    const strokeWidth = type === 'close' || type === 'chevron' ? 2 : 1.75;
+
+    return <Comp className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
 /* ------------------------------------------------------------------
 | DAFTAR MENU
 | match(path) -> true kalau menu ini sedang aktif
 ------------------------------------------------------------------ */
-const MENU = [
+const GRUP = [
     {
-        key: 'preventif',
-        href: '/pimpinan',
-        icon: 'dashboard',
-        title: 'Preventif Mesin',
-        desc: 'Approval & monitoring',
-        match: (path) =>
-            path === '/pimpinan' || path.startsWith('/pimpinan/pengiriman'),
+        judul: 'Menu Pimpinan',
+        menus: [
+            {
+                key: 'preventif-approval',
+                href: '/pimpinan',
+                icon: 'approval',
+                title: 'Approval Preventif',
+                desc: 'Approval & monitoring',
+                match: (p) =>
+                    p === '/pimpinan' || p.startsWith('/pimpinan/pengiriman'),
+            },
+            {
+                key: 'checksheet-mingguan',
+                href: '/pimpinan/check-sheet',
+                icon: 'checksheetMingguan',
+                title: 'Check Sheet Mingguan',
+                desc: 'Rekap & pemeriksaan mingguan',
+                match: (p) => p.startsWith('/pimpinan/check-sheet'),
+            },
+            {
+                key: 'rrf',
+                href: '/mtc/rrf',
+                icon: 'rrfVerifikasi',
+                title: 'Repair Request Form',
+                desc: 'Verifikasi permintaan perbaikan',
+                match: (p) => p.startsWith('/mtc/rrf'),
+            },
+        ],
     },
     {
-        key: 'checksheet',
-        href: '/pimpinan/check-sheet',
-        icon: 'checksheet',
-        title: 'Check Sheet Mingguan',
-        desc: 'Rekap & pemeriksaan mingguan',
-        match: (path) => path.startsWith('/pimpinan/check-sheet'),
-    },
-    {
-        key: 'rrf',
-        href: '/mtc/rrf',
-        icon: 'rrf',
-        title: 'RRF Maintenance',
-        desc: 'Verifikasi permintaan perbaikan',
-        match: (path) => path.startsWith('/mtc/rrf'),
+        judul: 'Menu Maintenance',
+        menus: [
+            {
+                key: 'preventif-mesin',
+                href: '/preventif-mesin',
+                icon: 'preventif',
+                title: 'Preventif Mesin',
+                desc: 'Maintenance schedule',
+                match: (p) =>
+                    p === '/preventif-mesin' || p.startsWith('/preventif-mesin/'),
+            },
+            {
+                key: 'schedule-preventif',
+                href: '/schedule-preventif',
+                icon: 'schedule',
+                title: 'Schedule Preventif Mingguan',
+                desc: 'Plan & act per week',
+                match: (p) =>
+                    p === '/schedule-preventif' ||
+                    p.startsWith('/schedule-preventif/'),
+            },
+            {
+                key: 'check-sheets',
+                href: '/check-sheets',
+                icon: 'checksheet',
+                title: 'Check Sheet Prediktif',
+                desc: 'Check sheet maintenance',
+                match: (p) =>
+                    p === '/check-sheets' || p.startsWith('/check-sheets/'),
+            },
+            {
+                key: 'overhaul',
+                href: '/overhaul-sc2',
+                icon: 'overhaul',
+                title: 'Schedule Overhaul',
+                desc: 'Jadwal overhaul mesin',
+                match: (p) =>
+                    p === '/overhaul-sc2' || p.startsWith('/overhaul-sc2/'),
+            },
+            {
+                key: 'joken',
+                href: '/joken',
+                icon: 'joken',
+                title: 'Joken Mesin',
+                desc: 'Standarisasi setting mesin',
+                match: (p) => p === '/joken' || p.startsWith('/joken/'),
+            },
+        ],
     },
 ];
 
@@ -108,9 +136,7 @@ export default function Sidebar({ open, onClose }) {
 
     return (
         <>
-            {/* =====================================================
-                BACKDROP
-            ====================================================== */}
+            {/* BACKDROP */}
             {open && (
                 <div
                     className="fixed inset-0 z-[90] cursor-pointer bg-[#030a26]/60 backdrop-blur-sm transition-opacity"
@@ -118,27 +144,20 @@ export default function Sidebar({ open, onClose }) {
                 />
             )}
 
-            {/* =====================================================
-                SIDEBAR
-            ====================================================== */}
+            {/* SIDEBAR */}
             <aside
                 className={`fixed left-0 top-0 z-[100] flex h-screen w-[290px] flex-col overflow-hidden border-r border-white/15 bg-gradient-to-b from-[#050f3a]/95 via-[#0a2260]/95 to-[#0c2a78]/95 text-white shadow-[0_0_80px_rgba(2,6,23,0.6)] backdrop-blur-2xl transition-transform duration-300 ease-out ${
                     open ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >
-                {/* TOP DECORATION */}
                 <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-                {/* GLOW */}
                 <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-blue-400/25 blur-[80px]" />
                 <div className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/25 blur-[80px]" />
 
-                {/* =================================================
-                    HEADER
-                ================================================== */}
+                {/* HEADER */}
                 <div className="relative border-b border-white/10 px-5 pb-5 pt-6">
                     <div className="flex items-center justify-between">
-                        {/* BRAND */}
                         <div className="flex items-center gap-3">
                             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
                                 <img
@@ -159,7 +178,6 @@ export default function Sidebar({ open, onClose }) {
                             </div>
                         </div>
 
-                        {/* CLOSE */}
                         <button
                             type="button"
                             onClick={onClose}
@@ -171,78 +189,90 @@ export default function Sidebar({ open, onClose }) {
                     </div>
                 </div>
 
-                {/* =================================================
-                    MENU
-                ================================================== */}
-                <nav className="relative flex-1 space-y-2 overflow-y-auto px-4 py-6">
-                    {/* SECTION TITLE */}
-                    <div className="mb-3 flex items-center gap-2 px-2">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">
-                            Menu Utama
-                        </span>
+                {/* MENU */}
+                <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
+                    {GRUP.map((grup) => (
+                        <div key={grup.judul}>
+                            <div className="mb-2.5 flex items-center gap-2 px-3">
+                                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">
+                                    {grup.judul}
+                                </span>
 
-                        <div className="h-px flex-1 bg-white/10" />
-                    </div>
+                                <div className="h-px flex-1 bg-white/10" />
+                            </div>
 
-                    {MENU.map((item) => {
-                        const active = item.match(path);
+                            <div className="space-y-1.5">
+                                {grup.menus.map((item) => {
+                                    const active = item.match(path);
 
-                        return (
-                            <Link
-                                key={item.key}
-                                href={item.href}
-                                onClick={onClose}
-                                aria-current={active ? 'page' : undefined}
-                                className={`group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
-                                    active
-                                        ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30 hover:bg-white/20'
-                                        : 'border-transparent hover:border-white/10 hover:bg-white/10'
-                                }`}
-                            >
-                                {/* ACTIVE BAR */}
-                                {active && (
-                                    <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
-                                )}
+                                    return (
+                                        <Link
+                                            key={item.key}
+                                            href={item.href}
+                                            onClick={onClose}
+                                            aria-current={active ? 'page' : undefined}
+                                            className={`group relative flex h-[68px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border px-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
+                                                active
+                                                    ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30 hover:bg-white/20'
+                                                    : 'border-transparent hover:border-white/10 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            {active && (
+                                                <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
+                                            )}
 
-                                {/* ICON */}
-                                <div className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 transition-transform duration-200 group-hover:scale-105">
-                                    <Icon type={item.icon} className="h-5 w-5" />
-                                </div>
+                                            <div
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
+                                                    active
+                                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-white/25'
+                                                        : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
+                                                }`}
+                                            >
+                                                <Icon type={item.icon} className="h-5 w-5" />
+                                            </div>
 
-                                {/* TEXT */}
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-white">
-                                        {item.title}
-                                    </p>
+                                            <div className="min-w-0 flex-1">
+                                                <p
+                                                    title={item.title}
+                                                    className={`line-clamp-2 text-[13px] font-semibold leading-tight ${
+                                                        active
+                                                            ? 'text-white'
+                                                            : 'text-blue-50/90 group-hover:text-white'
+                                                    }`}
+                                                >
+                                                    {item.title}
+                                                </p>
 
-                                    <p
-                                        className={`mt-0.5 truncate text-[11px] font-medium ${
-                                            active ? 'text-blue-200' : 'text-blue-200/60'
-                                        }`}
-                                    >
-                                        {item.desc}
-                                    </p>
-                                </div>
+                                                <p
+                                                    className={`mt-0.5 truncate text-[11px] font-medium ${
+                                                        active
+                                                            ? 'text-blue-200'
+                                                            : 'text-blue-200/50 group-hover:text-blue-200/80'
+                                                    }`}
+                                                >
+                                                    {item.desc}
+                                                </p>
+                                            </div>
 
-                                {/* ARROW */}
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100">
-                                    <Icon type="chevron" className="h-4 w-4" />
-                                </div>
-                            </Link>
-                        );
-                    })}
+                                            <div className="absolute right-2 top-1/2 flex h-7 w-7 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100">
+                                                <Icon type="chevron" className="h-3.5 w-3.5" />
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </nav>
 
-                {/* =====================================================
-                    BOTTOM / LOGOUT
-                ====================================================== */}
+                {/* LOGOUT */}
                 <div className="relative border-t border-white/10 p-4">
                     <button
                         type="button"
                         onClick={() => setShowLogoutModal(true)}
                         className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-all duration-200 hover:border-red-300/20 hover:bg-red-500/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                     >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 transition-all duration-200 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-red-950/50">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 ring-1 ring-white/20 transition-all duration-200 group-hover:scale-105">
                             <Icon type="logout" className="h-5 w-5" />
                         </div>
 
@@ -264,9 +294,7 @@ export default function Sidebar({ open, onClose }) {
                 </div>
             </aside>
 
-            {/* =====================================================
-                MODAL KONFIRMASI LOGOUT
-            ====================================================== */}
+            {/* MODAL KONFIRMASI LOGOUT */}
             {showLogoutModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
                     <div
@@ -274,10 +302,8 @@ export default function Sidebar({ open, onClose }) {
                         aria-modal="true"
                         className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40"
                     >
-                        {/* TOP DECORATION */}
                         <div className="absolute left-0 right-0 top-0 h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-orange-400" />
 
-                        {/* MODAL TOP */}
                         <div className="relative overflow-hidden bg-gradient-to-br from-red-50 via-white to-white px-6 pb-5 pt-8">
                             <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-red-100/60" />
 
@@ -302,7 +328,6 @@ export default function Sidebar({ open, onClose }) {
                             </div>
                         </div>
 
-                        {/* MODAL BUTTON */}
                         <div className="flex gap-3 border-t border-slate-100 bg-white px-6 py-5">
                             <button
                                 type="button"
@@ -312,20 +337,13 @@ export default function Sidebar({ open, onClose }) {
                                 Batal
                             </button>
 
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    router.post('/logout');
-                                }}
-                                className="flex-1"
+                            <button
+                                type="button"
+                                onClick={() => router.post('/logout')}
+                                className="flex-1 cursor-pointer rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600"
                             >
-                                <button
-                                    type="submit"
-                                    className="w-full cursor-pointer rounded-xl bg-red-500 px-4 py-3 font-semibold text-white hover:bg-red-600"
-                                >
-                                    Logout
-                                </button>
-                            </form>
+                                Logout
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -9,6 +9,7 @@ use App\Models\RrfClass;
 use App\Models\RrfNotification;
 use App\Models\RrfStatusLog;
 use App\Models\User;
+use App\Support\RrfNotifier;
 use App\Support\RrfPayload;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -34,14 +35,11 @@ class RrfController extends Controller
         $user = $request->user();
         $this->pastikanPunyaDivisi($user);
 
+        // SPV dan operator sama-sama melihat SEMUA RRF divisinya, apa pun statusnya
         $query = Rrf::query()
             ->with(['kelas', 'creator:id,name'])
             ->where('divisi_id', $user->divisi_id)
             ->latest('id');
-
-        if ($user->role === 'operator_produksi') {
-            $query->where('created_by', $user->id);
-        }
 
         $status = $request->query('status');
         if ($status && array_key_exists($status, Rrf::STATUS_LABEL)) {
@@ -176,10 +174,20 @@ class RrfController extends Controller
                     'catatan'     => $otomatis ? 'RRF dibuat oleh SPV, langsung disetujui' : 'RRF dibuat',
                 ]);
 
-                if (!$otomatis) {
-                    $this->kirimNotifikasiKeSpv(
+                if ($otomatis) {
+                    // SPV (posisi lebih tinggi) membuat RRF -> operator divisi ikut diberi tahu
+                    RrfNotifier::keOperator(
                         $rrf,
-                        "Operator mengajukan RRF {$rrf->rrf_no}. Silakan periksa dan berikan keputusan."
+                        'RRF Baru dari SPV',
+                        "SPV {$user->name} membuat RRF {$rrf->rrf_no} dan langsung disetujui.",
+                        $user->id
+                    );
+                } else {
+                    RrfNotifier::keSpv(
+                        $rrf,
+                        'RRF Baru Menunggu Persetujuan',
+                        "Operator mengajukan RRF {$rrf->rrf_no}. Silakan periksa dan berikan keputusan.",
+                        $user->id
                     );
                 }
 
@@ -220,7 +228,9 @@ class RrfController extends Controller
     }
 
     /* ================================================================
-     | EDIT (selama masih menunggu SPV atau ditolak)
+     | EDIT
+     | - Operator: miliknya sendiri, selama diajukan / ditolak
+     | - SPV     : semua RRF divisinya, selama belum diterima Maintenance
      ================================================================ */
 
     public function edit(Request $request, Rrf $rrf)
@@ -311,14 +321,20 @@ class RrfController extends Controller
             DB::transaction(function () use ($rrf, $data, $divisiPelapor, $lokasi, $mesin, $parts, $jadwal, $hapusIds, $request, $user, &$stored, &$hapusPath, &$statusLama) {
                 $terkunci = Rrf::whereKey($rrf->id)->lockForUpdate()->firstOrFail();
 
-                // Dicek lagi setelah dikunci: bisa jadi SPV baru saja memproses RRF ini
-                if (!$this->statusBisaDiubah($terkunci)) {
+                // Dicek lagi setelah dikunci: bisa jadi status baru saja berubah
+                if (!$this->statusBisaDiubah($terkunci, $user)) {
                     throw ValidationException::withMessages([
-                        'status' => 'RRF ini sudah diproses SPV, jadi tidak bisa diubah lagi.',
+                        'status' => $user->role === 'spv_produksi'
+                            ? 'RRF ini sudah diterima Maintenance, jadi tidak bisa diubah lagi.'
+                            : 'RRF ini sudah diproses SPV, jadi tidak bisa diubah lagi.',
                     ]);
                 }
 
                 $statusLama = $terkunci->status;
+                $olehSpv    = $user->role === 'spv_produksi';
+
+                // SPV mengedit tanpa mengubah status. Operator mengedit -> diajukan (ulang) ke SPV.
+                $statusBaru = $olehSpv ? $statusLama : Rrf::STATUS_DIAJUKAN;
 
                 $terkunci->update([
                     'divisi_pelapor'   => $divisiPelapor,
@@ -329,7 +345,7 @@ class RrfController extends Controller
                     'req_schedule_at'  => $jadwal,
                     'problem'          => $data['problem'],
                     'counter_measure'  => $data['request_activity'] ?? null,
-                    'status'           => Rrf::STATUS_DIAJUKAN,
+                    'status'           => $statusBaru,
                 ]);
 
                 $terkunci->parts()->delete();
@@ -358,25 +374,38 @@ class RrfController extends Controller
                     ]);
                 }
 
-                $ulang = $statusLama === Rrf::STATUS_DITOLAK;
+                $ulang = !$olehSpv && $statusLama === Rrf::STATUS_DITOLAK;
 
                 RrfStatusLog::create([
                     'rrf_id'      => $terkunci->id,
                     'status_lama' => $statusLama,
-                    'status_baru' => Rrf::STATUS_DIAJUKAN,
+                    'status_baru' => $statusBaru,
                     'user_id'     => $user->id,
-                    'catatan'     => $ulang
-                        ? 'RRF diperbaiki dan diajukan ulang'
-                        : 'RRF diubah oleh pembuat sebelum diproses SPV',
+                    'catatan'     => $olehSpv
+                        ? 'RRF diubah oleh SPV'
+                        : ($ulang
+                            ? 'RRF diperbaiki dan diajukan ulang'
+                            : 'RRF diubah oleh pembuat sebelum diproses SPV'),
                 ]);
 
-                $this->kirimNotifikasiKeSpv(
-                    $terkunci,
-                    $ulang
-                        ? "Operator mengajukan ulang RRF {$terkunci->rrf_no} setelah melakukan perbaikan."
-                        : "Operator mengubah isi RRF {$terkunci->rrf_no} yang masih menunggu keputusan Anda.",
-                    $ulang ? 'RRF Diajukan Ulang' : 'RRF Diubah Pembuatnya'
-                );
+                if ($olehSpv) {
+                    // SPV mengubah isi RRF -> operator divisi diberi tahu
+                    RrfNotifier::keOperator(
+                        $terkunci,
+                        'RRF Diubah oleh SPV',
+                        "SPV {$user->name} mengubah isi RRF {$terkunci->rrf_no}.",
+                        $user->id
+                    );
+                } else {
+                    RrfNotifier::keSpv(
+                        $terkunci,
+                        $ulang ? 'RRF Diajukan Ulang' : 'RRF Diubah Pembuatnya',
+                        $ulang
+                            ? "Operator mengajukan ulang RRF {$terkunci->rrf_no} setelah melakukan perbaikan."
+                            : "Operator mengubah isi RRF {$terkunci->rrf_no} yang masih menunggu keputusan Anda.",
+                        $user->id
+                    );
+                }
             });
         } catch (\Throwable $e) {
             Storage::disk('public')->delete($stored);
@@ -388,13 +417,13 @@ class RrfController extends Controller
 
         return redirect()
             ->route('rrf.show', $rrf)
-            ->with('success', $statusLama === Rrf::STATUS_DITOLAK
+            ->with('success', ($user->role !== 'spv_produksi' && $statusLama === Rrf::STATUS_DITOLAK)
                 ? "RRF {$rrf->rrf_no} diperbaiki dan diajukan ulang ke SPV."
                 : "RRF {$rrf->rrf_no} berhasil diperbarui.");
     }
 
     /* ================================================================
-     | HAPUS (soft delete, hanya selama belum diproses SPV)
+     | HAPUS (soft delete, apa pun statusnya, hanya pembuat)
      ================================================================ */
 
     public function destroy(Request $request, Rrf $rrf)
@@ -480,6 +509,10 @@ class RrfController extends Controller
             abort(403, 'Hanya SPV Produksi yang bisa menyetujui atau menolak RRF.');
         }
 
+        if (!$this->bolehApprove($user, $rrf)) {
+            abort(403, 'Anda tidak berwenang memproses RRF ini.');
+        }
+
         DB::transaction(function () use ($user, $rrf, $statusBaru, $catatan) {
             $terkunci = Rrf::whereKey($rrf->id)->lockForUpdate()->firstOrFail();
 
@@ -509,10 +542,20 @@ class RrfController extends Controller
                 'catatan'     => $catatan,
             ]);
 
+            // Keputusan SPV diberitahukan ke semua operator divisi (setuju maupun tolak)
             if ($statusBaru === Rrf::STATUS_DITOLAK) {
-                $this->kirimNotifikasiKeOperator(
+                RrfNotifier::keOperator(
                     $terkunci,
-                    "RRF {$terkunci->rrf_no} ditolak oleh SPV. Alasan: {$catatan}"
+                    'RRF Ditolak oleh SPV',
+                    "RRF {$terkunci->rrf_no} ditolak oleh SPV. Alasan: {$catatan}",
+                    $user->id
+                );
+            } else {
+                RrfNotifier::keOperator(
+                    $terkunci,
+                    'RRF Disetujui oleh SPV',
+                    "RRF {$terkunci->rrf_no} disetujui SPV dan diteruskan ke Maintenance.",
+                    $user->id
                 );
             }
         });
@@ -612,21 +655,39 @@ class RrfController extends Controller
             && $rrf->status === Rrf::STATUS_DIAJUKAN;
     }
 
-    /** RRF hanya bisa diubah atau dihapus selama belum disetujui SPV. */
-    private function statusBisaDiubah(Rrf $rrf): bool
+    /**
+     * Apakah status RRF masih membolehkan perubahan isi?
+     * - SPV     : sampai sebelum diterima Maintenance (diajukan, ditolak, disetujui)
+     * - Operator: hanya selama belum disetujui SPV (diajukan, ditolak)
+     */
+    private function statusBisaDiubah(Rrf $rrf, User $user): bool
     {
-        return in_array($rrf->status, [Rrf::STATUS_DIAJUKAN, Rrf::STATUS_DITOLAK], true);
+        $boleh = $user->role === 'spv_produksi'
+            ? [Rrf::STATUS_DIAJUKAN, Rrf::STATUS_DITOLAK, Rrf::STATUS_DISETUJUI]
+            : [Rrf::STATUS_DIAJUKAN, Rrf::STATUS_DITOLAK];
+
+        return in_array($rrf->status, $boleh, true);
     }
 
-    /** Satu sumber aturan edit/hapus: null artinya boleh, selain itu berisi alasan terkunci. */
+    /** Satu sumber aturan edit: null artinya boleh, selain itu berisi alasan terkunci. */
     private function alasanTerkunci(User $user, Rrf $rrf): ?string
     {
-        if (!$this->statusBisaDiubah($rrf)) {
-            return 'Sudah diproses SPV, tidak bisa diubah atau dihapus.';
+        if ($user->role === 'spv_produksi') {
+            if ((int) $rrf->divisi_id !== (int) $user->divisi_id) {
+                return 'RRF ini bukan dari divisi Anda.';
+            }
+
+            return $this->statusBisaDiubah($rrf, $user)
+                ? null
+                : 'Sudah diterima Maintenance, tidak bisa diubah lagi.';
+        }
+
+        if (!$this->statusBisaDiubah($rrf, $user)) {
+            return 'Sudah diproses SPV, tidak bisa diubah.';
         }
 
         if ((int) $rrf->created_by !== (int) $user->id) {
-            return 'Hanya pembuat RRF yang bisa mengubah atau menghapus.';
+            return 'Hanya pembuat RRF atau SPV yang bisa mengubah.';
         }
 
         return null;
@@ -636,7 +697,7 @@ class RrfController extends Controller
     {
         return $this->alasanTerkunci($user, $rrf) === null;
     }
-    
+
     /** Hapus tidak terikat status, hanya pembuat RRF yang boleh. */
     private function bolehHapus(User $user, Rrf $rrf): bool
     {
@@ -670,16 +731,13 @@ class RrfController extends Controller
         }
     }
 
+    /** SPV dan operator boleh melihat semua RRF di divisinya. */
     private function pastikanBolehLihat(User $user, Rrf $rrf): void
     {
         $this->pastikanPunyaDivisi($user);
 
         if ((int) $rrf->divisi_id !== (int) $user->divisi_id) {
             abort(404);
-        }
-
-        if ($user->role === 'operator_produksi' && (int) $rrf->created_by !== (int) $user->id) {
-            abort(403, 'Anda hanya bisa melihat RRF yang Anda buat.');
         }
     }
 
@@ -735,31 +793,5 @@ class RrfController extends Controller
             : 1;
 
         return $prefix . \str_pad((string) $berikut, 4, '0', STR_PAD_LEFT);
-    }
-
-    private function kirimNotifikasiKeSpv(Rrf $rrf, string $pesan, string $judul = 'RRF Baru Menunggu Persetujuan'): void
-    {
-        $spvs = User::where('role', 'spv_produksi')
-            ->where('divisi_id', $rrf->divisi_id)
-            ->get(['id']);
-
-        foreach ($spvs as $spv) {
-            RrfNotification::create([
-                'user_id' => $spv->id,
-                'rrf_id'  => $rrf->id,
-                'judul'   => $judul,
-                'pesan'   => $pesan,
-            ]);
-        }
-    }
-
-    private function kirimNotifikasiKeOperator(Rrf $rrf, string $pesan): void
-    {
-        RrfNotification::create([
-            'user_id' => $rrf->created_by,
-            'rrf_id'  => $rrf->id,
-            'judul'   => 'RRF Ditolak oleh SPV',
-            'pesan'   => $pesan,
-        ]);
     }
 }
