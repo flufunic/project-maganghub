@@ -23,6 +23,7 @@ use App\Http\Controllers\JokenController;
 use App\Http\Controllers\RrfController;
 use App\Http\Controllers\RrfNotificationController;
 use App\Http\Controllers\MtcRrfController;
+use App\Http\Controllers\SopIkController;
 
 /*
 |--------------------------------------------------------------------------
@@ -458,6 +459,17 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     // routes/web.php (di grup yang sudah dilindungi login)
     Route::get('/joken/{joken}/export', [JokenController::class, 'export'])->name('joken.export');
 
+    /*
+    |--------------------------------------------------------------------------
+    | SopIk
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/sop-ik', [SopIkController::class, 'index']);
+    Route::get('/sop-ik/revisions/{revision}/file', [SopIkController::class, 'file']);
+    Route::post('/sop-ik', [SopIkController::class, 'store']);
+    Route::put('/sop-ik/{sopDocument}', [SopIkController::class, 'update']);
+    Route::delete('/sop-ik/{sopDocument}', [SopIkController::class, 'destroy']);
+    Route::delete('/sop-ik/{sopDocument}/revisions/{revision}', [SopIkController::class, 'destroyRevision']);
 });
 
 

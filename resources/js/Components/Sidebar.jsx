@@ -10,6 +10,7 @@ import {
     SlidersHorizontal,
     LogOut,
     ClipboardCheck,
+    FileText,
 } from "lucide-react";
 
 import SidebarPimpinan from "./Pimpinan/Sidebar";
@@ -25,6 +26,7 @@ const ICONS = {
     joken: SlidersHorizontal,
     logout: LogOut,
     rrf: ClipboardCheck,
+    sop: FileText,
 };
 
 function Icon({ type, className = "h-5 w-5" }) {
@@ -73,6 +75,12 @@ const MENUS = [
         icon: "rrf",
         label: "Repair Request Form",
         desc: "Request perbaikan mesin",
+    },
+    {
+        href: "/sop-ik",
+        icon: "sop",
+        label: "SOP/IK",
+        desc: "Dokumen SOP & IK maintenance",
     },
 ];
 function SidebarAdmin({ open, onClose }) {
