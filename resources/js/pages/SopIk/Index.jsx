@@ -201,6 +201,7 @@ const emptyForm = {
     tanggal_revisi: '',
     catatan: '',
     file: null,
+    punyaFile: false, // dokumen ini sudah pernah punya file atau belum
 };
 
 export default function Index({ documents = [], flash }) {
@@ -244,7 +245,6 @@ export default function Index({ documents = [], flash }) {
 
     /* ---------------- tambah / edit ---------------- */
     const openForm = (doc = null) => {
-        setShowSuccess(false); 
         setErrors({});
         setForm(
             doc
@@ -255,6 +255,7 @@ export default function Index({ documents = [], flash }) {
                       proses: doc.proses,
                       proses_penting: doc.proses_penting ?? '',
                       tanggal_revisi: doc.tanggal_revisi ?? '',
+                      punyaFile: doc.revisions.length > 0,
                   }
                 : { ...emptyForm }
         );
@@ -298,7 +299,7 @@ export default function Index({ documents = [], flash }) {
             title: baru ? 'Tambah dokumen?' : 'Simpan data edit?',
             message: baru
                 ? `Apakah kamu yakin ingin menambahkan dokumen ${form.no_dok || 'ini'}?`
-                : form.file
+                : form.file && form.punyaFile
                   ? 'Apakah kamu yakin ingin menyimpan data edit ini? Dokumen baru akan tersimpan sebagai revisi, dan dokumen sebelumnya tetap ada.'
                   : 'Apakah kamu yakin ingin menyimpan data edit ini?',
             confirmLabel: baru ? 'Ya, Tambah' : 'Ya, Simpan',
@@ -357,7 +358,7 @@ export default function Index({ documents = [], flash }) {
     return (
         <>
             <Sidebar open={showSidebar} onClose={() => setShowSidebar(false)} />
-            <Head title="SOP/IK" />
+            <Head title="Daftar Isi SOP/IK" />
 
             <div className="relative flex min-h-screen flex-col overflow-x-hidden">
                 <div className="fixed inset-0 -z-20 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
@@ -375,7 +376,7 @@ export default function Index({ documents = [], flash }) {
                         </button>
 
                         <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
-                            SOP/IK Maintenance
+                            Daftar Isi SOP/IK Maintenance
                         </h1>
                     </div>
                 </header>
@@ -552,7 +553,7 @@ export default function Index({ documents = [], flash }) {
             {form && (
                 <ModalShell
                     title={form.id ? 'Edit Dokumen' : 'Tambah Dokumen'}
-                    subtitle={form.id ? 'Upload dokumen baru untuk membuat revisi, dokumen lama tetap tersimpan' : undefined}
+                    subtitle={form.id && form.punyaFile ? 'Upload dokumen baru untuk membuat revisi, dokumen lama tetap tersimpan' : undefined}
                     onClose={() => setForm(null)}
                     footer={
                         <>
@@ -604,7 +605,7 @@ export default function Index({ documents = [], flash }) {
 
                         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
                             <Field
-                                label={form.id ? 'Upload Dokumen Baru (opsional)' : 'File Dokumen'}
+                                label={form.id && form.punyaFile ? 'Upload Dokumen Baru (opsional)' : 'File Dokumen (opsional)'}
                                 error={errors.file}
                             >
                                 <input
@@ -615,7 +616,7 @@ export default function Index({ documents = [], flash }) {
                                 />
                             </Field>
 
-                            {form.id && form.file && (
+                            {form.id && form.punyaFile && form.file && (
                                 <div className="mt-3">
                                     <Field label="Catatan Revisi" error={errors.catatan}>
                                         <textarea
@@ -657,6 +658,11 @@ export default function Index({ documents = [], flash }) {
                     </dl>
 
                     <h3 className="mb-2 text-sm font-bold text-slate-800">Semua Versi Dokumen</h3>
+                    {viewDoc.revisions.length === 0 && (
+                        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-400">
+                            Belum ada file dokumen.
+                        </p>
+                    )}
                     <ul className="space-y-2">
                         {viewDoc.revisions.map((r, i) => (
                             <li key={r.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -710,6 +716,11 @@ export default function Index({ documents = [], flash }) {
                     }
                 >
                     <h3 className="mb-2 text-sm font-bold text-slate-800">Hapus per versi dokumen</h3>
+                    {deleteDoc.revisions.length === 0 && (
+                        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-400">
+                            Dokumen ini belum punya file.
+                        </p>
+                    )}
                     <ul className="space-y-2">
                         {deleteDoc.revisions.map((r) => (
                             <li key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">

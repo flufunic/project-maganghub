@@ -12,6 +12,7 @@ import {
     Activity,
     Cog,
     SlidersHorizontal,
+    FileText,
 } from 'lucide-react';
 
 const ICONS = {
@@ -26,6 +27,7 @@ const ICONS = {
     checksheet: Activity,
     overhaul: Cog,
     joken: SlidersHorizontal,
+    sop: FileText,
 };
 
 function Icon({ type, className = 'h-5 w-5' }) {
@@ -122,6 +124,14 @@ const GRUP = [
                 title: 'Joken Mesin',
                 desc: 'Standarisasi setting mesin',
                 match: (p) => p === '/joken' || p.startsWith('/joken/'),
+            },
+            {
+                key: 'sop-ik',
+                href: '/sop-ik',
+                icon: 'sop',
+                title: 'SOP/IK',
+                desc: 'Dokumen SOP & IK maintenance',
+                match: (p) => p === '/sop-ik' || p.startsWith('/sop-ik/'),
             },
         ],
     },

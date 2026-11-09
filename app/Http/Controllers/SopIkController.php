@@ -47,10 +47,9 @@ class SopIkController extends Controller
             'proses'         => ['required', 'string', 'max:255'],
             'proses_penting' => ['nullable', 'string', 'max:255'],
             'tanggal_revisi' => ['nullable', 'date'],
-            'file'           => ['required', 'file', 'mimes:pdf,doc,docx,xls,xlsx', 'max:20480'],
+            'file'           => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx', 'max:20480'],
         ], [
             'no_dok.unique' => 'No dokumen sudah digunakan.',
-            'file.required' => 'File dokumen wajib diupload.',
         ]);
 
         DB::transaction(function () use ($data, $request) {
@@ -61,8 +60,11 @@ class SopIkController extends Controller
                 'tanggal_revisi' => $data['tanggal_revisi'] ?? null,
             ]);
 
-            // Versi pertama = dokumen awal (tanpa catatan, tidak masuk kolom keterangan)
-            $this->addRevision($doc, $request, 1, null);
+            // File opsional. Kalau ada, jadi versi pertama = dokumen awal
+            // (tanpa catatan, tidak masuk kolom keterangan)
+            if ($request->hasFile('file')) {
+                $this->addRevision($doc, $request, 1, null);
+            }
         });
 
         return back()->with('success', 'Dokumen berhasil ditambahkan.');
@@ -71,6 +73,8 @@ class SopIkController extends Controller
     public function update(Request $request, SopDocument $sopDocument)
     {
         $hasFile = $request->hasFile('file');
+        // Kalau dokumen belum pernah punya file, upload pertama = dokumen awal (catatan tidak wajib)
+        $sudahAdaFile = $sopDocument->revisions()->exists();
 
         $data = $request->validate([
             'no_dok'         => ['required', 'string', 'max:100',
@@ -80,13 +84,13 @@ class SopIkController extends Controller
             'proses_penting' => ['nullable', 'string', 'max:255'],
             'tanggal_revisi' => ['nullable', 'date'],
             'file'           => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx', 'max:20480'],
-            'catatan'        => [$hasFile ? 'required' : 'nullable', 'string'],
+            'catatan'        => [$hasFile && $sudahAdaFile ? 'required' : 'nullable', 'string'],
         ], [
             'no_dok.unique'    => 'No dokumen sudah digunakan.',
             'catatan.required' => 'Catatan revisi wajib diisi saat upload dokumen baru.',
         ]);
 
-        DB::transaction(function () use ($data, $request, $sopDocument, $hasFile) {
+        DB::transaction(function () use ($data, $request, $sopDocument, $hasFile, $sudahAdaFile) {
             $sopDocument->update([
                 'no_dok'         => trim($data['no_dok']),
                 'proses'         => $data['proses'],
@@ -100,7 +104,7 @@ class SopIkController extends Controller
                     ->where('sop_document_id', $sopDocument->id)
                     ->max('revisi_ke') + 1;
 
-                $this->addRevision($sopDocument, $request, $next, $data['catatan']);
+                $this->addRevision($sopDocument, $request, $next, $sudahAdaFile ? $data['catatan'] : null);
             }
         });
 
@@ -112,10 +116,7 @@ class SopIkController extends Controller
     {
         abort_unless(Storage::disk('local')->exists($revision->file_path), 404);
 
-        return response()->download(
-            Storage::disk('local')->path($revision->file_path),
-            $revision->file_name
-        );
+        return Storage::disk('local')->response($revision->file_path, $revision->file_name);
     }
 
     // Hapus seluruh data (soft delete dokumen + semua versinya)
