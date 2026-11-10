@@ -352,8 +352,8 @@ export default function Index({ documents = [], flash }) {
         ? documents.filter((d) => `${d.no_dok} ${d.proses}`.toLowerCase().includes(q))
         : documents;
 
-    const th = 'px-4 py-3 text-center font-bold';
-    const td = 'border-b border-slate-200 px-4 py-2.5 align-top';
+    const th = 'border-b border-r border-white/20 px-4 py-3 text-center font-bold last:border-r-0';
+    const td = 'border-b border-r border-slate-300 px-4 py-2.5 align-top last:border-r-0';
 
     return (
         <>
@@ -402,7 +402,7 @@ export default function Index({ documents = [], flash }) {
                                 </button>
                             </div>
 
-                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <div className="overflow-x-auto rounded-xl border border-slate-300">
                                 <table className="w-full border-separate border-spacing-0 text-sm">
                                     <thead>
                                         <tr className="bg-gradient-to-r from-[#0a1a4d] via-blue-900 to-indigo-900 text-[11px] uppercase tracking-wider text-white">
@@ -416,10 +416,10 @@ export default function Index({ documents = [], flash }) {
                                         </tr>
                                     </thead>
 
-                                    <tbody>
+                                    <tbody className="[&>tr:last-child>td]:border-b-0">
                                         {tampil.length === 0 && (
                                             <tr>
-                                                <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                                                <td colSpan={7} className="px-4 py-10 text-center text-slate-400 border-r-0">
                                                     {documents.length === 0 ? 'Belum ada dokumen.' : 'Tidak ada dokumen yang cocok.'}
                                                 </td>
                                             </tr>

@@ -6,14 +6,12 @@ use App\Exports\PreventifMesinExport;
 use App\Models\CheckSheetAbnormality;
 use App\Models\PreventifMesin;
 use App\Models\PreventifMesinBulanan;
-use App\Models\PreventifPengiriman;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Models\PreventifDokumen;
 use App\Models\PreventifMesinPlanOverride;
 
 class PreventifMesinController extends Controller
@@ -597,37 +595,6 @@ class PreventifMesinController extends Controller
         // Abnormality paling atas karena paling penting
         $notifikasi = array_merge($notifAbnormality, $notifikasi);
 
-
-        // =========================
-        // DOKUMEN PER TANGGAL (bulan yang sedang ditampilkan)
-        // =========================
-        $dokumens = PreventifDokumen::query()
-            ->whereYear('tanggal', $tahun)
-            ->whereMonth('tanggal', $bulan)
-            ->orderBy('created_at')
-            ->get()
-            ->groupBy(fn ($d) => $d->tanggal->format('Y-m-d'))
-            ->map(fn ($grup) => $grup->map(fn ($d) => $d->toFrontend())->values());
-            
-
-        // =========================
-        // STATUS PENGIRIMAN PER TANGGAL
-        // =========================
-        $notifikasiPengiriman = PreventifPengiriman::query()
-            ->whereIn('status', ['menunggu', 'diperiksa', 'ditolak'])
-            ->get()
-            ->map(function ($pengiriman) {
-                return [
-                    'id' => $pengiriman->id,
-                    'tanggal' => Carbon::parse($pengiriman->tanggal)->format('Y-m-d'),
-                    'tanggal_format' => Carbon::parse($pengiriman->tanggal)
-                        ->translatedFormat('d F Y'),
-                    'status' => $pengiriman->status,
-                    'alasan_penolakan' => $pengiriman->alasan_penolakan,
-                ];
-            })
-            ->values();
-
         return Inertia::render('PreventifMesin/Index', [
             'preventifMesins' => $preventifMesins,
 
@@ -643,14 +610,11 @@ class PreventifMesinController extends Controller
             'totalHotPlan' => $totalHotPlan,
 
             'notifikasi' => $notifikasi,
-            'notifikasiPengiriman' => $notifikasiPengiriman,
-            'dokumens' => $dokumens, 
 
             'flash' => [
                 'success' => session('success'),
             ],
         ]);
-        
     }
 
     // =====================================================
@@ -820,8 +784,6 @@ class PreventifMesinController extends Controller
     /**
      * Simpan durasi / total_durasi / dot / hot untuk SATU bulan tertentu.
      * Kalau semua field dikosongkan, data bulanan dihapus.
-     * Kalau ada perubahan dan bulan tsb sudah punya pengiriman ke pimpinan
-     * (status menunggu / diperiksa), perubahan dicatat sebagai revisi.
      */
     public function updateBulanan(Request $request, PreventifMesin $preventifMesin)
     {
@@ -859,75 +821,11 @@ class PreventifMesinController extends Controller
             'bulan' => $data['bulan'],
         ];
 
-        // ---------- HITUNG PERUBAHAN (sebelum disimpan) ----------
-        $lama = PreventifMesinBulanan::where($kunci)->first();
-
-        $perubahan = [];
-
-        $namaLama = filled($lama?->item_preventif)
-            ? trim((string) $lama->item_preventif)
-            : $namaMaster;
-
-        $namaBaru = $itemBulan ?? $namaMaster;
-
-        if ($namaLama !== $namaBaru) {
-            $perubahan[] = [
-                'jenis' => 'item',
-                'keterangan' => 'Nama item diubah: "' . $namaLama . '" → "' . $namaBaru . '"',
-                'lama' => $namaLama,
-                'baru' => $namaBaru,
-            ];
-        }
-
-        $labelField = [
-            'durasi' => 'Durasi',
-            'total_durasi' => 'Total Durasi',
-            'dot' => 'DOT',
-            'hot' => 'HOT',
-        ];
-
-        foreach ($labelField as $field => $label) {
-            $a = $lama?->{$field};
-            $b = $nilai[$field];
-
-            $a = ($a === null || $a === '') ? null : round((float) $a, 2);
-            $b = ($b === null || $b === '') ? null : round((float) $b, 2);
-
-            if ($a !== $b) {
-                $teksLama = $this->formatAngka($a);
-                $teksBaru = $this->formatAngka($b);
-
-                $perubahan[] = [
-                    'jenis' => $field,
-                    'keterangan' => $label . ': ' . ($teksLama ?? '-') . ' → ' . ($teksBaru ?? '-'),
-                    'lama' => $teksLama,
-                    'baru' => $teksBaru,
-                ];
-            }
-        }
-
         // Semua kosong -> hapus data bulanan
         if (collect($nilai)->every(fn ($v) => $v === null)) {
             PreventifMesinBulanan::where($kunci)->delete();
         } else {
             PreventifMesinBulanan::updateOrCreate($kunci, $nilai);
-        }
-
-        // ---------- CATAT REVISI ----------
-        if (!empty($perubahan)) {
-            $pengirimans = PreventifPengiriman::query()
-                ->whereYear('tanggal', $data['tahun'])
-                ->whereMonth('tanggal', $data['bulan'])
-                ->bisaDirevisi()
-                ->get();
-
-            $this->catatRevisi(
-                $pengirimans,
-                $preventifMesin,
-                $namaBaru,
-                $perubahan,
-                $request->user()?->id
-            );
         }
 
         return back()->with('success', 'Data bulanan berhasil disimpan.');
@@ -945,16 +843,6 @@ class PreventifMesinController extends Controller
             'catatan' => ['nullable', 'string'],
         ]);
 
-        $tanggal = Carbon::parse($request->tanggal);
-
-        // ---------- DATA SEBELUM DIUBAH ----------
-        $lama = $preventifMesin->checklists()
-            ->whereDate('tanggal', $tanggal->toDateString())
-            ->first();
-
-        $statusLama = (bool) ($lama?->status);
-        $catatanLama = $this->bersihkanTeks($lama?->catatan);
-
         $preventifMesin->checklists()->updateOrCreate(
             ['tanggal' => $request->tanggal],
             [
@@ -963,135 +851,12 @@ class PreventifMesinController extends Controller
             ]
         );
 
-        // ---------- CATAT REVISI (kalau tanggal ini sudah dikirim) ----------
-        $statusBaru = $request->boolean('status');
-        $catatanBaru = $this->bersihkanTeks($request->catatan);
-
-        $perubahan = [];
-
-        if ($statusLama !== $statusBaru) {
-            $tandaLama = $statusLama ? '✓' : '✕';
-            $tandaBaru = $statusBaru ? '✓' : '✕';
-
-            $perubahan[] = [
-                'jenis' => 'centang',
-                'keterangan' => 'Centang diubah dari ' . $tandaLama . ' ke ' . $tandaBaru,
-                'lama' => $tandaLama,
-                'baru' => $tandaBaru,
-            ];
-        }
-
-        if ($catatanLama !== $catatanBaru) {
-            if ($catatanLama === null) {
-                $keterangan = 'Catatan ditambahkan';
-            } elseif ($catatanBaru === null) {
-                $keterangan = 'Catatan dihapus';
-            } else {
-                $keterangan = 'Catatan diubah';
-            }
-
-            $perubahan[] = [
-                'jenis' => 'catatan',
-                'keterangan' => $keterangan,
-                'lama' => $catatanLama,
-                'baru' => $catatanBaru,
-            ];
-        }
-
-        if (!empty($perubahan)) {
-            $pengirimans = PreventifPengiriman::query()
-                ->whereDate('tanggal', $tanggal->toDateString())
-                ->bisaDirevisi()
-                ->get();
-
-            $this->catatRevisi(
-                $pengirimans,
-                $preventifMesin,
-                $this->namaItemBulan($preventifMesin, $tanggal->year, $tanggal->month),
-                $perubahan,
-                $request->user()?->id
-            );
-        }
-
         return back();
     }
 
     // =====================================================
     // HELPER
     // =====================================================
-
-    /**
-     * Simpan daftar perubahan sebagai revisi di setiap pengiriman.
-     * Pengiriman berstatus "diperiksa" otomatis kembali ke "menunggu"
-     * (diatur di PreventifPengiriman::catatRevisi).
-     *
-     * @param  iterable<int, PreventifPengiriman>  $pengirimans
-     * @param  array<int, array{jenis: string, keterangan: string, lama: ?string, baru: ?string}>  $perubahan
-     */
-    private function catatRevisi(
-        iterable $pengirimans,
-        PreventifMesin $preventifMesin,
-        string $namaItem,
-        array $perubahan,
-        ?int $userId
-    ): void {
-        foreach ($pengirimans as $pengiriman) {
-            foreach ($perubahan as $item) {
-                $pengiriman->catatRevisi(
-                    (int) $preventifMesin->no,
-                    $namaItem,
-                    $item['jenis'],
-                    $item['keterangan'],
-                    $item['lama'],
-                    $item['baru'],
-                    $userId
-                );
-            }
-        }
-    }
-
-    /**
-     * Nama item untuk bulan tertentu (nama khusus bulan kalau ada, kalau tidak nama master).
-     */
-    private function namaItemBulan(
-        PreventifMesin $preventifMesin,
-        int $tahun,
-        int $bulan
-    ): string {
-        $namaBulanan = $preventifMesin->bulanans()
-            ->where('tahun', $tahun)
-            ->where('bulan', $bulan)
-            ->value('item_preventif');
-
-        return filled($namaBulanan)
-            ? (string) $namaBulanan
-            : (string) $preventifMesin->getOriginal('item_preventif');
-    }
-
-    /**
-     * Rapikan teks: trim, string kosong dianggap null.
-     */
-    private function bersihkanTeks(mixed $teks): ?string
-    {
-        $teks = trim((string) $teks);
-
-        return $teks === '' ? null : $teks;
-    }
-
-    /**
-     * Format angka jam: 2.50 => "2.5", 3.00 => "3", null => null
-     */
-    private function formatAngka(mixed $nilai): ?string
-    {
-        if ($nilai === null || $nilai === '') {
-            return null;
-        }
-
-        return rtrim(
-            rtrim(number_format((float) $nilai, 2, '.', ''), '0'),
-            '.'
-        );
-    }
 
     /**
      * Nilai durasi/total_durasi/dot/hot untuk bulan tertentu.
@@ -1181,8 +946,8 @@ class PreventifMesinController extends Controller
         return $tanggalPlan;
     }
 
-    
-    private function getTanggalPlanEfektif(
+
+    public function getTanggalPlanEfektif(
         PreventifMesin $preventifMesin,
         int $tahun,
         int $bulan

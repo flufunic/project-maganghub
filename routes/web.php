@@ -5,8 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\PreventifMesinController;
-use App\Http\Controllers\PreventifPengirimanController;
-use App\Http\Controllers\PimpinanController;
+use App\Http\Controllers\PreventifLaporanMingguanController;
 use App\Http\Controllers\CheckSheetController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CheckSheetImportController;
@@ -15,7 +14,6 @@ use App\Http\Controllers\CheckSheetBbmController;
 use App\Http\Controllers\OverhaulSc2Controller;
 use App\Http\Controllers\CheckSheetPengirimanController;
 use App\Http\Controllers\CheckSheetPimpinanController;
-use App\Http\Controllers\PreventifDokumenController;
 use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
@@ -98,49 +96,108 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         'storeChecklist',
     ])->name('preventif-mesin.checklist.store');
 
-    Route::put('/preventif-mesin/{preventifMesin}/plan', [PreventifMesinController::class, 'updatePlan'])
-    ->name('preventif-mesin.plan.update');
+    Route::put('/preventif-mesin/{preventifMesin}/plan', [
+        PreventifMesinController::class,
+        'updatePlan',
+    ])->name('preventif-mesin.plan.update');
 
     Route::put('/preventif-mesin/{preventifMesin}/bulanan', [
         PreventifMesinController::class,
         'updateBulanan',
     ])->name('preventif-mesin.bulanan');
 
-    Route::post('/preventif-pengiriman', [
-        PreventifPengirimanController::class,
-        'store',
-    ])->middleware('role:admin')
-      ->name('preventif-pengiriman.store');
 
-    Route::post('/preventif-dokumen', [
-        PreventifDokumenController::class,
-        'store',
-    ])->name('preventif-dokumen.store');
+    /*
+    |--------------------------------------------------------------------------
+    | Report Mingguan Preventif
+    | (menggantikan tombol Kirim & Upload Dokumen per tanggal)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('laporan-mingguan')->name('laporan-mingguan.')->group(function () {
 
-    Route::get('/preventif-dokumen/{dokumen}/download', [
-        PreventifDokumenController::class,
-        'download',
-    ])->name('preventif-dokumen.download');
+        // Halaman utama: tabel riwayat
+        Route::get('/', [
+            PreventifLaporanMingguanController::class,
+            'riwayat',
+        ])->name('index');
 
-    Route::delete('/preventif-dokumen/{dokumen}', [
-        PreventifDokumenController::class,
-        'destroy',
-    ])->name('preventif-dokumen.destroy');
+        // Halaman form laporan
+        Route::get('/form', [
+            PreventifLaporanMingguanController::class,
+            'index',
+        ])->name('form');
 
-    Route::get('/preventif-dokumen/{dokumen}/lihat', [
-        PreventifDokumenController::class,
-        'lihat',
-    ])->name('preventif-dokumen.lihat');
+        // Export
+        Route::get('/export', [
+            PreventifLaporanMingguanController::class,
+            'export',
+        ])->name('export');
 
-    Route::get('/dokumen/{dokumen}/lihat', [
-        PreventifDokumenController::class,
-        'lihat',
-    ])->name('pimpinan.dokumen.lihat');
+        // Menampilkan foto
+        Route::get('/foto/{item}/{jenis}', [
+            PreventifLaporanMingguanController::class,
+            'foto',
+        ])->name('foto');
 
-    Route::get('/dokumen/{dokumen}/download', [
-        PreventifDokumenController::class,
-        'download',
-    ])->name('pimpinan.dokumen.download');
+        // Admin
+        Route::middleware('role:admin')->group(function () {
+
+            Route::put('/item/{item}', [
+                PreventifLaporanMingguanController::class,
+                'updateItem',
+            ])->name('item.update');
+
+            Route::post('/item/{item}/foto', [
+                PreventifLaporanMingguanController::class,
+                'uploadFoto',
+            ])->name('item.foto');
+
+            Route::delete('/item/{item}', [
+                PreventifLaporanMingguanController::class,
+                'destroyItem',
+            ])->name('item.destroy');
+
+            Route::delete('/{laporan}', [
+                PreventifLaporanMingguanController::class,
+                'destroy',
+            ])->name('destroy');
+
+            Route::post('/{laporan}/temuan', [
+                PreventifLaporanMingguanController::class,
+                'storeTemuan',
+            ])->name('temuan.store');
+
+            Route::post('/{laporan}/simpan', [
+                PreventifLaporanMingguanController::class,
+                'simpan',
+            ])->name('simpan');
+
+            Route::post('/{laporan}/kirim', [
+                PreventifLaporanMingguanController::class,
+                'kirim',
+            ])->name('kirim');
+        });
+
+        // Pimpinan
+        Route::middleware('role:pimpinan')->group(function () {
+
+            Route::post('/{laporan}/periksa', [
+                PreventifLaporanMingguanController::class,
+                'periksa',
+            ])->name('periksa');
+
+            Route::post('/{laporan}/setujui', [
+                PreventifLaporanMingguanController::class,
+                'setujui',
+            ])->name('setujui');
+
+            Route::post('/{laporan}/tolak', [
+                PreventifLaporanMingguanController::class,
+                'tolak',
+            ])->name('tolak');
+        });
+    });
+
 
 
     /*
@@ -194,7 +251,6 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
             ScheduleBarisController::class,
             'destroy',
         ])->name('baris.destroy');
-
     });
 
 
@@ -310,7 +366,7 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         CheckSheetController::class,
         'centangSemua',
     ])->middleware('role:pimpinan')
-    ->name('check-sheets.checklist.centang-semua');
+      ->name('check-sheets.checklist.centang-semua');
 
     Route::post('/check-sheets/{checkSheet}/nilai', [
         CheckSheetController::class,
@@ -449,21 +505,28 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         'hapusDokumen',
     ])->name('overhaul-dokumen.destroy');
 
+
     /*
     |--------------------------------------------------------------------------
     | Joken
     |--------------------------------------------------------------------------
     */
- 
+
+    // Export harus sebelum resource supaya tidak tertangkap {joken}
+    Route::get('/joken/{joken}/export', [
+        JokenController::class,
+        'export',
+    ])->name('joken.export');
+
     Route::resource('joken', JokenController::class);
-    // routes/web.php (di grup yang sudah dilindungi login)
-    Route::get('/joken/{joken}/export', [JokenController::class, 'export'])->name('joken.export');
+
 
     /*
     |--------------------------------------------------------------------------
     | SopIk
     |--------------------------------------------------------------------------
     */
+
     Route::get('/sop-ik', [SopIkController::class, 'index']);
     Route::get('/sop-ik/revisions/{revision}/file', [SopIkController::class, 'file']);
     Route::post('/sop-ik', [SopIkController::class, 'store']);
@@ -481,31 +544,11 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
 
 Route::middleware(['auth', 'role:pimpinan'])->group(function () {
 
-    // Pengiriman Preventif Mesin
-    Route::get('/pimpinan', [
-        PimpinanController::class,
-        'index',
-    ])->name('pimpinan.index');
-
-    Route::get('/pimpinan/pengiriman/{pengiriman}', [
-        PimpinanController::class,
-        'show',
-    ])->name('pimpinan.pengiriman.show');
-
-    Route::post('/pimpinan/pengiriman/{pengiriman}/periksa', [
-        PimpinanController::class,
-        'periksa',
-    ])->name('pimpinan.pengiriman.periksa');
-
-    Route::post('/pimpinan/pengiriman/{pengiriman}/tolak', [
-        PimpinanController::class,
-        'tolak',
-    ])->name('pimpinan.pengiriman.tolak');
-    Route::post('/pimpinan/pengiriman/{pengiriman}/batalkan', [
-        PimpinanController::class,
-        'batalkanVerifikasi',
-    ])->name('pimpinan.batalkan');
-
+    // Alamat lama /pimpinan diarahkan ke Report Mingguan.
+    // Nama route 'pimpinan.index' dipertahankan supaya link lama di
+    // Sidebar / halaman lain tidak error.
+    Route::redirect('/pimpinan', '/laporan-mingguan')
+        ->name('pimpinan.index');
 
     // Pengiriman Check Sheet
     Route::get('/pimpinan/check-sheet', [
@@ -533,6 +576,7 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
         'destroy',
     ])->name('pimpinan.check-sheet.destroy');
 });
+
 
 /*
 |--------------------------------------------------------------------------
@@ -566,6 +610,7 @@ Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])
         });
     });
 
+
 /*
 |--------------------------------------------------------------------------
 | Notifikasi RRF (semua role yang memakai menu RRF)
@@ -585,6 +630,7 @@ Route::middleware(['auth', 'role:admin,pimpinan,spv_produksi,operator_produksi']
             'baca',
         ])->name('rrf.notifikasi.baca');
     });
+
 
 /*
 |--------------------------------------------------------------------------
