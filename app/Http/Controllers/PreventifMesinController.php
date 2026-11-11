@@ -115,26 +115,25 @@ class PreventifMesinController extends Controller
 
             $totalJadwalItem = count($tanggalPlan);
 
-            // Item tanpa jadwal di bulan ini tidak ditampilkan
-            if ($totalJadwalItem === 0) {
+            // ACT dihitung dari semua checklist yang dicentang
+            // pada bulan terpilih, tidak harus pada tanggal Plan.
+            $actItem = $preventif->checklists
+                ->filter(function ($checklist) use ($tahun, $bulan) {
+                    $tanggal = Carbon::parse($checklist->tanggal);
+
+                    return (bool) $checklist->status === true
+                        && $tanggal->year === $tahun
+                        && $tanggal->month === $bulan;
+                })
+                ->count();
+
+            // Item dilewati hanya jika tidak punya Plan maupun ACT.
+            if ($totalJadwalItem === 0 && $actItem === 0) {
                 continue;
             }
 
-            $checklistByDate = $preventif->checklists->keyBy(
-                fn ($checklist) => Carbon::parse($checklist->tanggal)->format('Y-m-d')
-            );
-
-            $actItem = 0;
-
-            foreach ($tanggalPlan as $tanggal) {
-                $checklist = $checklistByDate->get($tanggal);
-
-                if ($checklist && (bool) $checklist->status === true) {
-                    $actItem++;
-                }
-            }
-
-            $planItem = $totalJadwalItem - $actItem;
+            // Plan tersisa = total jadwal dikurangi ACT.
+            $planItem = max($totalJadwalItem - $actItem, 0);
 
             $totalItem++;
             $totalJadwal += $totalJadwalItem;
@@ -218,27 +217,35 @@ class PreventifMesinController extends Controller
                     $bulanLaporan
                 );
 
-                if (count($tanggalPlanTahunan) === 0) {
-                    continue;
-                }
-
                 $checklistByDate = $checklistPerItem[$preventif->no];
 
                 $divisi = $preventif->divisi ?: 'Lainnya';
 
-                $actItemBulanIni = 0;
+                // Hitung semua ACT pada bulan ini, termasuk ACT
+                // yang dilakukan di luar tanggal Plan.
+                $actItemBulanIni = $checklistByDate
+                    ->filter(function ($checklist) use ($tahunLaporan, $bulanLaporan) {
+                        $tanggal = Carbon::parse($checklist->tanggal);
 
-                foreach ($tanggalPlanTahunan as $tanggal) {
-                    $checklist = $checklistByDate->get($tanggal);
+                        return (bool) $checklist->status === true
+                            && $tanggal->year === $tahunLaporan
+                            && $tanggal->month === $bulanLaporan;
+                    })
+                    ->count();
 
-                    $totalPlanTahunan++;
+                $jumlahPlanBulanIni = count($tanggalPlanTahunan);
 
-                    if ($checklist && (bool) $checklist->status === true) {
-                        $totalActTahunan++;
-                        $actPerDivisi[$divisi]++;
-                        $actItemBulanIni++;
-                    }
+                // Lewati jika bulan ini tidak memiliki Plan maupun ACT.
+                if ($jumlahPlanBulanIni === 0 && $actItemBulanIni === 0) {
+                    continue;
                 }
+
+                // Total Plan tetap berdasarkan tanggal Plan efektif.
+                $totalPlanTahunan += $jumlahPlanBulanIni;
+
+                // Total ACT berdasarkan checklist aktual.
+                $totalActTahunan += $actItemBulanIni;
+                $actPerDivisi[$divisi] += $actItemBulanIni;
 
                 // Simpan rincian item ini untuk bulan yang sedang diproses
                 $kodeItem = $preventif->no;
