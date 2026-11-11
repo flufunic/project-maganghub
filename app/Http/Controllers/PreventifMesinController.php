@@ -104,7 +104,14 @@ class PreventifMesinController extends Controller
         $divisiReport = [];
 
         foreach ($preventifMesins as $preventif) {
-            $tanggalPlan = $this->getTanggalPlanEfektif($preventif, $tahun, $bulan);
+            // Pakai Plan efektif:
+            // - Plan manual jika sudah pernah diatur
+            // - Plan otomatis jika belum pernah diatur
+            $tanggalPlan = $this->getTanggalPlanEfektif(
+                $preventif,
+                $tahun,
+                $bulan
+            );
 
             $totalJadwalItem = count($tanggalPlan);
 
@@ -205,7 +212,7 @@ class PreventifMesinController extends Controller
             $actPerDivisi = array_fill_keys($daftarDivisi, 0);
 
             foreach ($preventifMesins as $preventif) {
-                $tanggalPlanTahunan = $this->generateTanggalPlan(
+                $tanggalPlanTahunan = $this->getTanggalPlanEfektif(
                     $preventif,
                     $tahunLaporan,
                     $bulanLaporan
