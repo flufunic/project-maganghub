@@ -111,8 +111,8 @@ class PreventifLaporanMingguanController extends Controller
                 'id' => $laporan->id,
                 'status' => $laporan->status,
                 'alasan_penolakan' => $laporan->alasan_penolakan,
-                'dikirim_pada' => $laporan->dikirim_pada?->translatedFormat('d F Y H:i'),
-                'disetujui_pada' => $laporan->disetujui_pada?->translatedFormat('d F Y H:i'),
+                'dikirim_pada' => $laporan->dikirim_pada?->translatedFormat('d F Y'),
+                'disetujui_pada' => $laporan->disetujui_pada?->translatedFormat('d F Y'),
             ],
 
             'bagian1' => $this->bagian1Untuk(
@@ -140,7 +140,7 @@ class PreventifLaporanMingguanController extends Controller
                     'id' => $r->id,
                     'keterangan' => $r->keterangan,
                     'waktu' => $r->created_at
-                        ->translatedFormat('d F Y H:i'),
+                        ->translatedFormat('d F Y'),
                 ]),
 
             'bisaPersetujuan' => $this->adalahPimpinan($request),
@@ -175,8 +175,8 @@ class PreventifLaporanMingguanController extends Controller
                     'week' => $item->week,
                     'status' => $item->status,
                     'items_count' => $item->items_count,
-                    'dikirim_pada' => $item->dikirim_pada?->translatedFormat('d F Y H:i'),
-                    'disetujui_pada' => $item->disetujui_pada?->translatedFormat('d F Y H:i'),
+                    'dikirim_pada' => $item->dikirim_pada?->translatedFormat('d F Y'),
+                    'disetujui_pada' => $item->disetujui_pada?->translatedFormat('d F Y'),
                     'alasan_penolakan' => $item->alasan_penolakan,
                 ];
             }),

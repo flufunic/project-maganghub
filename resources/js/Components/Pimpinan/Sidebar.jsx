@@ -54,10 +54,12 @@ const GRUP = [
                 key: 'preventif-approval',
                 href: '/pimpinan',
                 icon: 'approval',
-                title: 'Approval Preventif',
+                title: 'Approval Report Mingguan',
                 desc: 'Approval & monitoring',
                 match: (p) =>
-                    p === '/pimpinan' || p.startsWith('/pimpinan/pengiriman'),
+                    p === '/pimpinan' ||
+                    p.startsWith('/pimpinan/laporan') ||
+                    p.startsWith('/laporan-mingguan'),
             },
             {
                 key: 'checksheet-mingguan',

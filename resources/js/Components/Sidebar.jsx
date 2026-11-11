@@ -8,7 +8,6 @@ import {
     ChevronDown,
     ChevronUp,
     LogOut,
-    LayoutDashboard,
     ClipboardList,
     ClipboardCheck,
     Wrench,
@@ -18,6 +17,8 @@ import {
     SlidersHorizontal,
     FileText,
 } from 'lucide-react';
+
+import SidebarPimpinan from './Pimpinan/Sidebar';
 
 /* ------------------------------------------------------------------
 | ICON
@@ -29,9 +30,8 @@ const ICONS = {
     chevronDown: ChevronDown,
     chevronUp: ChevronUp,
     logout: LogOut,
-    approval: LayoutDashboard,
-    checksheetMingguan: ClipboardList,
-    rrfVerifikasi: ClipboardCheck,
+    laporan: ClipboardList,
+    rrf: ClipboardCheck,
     preventif: Wrench,
     schedule: CalendarClock,
     checksheet: Activity,
@@ -47,69 +47,21 @@ function Icon({ type, className = 'h-5 w-5' }) {
         return null;
     }
 
-    const strokeWidth =
-        type === 'close' ||
-        type === 'chevron' ||
-        type === 'chevronDown' ||
-        type === 'chevronUp'
-            ? 2
-            : 1.75;
+    const strokeWidth = ['close', 'chevron', 'chevronDown', 'chevronUp'].includes(type)
+        ? 2
+        : 1.75;
 
-    return (
-        <Comp
-            className={className}
-            strokeWidth={strokeWidth}
-            aria-hidden="true"
-        />
-    );
+    return <Comp className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
+const mulai = (p, base) => p === base || p.startsWith(`${base}/`);
+
 /* ------------------------------------------------------------------
-| DAFTAR MENU
-| match(path) -> true kalau menu sedang aktif
+| DAFTAR MENU ADMIN (tanpa menu pimpinan)
+| Report Mingguan = submenu dari Preventif Mesin
 ------------------------------------------------------------------ */
 
 const GRUP = [
-    {
-        judul: 'Menu Pimpinan',
-
-        menus: [
-            {
-                key: 'preventif-approval',
-                href: '/pimpinan',
-                icon: 'approval',
-                title: 'Approval Preventif',
-                desc: 'Approval & monitoring',
-
-                match: (p) =>
-                    p === '/pimpinan' ||
-                    p.startsWith('/pimpinan/pengiriman'),
-            },
-
-            {
-                key: 'checksheet-mingguan',
-                href: '/pimpinan/check-sheet',
-                icon: 'checksheetMingguan',
-                title: 'Check Sheet Mingguan',
-                desc: 'Rekap & pemeriksaan mingguan',
-
-                match: (p) =>
-                    p.startsWith('/pimpinan/check-sheet'),
-            },
-
-            {
-                key: 'rrf',
-                href: '/mtc/rrf',
-                icon: 'rrfVerifikasi',
-                title: 'Repair Request Form',
-                desc: 'Verifikasi permintaan perbaikan',
-
-                match: (p) =>
-                    p.startsWith('/mtc/rrf'),
-            },
-        ],
-    },
-
     {
         judul: 'Menu Maintenance',
 
@@ -120,21 +72,16 @@ const GRUP = [
                 icon: 'preventif',
                 title: 'Preventif Mesin',
                 desc: 'Maintenance schedule',
-
-                match: (p) =>
-                    p === '/preventif-mesin' ||
-                    p.startsWith('/preventif-mesin'),
+                match: (p) => mulai(p, '/preventif-mesin'),
 
                 children: [
                     {
                         key: 'laporan-mingguan',
                         href: '/laporan-mingguan',
-                        title: 'Laporan Mingguan',
+                        icon: 'laporan',
+                        title: 'Report Mingguan',
                         desc: 'Laporan preventif mingguan',
-
-                        match: (p) =>
-                            p === '/laporan-mingguan' ||
-                            p.startsWith('/laporan-mingguan/'),
+                        match: (p) => mulai(p, '/laporan-mingguan'),
                     },
                 ],
             },
@@ -145,10 +92,7 @@ const GRUP = [
                 icon: 'schedule',
                 title: 'Schedule Preventif Mingguan',
                 desc: 'Plan & act per week',
-
-                match: (p) =>
-                    p === '/schedule-preventif' ||
-                    p.startsWith('/schedule-preventif/'),
+                match: (p) => mulai(p, '/schedule-preventif'),
             },
 
             {
@@ -157,10 +101,7 @@ const GRUP = [
                 icon: 'checksheet',
                 title: 'Check Sheet Prediktif',
                 desc: 'Check sheet maintenance',
-
-                match: (p) =>
-                    p === '/check-sheets' ||
-                    p.startsWith('/check-sheets/'),
+                match: (p) => mulai(p, '/check-sheets'),
             },
 
             {
@@ -169,10 +110,7 @@ const GRUP = [
                 icon: 'overhaul',
                 title: 'Schedule Overhaul',
                 desc: 'Jadwal overhaul mesin',
-
-                match: (p) =>
-                    p === '/overhaul-sc2' ||
-                    p.startsWith('/overhaul-sc2/'),
+                match: (p) => mulai(p, '/overhaul-sc2'),
             },
 
             {
@@ -181,10 +119,16 @@ const GRUP = [
                 icon: 'joken',
                 title: 'Joken Mesin',
                 desc: 'Standarisasi setting mesin',
+                match: (p) => mulai(p, '/joken'),
+            },
 
-                match: (p) =>
-                    p === '/joken' ||
-                    p.startsWith('/joken/'),
+            {
+                key: 'rrf',
+                href: '/mtc/rrf',
+                icon: 'rrf',
+                title: 'Repair Request Form',
+                desc: 'Request perbaikan mesin',
+                match: (p) => mulai(p, '/mtc/rrf'),
             },
 
             {
@@ -193,39 +137,32 @@ const GRUP = [
                 icon: 'sop',
                 title: 'SOP/IK',
                 desc: 'Dokumen SOP & IK maintenance',
-
-                match: (p) =>
-                    p === '/sop-ik' ||
-                    p.startsWith('/sop-ik/'),
+                match: (p) => mulai(p, '/sop-ik'),
             },
         ],
     },
 ];
 
-export default function Sidebar({ open, onClose }) {
+function SidebarAdmin({ open, onClose }) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-
-    // State untuk membuka/tutup submenu
-    const [openSubmenu, setOpenSubmenu] = useState(null);
 
     const { url } = usePage();
 
     // Buang query string (?a=b)
     const path = url.split('?')[0];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Buka otomatis submenu Preventif Mesin kalau sedang di halaman
-    | Laporan Mingguan
-    |--------------------------------------------------------------------------
-    */
+    // Submenu terbuka otomatis kalau sedang berada di salah satu halaman anaknya,
+    // tapi tetap bisa ditutup/dibuka manual lewat tombol panah.
+    const [terbuka, setTerbuka] = useState(() =>
+        GRUP.flatMap((g) => g.menus)
+            .filter((m) => m.children?.some((c) => c.match(path)))
+            .map((m) => m.key)
+    );
 
-    const preventifMenu = GRUP
-        .flatMap((grup) => grup.menus)
-        .find((menu) => menu.key === 'preventif-mesin');
-
-    const laporanMingguanAktif =
-        preventifMenu?.children?.some((child) => child.match(path));
+    const toggle = (key) =>
+        setTerbuka((prev) =>
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+        );
 
     return (
         <>
@@ -246,7 +183,6 @@ export default function Sidebar({ open, onClose }) {
                 <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
                 <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-blue-400/25 blur-[80px]" />
-
                 <div className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/25 blur-[80px]" />
 
                 {/* HEADER */}
@@ -263,7 +199,7 @@ export default function Sidebar({ open, onClose }) {
 
                             <div>
                                 <h2 className="text-sm font-bold tracking-tight text-white">
-                                    MMS (Pimpinan)
+                                    MMS (Admin)
                                 </h2>
 
                                 <p className="mt-0.5 text-[11px] font-medium text-blue-200/70">
@@ -278,17 +214,13 @@ export default function Sidebar({ open, onClose }) {
                             className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-all duration-200 hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-95"
                             title="Tutup"
                         >
-                            <Icon
-                                type="close"
-                                className="h-5 w-5"
-                            />
+                            <Icon type="close" className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
 
                 {/* MENU */}
                 <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
-
                     {GRUP.map((grup) => (
                         <div key={grup.judul}>
                             {/* JUDUL GRUP */}
@@ -301,73 +233,53 @@ export default function Sidebar({ open, onClose }) {
                             </div>
 
                             <div className="space-y-1.5">
-
                                 {grup.menus.map((item) => {
                                     const active = item.match(path);
-
-                                    const hasChildren =
-                                        item.children &&
-                                        item.children.length > 0;
-
-                                    const childActive =
-                                        hasChildren &&
-                                        item.children.some((child) =>
-                                            child.match(path)
-                                        );
-
-                                    const isParentActive =
-                                        active || childActive;
-
-                                    const submenuOpen =
-                                        openSubmenu === item.key ||
-                                        childActive;
+                                    const hasChildren = item.children?.length > 0;
 
                                     /* ------------------------------------------------
-                                    | MENU YANG PUNYA SUBMENU
+                                    | MENU DENGAN SUBMENU
                                     ------------------------------------------------ */
-
                                     if (hasChildren) {
+                                        const childActive = item.children.some((c) => c.match(path));
+                                        const parentActive = active || childActive;
+                                        const submenuOpen = terbuka.includes(item.key);
+
                                         return (
                                             <div key={item.key}>
-                                                {/* PARENT MENU */}
+                                                {/* PARENT */}
                                                 <div
                                                     className={`group relative flex h-[68px] items-center gap-3 overflow-hidden rounded-2xl border transition-all duration-200 ${
-                                                        isParentActive
+                                                        parentActive
                                                             ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30'
                                                             : 'border-transparent hover:border-white/10 hover:bg-white/10'
                                                     }`}
                                                 >
-                                                    {isParentActive && (
+                                                    {parentActive && (
                                                         <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
                                                     )}
 
-                                                    {/* LINK MENU UTAMA */}
                                                     <Link
                                                         href={item.href}
                                                         onClick={onClose}
                                                         aria-current={active ? 'page' : undefined}
                                                         className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1"
                                                     >
-                                                        {/* ICON */}
                                                         <div
                                                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
-                                                                isParentActive
+                                                                parentActive
                                                                     ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-white/25'
                                                                     : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
                                                             }`}
                                                         >
-                                                            <Icon
-                                                                type={item.icon}
-                                                                className="h-5 w-5"
-                                                            />
+                                                            <Icon type={item.icon} className="h-5 w-5" />
                                                         </div>
 
-                                                        {/* TEXT */}
                                                         <div className="min-w-0 flex-1">
                                                             <p
                                                                 title={item.title}
                                                                 className={`line-clamp-2 text-[13px] font-semibold leading-tight ${
-                                                                    isParentActive
+                                                                    parentActive
                                                                         ? 'text-white'
                                                                         : 'text-blue-50/90 group-hover:text-white'
                                                                 }`}
@@ -377,7 +289,7 @@ export default function Sidebar({ open, onClose }) {
 
                                                             <p
                                                                 className={`mt-0.5 truncate text-[11px] font-medium ${
-                                                                    isParentActive
+                                                                    parentActive
                                                                         ? 'text-blue-200'
                                                                         : 'text-blue-200/50 group-hover:text-blue-200/80'
                                                                 }`}
@@ -387,30 +299,16 @@ export default function Sidebar({ open, onClose }) {
                                                         </div>
                                                     </Link>
 
-                                                    {/* TOMBOL PANAH SUBMENU */}
+                                                    {/* PANAH BUKA/TUTUP SUBMENU */}
                                                     <button
                                                         type="button"
-                                                        onClick={() =>
-                                                            setOpenSubmenu(
-                                                                openSubmenu === item.key
-                                                                    ? null
-                                                                    : item.key
-                                                            )
-                                                        }
-                                                        aria-label={
-                                                            submenuOpen
-                                                                ? 'Tutup submenu'
-                                                                : 'Buka submenu'
-                                                        }
+                                                        onClick={() => toggle(item.key)}
+                                                        aria-label={submenuOpen ? 'Tutup submenu' : 'Buka submenu'}
                                                         aria-expanded={submenuOpen}
                                                         className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-blue-100 transition hover:bg-white/20"
                                                     >
                                                         <Icon
-                                                            type={
-                                                                submenuOpen
-                                                                    ? 'chevronUp'
-                                                                    : 'chevronDown'
-                                                            }
+                                                            type={submenuOpen ? 'chevronUp' : 'chevronDown'}
                                                             className="h-4 w-4"
                                                         />
                                                     </button>
@@ -427,9 +325,7 @@ export default function Sidebar({ open, onClose }) {
                                                                     key={child.key}
                                                                     href={child.href}
                                                                     onClick={onClose}
-                                                                    aria-current={
-                                                                        childIsActive ? 'page' : undefined
-                                                                    }
+                                                                    aria-current={childIsActive ? 'page' : undefined}
                                                                     className={`group relative flex min-h-[50px] w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200 ${
                                                                         childIsActive
                                                                             ? 'bg-white/15 text-white shadow-sm'
@@ -447,10 +343,7 @@ export default function Sidebar({ open, onClose }) {
                                                                                 : 'bg-white/10 text-blue-200/70 group-hover:bg-white/15 group-hover:text-white'
                                                                         }`}
                                                                     >
-                                                                        <Icon
-                                                                            type="preventif"
-                                                                            className="h-4 w-4"
-                                                                        />
+                                                                        <Icon type={child.icon} className="h-4 w-4" />
                                                                     </div>
 
                                                                     <div className="min-w-0 flex-1">
@@ -492,17 +385,14 @@ export default function Sidebar({ open, onClose }) {
                                     }
 
                                     /* ------------------------------------------------
-                                    | MENU BIASA TANPA SUBMENU
+                                    | MENU BIASA
                                     ------------------------------------------------ */
-
                                     return (
                                         <Link
                                             key={item.key}
                                             href={item.href}
                                             onClick={onClose}
-                                            aria-current={
-                                                active ? 'page' : undefined
-                                            }
+                                            aria-current={active ? 'page' : undefined}
                                             className={`group relative flex h-[68px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border px-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
                                                 active
                                                     ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30 hover:bg-white/20'
@@ -520,10 +410,7 @@ export default function Sidebar({ open, onClose }) {
                                                         : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
                                                 }`}
                                             >
-                                                <Icon
-                                                    type={item.icon}
-                                                    className="h-5 w-5"
-                                                />
+                                                <Icon type={item.icon} className="h-5 w-5" />
                                             </div>
 
                                             <div className="min-w-0 flex-1">
@@ -550,15 +437,11 @@ export default function Sidebar({ open, onClose }) {
                                             </div>
 
                                             <div className="absolute right-2 top-1/2 flex h-7 w-7 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100">
-                                                <Icon
-                                                    type="chevron"
-                                                    className="h-3.5 w-3.5"
-                                                />
+                                                <Icon type="chevron" className="h-3.5 w-3.5" />
                                             </div>
                                         </Link>
                                     );
                                 })}
-
                             </div>
                         </div>
                     ))}
@@ -572,10 +455,7 @@ export default function Sidebar({ open, onClose }) {
                         className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-all duration-200 hover:border-red-300/20 hover:bg-red-500/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                     >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 ring-1 ring-white/20 transition-all duration-200 group-hover:scale-105">
-                            <Icon
-                                type="logout"
-                                className="h-5 w-5"
-                            />
+                            <Icon type="logout" className="h-5 w-5" />
                         </div>
 
                         <div className="flex-1">
@@ -614,10 +494,7 @@ export default function Sidebar({ open, onClose }) {
                                     <div className="absolute inset-0 rounded-2xl bg-red-200 blur-xl" />
 
                                     <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-300/50">
-                                        <Icon
-                                            type="logout"
-                                            className="h-7 w-7"
-                                        />
+                                        <Icon type="logout" className="h-7 w-7" />
                                     </div>
                                 </div>
                             </div>
@@ -636,9 +513,7 @@ export default function Sidebar({ open, onClose }) {
                         <div className="flex gap-3 border-t border-slate-100 bg-white px-6 py-5">
                             <button
                                 type="button"
-                                onClick={() =>
-                                    setShowLogoutModal(false)
-                                }
+                                onClick={() => setShowLogoutModal(false)}
                                 className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 active:scale-[0.98]"
                             >
                                 Batal
@@ -657,4 +532,17 @@ export default function Sidebar({ open, onClose }) {
             )}
         </>
     );
+}
+
+/* ------------------------------------------------------------------
+| Pemilih sidebar berdasarkan role
+------------------------------------------------------------------ */
+export default function Sidebar(props) {
+    const { auth } = usePage().props;
+
+    if (auth?.user?.role === 'pimpinan') {
+        return <SidebarPimpinan {...props} />;
+    }
+
+    return <SidebarAdmin {...props} />;
 }

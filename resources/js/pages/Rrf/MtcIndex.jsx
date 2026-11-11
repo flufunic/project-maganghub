@@ -366,7 +366,8 @@ export default function MtcIndex({
             )}
 
             {/* FILTER STATUS = KARTU RINGKASAN */}
-            <div className={`mb-4 grid gap-3 ${gridKartu}`}>
+            {/* FILTER STATUS = KARTU RINGKASAN (kompak) */}
+            <div className={`mb-4 grid gap-2.5 ${gridKartu}`}>
                 {kartu.map(([kode, label, jumlah]) => {
                     const t = temaDari(kode || 'semua');
                     const Ikon = t.ikon;
@@ -376,36 +377,36 @@ export default function MtcIndex({
                         <button
                             key={kode || 'semua'}
                             type="button"
+                            title={label}
                             onClick={() => pilihStatus(kode)}
-                            className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-white/40 bg-white/[0.94] p-4 text-left shadow-lg shadow-slate-950/10 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl ${
+                            className={`group relative flex cursor-pointer items-center gap-2.5 overflow-hidden rounded-xl border border-white/40 bg-white/[0.94] px-3 pb-2 pt-2.5 text-left shadow-md shadow-slate-950/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
                                 aktif ? `ring-2 ${t.cincin}` : ''
                             }`}
                         >
                             <span
-                                className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.warna}`}
+                                className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${t.warna}`}
                             />
 
-                            <div className="flex items-start justify-between gap-2">
-                                <span
-                                    className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${t.warna}`}
-                                >
-                                    <Ikon className="h-4 w-4" strokeWidth={1.75} />
-                                </span>
+                            <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow ${t.warna}`}
+                            >
+                                <Ikon className="h-4 w-4" strokeWidth={1.75} />
+                            </span>
 
-                                <span
-                                    className={`text-2xl font-black leading-none ${t.teks}`}
-                                >
+                            <div className="min-w-0 flex-1">
+                                <p className={`text-xl font-black leading-none ${t.teks}`}>
                                     {jumlah}
-                                </span>
-                            </div>
+                                </p>
 
-                            <p className="mt-3 text-xs font-bold text-slate-600">
-                                {label}
-                            </p>
+                                <p className="mt-1 truncate text-[11px] font-bold text-slate-600">
+                                    {label}
+                                </p>
+                            </div>
                         </button>
                     );
                 })}
             </div>
+
 
             {/* TABEL */}
             <div className="overflow-hidden rounded-2xl border border-white/40 bg-white/[0.94] shadow-[0_24px_70px_rgba(2,6,23,0.30)] backdrop-blur-2xl">

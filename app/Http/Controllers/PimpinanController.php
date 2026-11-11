@@ -2,406 +2,370 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PreventifLaporanMingguan;
 use App\Models\PreventifMesin;
-use App\Models\PreventifPengiriman;
-use App\Models\PreventifRevisi;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Models\PreventifDokumen;
 
-
+/**
+ * Sisi Pimpinan untuk Report Mingguan Preventif yang dikirim Admin.
+ *
+ * Alur status: menunggu -> diperiksa -> disetujui / ditolak
+ * (draft tidak pernah tampil di sisi pimpinan).
+ */
 class PimpinanController extends Controller
 {
+    private const NAMA_BULAN = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+
+    // =====================================================
+    // DASHBOARD
+    // =====================================================
+
     public function index(Request $request): Response
     {
-        $pengirimans = PreventifPengiriman::with('pengirim')
-            ->withCount([
-                'revisis',
-                'revisis as revisi_baru_count' => function ($query) {
-                    $query->whereNull('ditinjau_pada');
-                },
-            ])
-            ->withMax('revisis', 'created_at')
-            ->orderByDesc('tanggal')
-            ->get()
-            ->map(function ($pengiriman) {
-                return [
-                    'id' => $pengiriman->id,
-                    'tanggal' => $pengiriman->tanggal->format('Y-m-d'),
-                    'tanggal_format' => $pengiriman->tanggal->translatedFormat('d F Y'),
-                    'dikirim_oleh' => $pengiriman->pengirim?->name,
-                    'dikirim_pada' => $pengiriman->dikirim_pada?->translatedFormat('d F Y'),
-                    'status' => $pengiriman->status,
-                    'alasan_penolakan' => $pengiriman->alasan_penolakan,
+        $laporans = PreventifLaporanMingguan::query()
+            ->where('status', '!=', 'draft')
+            ->withCount('revisis')
+            ->orderByDesc('tahun')
+            ->orderByDesc('bulan')
+            ->orderByDesc('week')
+            ->get();
 
-                    // Info revisi
-                    'jumlah_revisi' => (int) $pengiriman->revisis_count,
-                    'revisi_baru' => (int) $pengiriman->revisi_baru_count,
-                    'revisi_terakhir' => $pengiriman->revisis_max_created_at
-                        ? Carbon::parse($pengiriman->revisis_max_created_at)
-                            ->translatedFormat('d F Y')
-                        : null,
-                ];
-            });
+        $nama = $this->namaUser($laporans->pluck('dikirim_oleh'));
 
         return Inertia::render('Pimpinan/Index', [
             'user' => [
                 'name' => $request->user()?->name,
                 'role' => $request->user()?->role,
             ],
-            'pengirimans' => $pengirimans,
+
+            'laporans' => $laporans->map(fn ($l) => [
+                'id' => $l->id,
+                'tahun' => $l->tahun,
+                'bulan' => $l->bulan,
+                'week' => $l->week,
+                'periode' => $this->labelPeriode($l),
+                'status' => $l->status,
+                'alasan_penolakan' => $l->alasan_penolakan,
+                'dikirim_oleh' => $nama[$l->dikirim_oleh] ?? null,
+                'dikirim_pada' => $this->waktu($l->dikirim_pada),
+                'disetujui_pada' => $this->waktu($l->disetujui_pada),
+
+                // Perubahan yang dilakukan admin setelah laporan dikirim
+                'jumlah_revisi' => (int) $l->revisis_count,
+
+                // Angka dari snapshot (dibekukan saat dikirim); null kalau tidak ada
+                'ringkasan' => $this->ringkasanSnapshot($l),
+            ])->values(),
+
+            'flash' => [
+                'success' => session('success'),
+            ],
         ]);
     }
 
-    public function show(PreventifPengiriman $pengiriman): Response
+    // =====================================================
+    // DETAIL LAPORAN
+    // =====================================================
+
+    public function show(Request $request, PreventifLaporanMingguan $laporan): Response
     {
-        $tanggalPengiriman = Carbon::parse($pengiriman->tanggal);
+        abort_if($laporan->status === 'draft', 404);
 
-        $tanggal = $tanggalPengiriman->format('Y-m-d');
-
-        $bulan = $tanggalPengiriman->month;
-        $tahun = $tanggalPengiriman->year;
-        // Dokumen yang diunggah Admin untuk tanggal pengiriman ini
-        $dokumens = PreventifDokumen::query()
-            ->whereDate('tanggal', $tanggal)
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn ($dokumen) => [
-                'id' => $dokumen->id,
-                'nama_asli' => $dokumen->nama_asli,
-                'mime' => $dokumen->mime,
-                'ukuran' => $dokumen->ukuran,
-                'lihat_url' => route('pimpinan.dokumen.lihat', $dokumen),
-                'download_url' => route('pimpinan.dokumen.download', $dokumen),
-            ])
-            ->values();
-
-        $preventifMesins = PreventifMesin::where('is_hidden', false)
-            ->with([
-                'checklists' => function ($query) use ($tanggal) {
-                    $query->whereDate('tanggal', $tanggal);
-                },
-
-                // Nilai durasi/total_durasi/dot/hot khusus bulan pengiriman
-                'bulanans' => function ($query) use ($bulan, $tahun) {
-                    $query->where('tahun', $tahun)
-                        ->where('bulan', $bulan);
-                },
-            ])
-            ->orderBy('divisi')
-            ->orderBy('no_item')
+        $items = $laporan->items()
+            ->orderBy('bagian')
+            ->orderBy('urutan')
             ->get();
 
-        // =========================
-        // REVISI (hanya untuk item yang masih tampil)
-        // =========================
-        $idItemTampil = $preventifMesins->pluck('no')->all();
+        $revisis = $laporan->revisis()->latest()->limit(50)->get();
 
-        $revisis = $pengiriman->revisis()
-            ->with('pengubah')
-            ->whereIn('preventif_mesin_id', $idItemTampil)
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->get();
+        $nama = $this->namaUser(
+            $revisis->pluck('user_id')
+                ->push($laporan->dikirim_oleh)
+                ->push($laporan->disetujui_oleh)
+        );
 
-        $revisiPerItem = $revisis->groupBy('preventif_mesin_id');
+        return Inertia::render('Pimpinan/Detail', [
+            'user' => [
+                'name' => $request->user()?->name,
+                'role' => $request->user()?->role,
+            ],
 
-        $revisiList = $revisis
-            ->map(fn ($revisi) => $this->formatRevisi($revisi))
-            ->values();
+            'laporan' => [
+                'id' => $laporan->id,
+                'tahun' => $laporan->tahun,
+                'bulan' => $laporan->bulan,
+                'week' => $laporan->week,
+                'periode' => $this->labelPeriode($laporan),
+                'status' => $laporan->status,
+                'alasan_penolakan' => $laporan->alasan_penolakan,
+                'dikirim_oleh' => $nama[$laporan->dikirim_oleh] ?? null,
+                'dikirim_pada' => $this->waktu($laporan->dikirim_pada),
+                'disetujui_oleh' => $nama[$laporan->disetujui_oleh] ?? null,
+                'disetujui_pada' => $this->waktu($laporan->disetujui_pada),
+            ],
 
-        // =========================
-        // DATA TABEL
-        // =========================
-        $data = $preventifMesins
-            ->map(function ($preventif) use ($bulan, $tahun, $tanggal, $revisiPerItem) {
+            'bagian1' => $this->bagian1($laporan, $items),
 
-                $tanggalPlan = $this->generateTanggalPlan(
-                    $preventif,
-                    $tahun,
-                    $bulan
-                );
+            'bagian2' => $items->where('bagian', 2)
+                ->map(fn ($i) => $this->itemKeArray($i))
+                ->values(),
 
-                $adaPlan = in_array($tanggal, $tanggalPlan, true);
+            'bagian3' => $items->where('bagian', 3)
+                ->map(fn ($i) => $this->itemKeArray($i))
+                ->values(),
 
-                $nilai = $this->nilaiBulanan($preventif);
+            'revisis' => $revisis->map(fn ($r) => [
+                'id' => $r->id,
+                'keterangan' => $r->keterangan,
+                'oleh' => $nama[$r->user_id] ?? 'Admin',
+                'waktu' => $r->created_at?->translatedFormat('d F Y'),
+            ])->values(),
 
-                $revisiItem = ($revisiPerItem->get($preventif->no) ?? collect())
-                    ->map(fn ($revisi) => $this->formatRevisi($revisi))
-                    ->values();
-
-                return [
-                    'id' => $preventif->no,
-                    'divisi' => $preventif->divisi,
-                    'no_item' => $preventif->no_item,
-                    'item_preventif' => $nilai['item_preventif'],
-
-                    'periode' => $preventif->periode_nilai
-                        ? rtrim(
-                            rtrim(
-                                number_format(
-                                    (float) $preventif->periode_nilai,
-                                    2,
-                                    '.',
-                                    ''
-                                ),
-                                '0'
-                            ),
-                            '.'
-                        ) . ' ' . $preventif->periode_satuan
-                        : '',
-
-                    'durasi' => $nilai['durasi'],
-                    'total_durasi' => $nilai['total_durasi'],
-                    'dot' => $nilai['dot'],
-                    'hot' => $nilai['hot'],
-
-                    'tanggal_plan' => $adaPlan
-                        ? [$tanggal]
-                        : [],
-
-                    'checklists' => $preventif->checklists
-                        ->map(function ($checklist) {
-                            return [
-                                'tanggal' => Carbon::parse($checklist->tanggal)
-                                    ->format('Y-m-d'),
-                                'status' => (bool) $checklist->status,
-                                'catatan' => $checklist->catatan,
-                            ];
-                        })
-                        ->values(),
-
-                    'revisis' => $revisiItem,
-                ];
-            })
-            ->values();
-
-        
-            return Inertia::render('Pimpinan/Detail', [
-                'user' => [
-                    'name' => request()->user()?->name,
-                    'role' => request()->user()?->role,
-                ],
-
-                'pengiriman' => [
-                    'id' => $pengiriman->id,
-                    'tanggal' => $tanggalPengiriman->format('Y-m-d'),
-                    'tanggal_format' => $tanggalPengiriman->translatedFormat('d F Y'),
-                    'dikirim_oleh' => $pengiriman->pengirim?->name,
-                    'dikirim_pada' => $pengiriman->dikirim_pada?->translatedFormat('d F Y'),
-                    'status' => $pengiriman->status,
-                    'alasan_penolakan' => $pengiriman->alasan_penolakan,
-                ],
-
-                'bulan' => $bulan,
-                'tahun' => $tahun,
-                'preventifMesins' => $data,
-                'revisis' => $revisiList,
-
-                // Dokumen dikirim sebagai prop terpisah
-                'dokumens' => $dokumens,
-            ]);
-
+            'flash' => [
+                'success' => session('success'),
+            ],
+        ]);
     }
 
-    public function periksa(PreventifPengiriman $pengiriman)
-    {
-        // Semua revisi yang ada dianggap sudah ditinjau pimpinan
-        $pengiriman->revisis()
-            ->whereNull('ditinjau_pada')
-            ->update(['ditinjau_pada' => now()]);
+    // =====================================================
+    // AKSI PIMPINAN
+    // =====================================================
 
-        $pengiriman->update([
-            'status' => 'diperiksa',
+    public function periksa(PreventifLaporanMingguan $laporan)
+    {
+        abort_unless($laporan->status === 'menunggu', 422, 'Laporan ini tidak sedang menunggu.');
+
+        $laporan->update(['status' => 'diperiksa']);
+
+        return back()->with('success', 'Laporan ditandai sedang diperiksa.');
+    }
+
+    public function setujui(Request $request, PreventifLaporanMingguan $laporan)
+    {
+        abort_unless(
+            in_array($laporan->status, ['menunggu', 'diperiksa'], true),
+            422,
+            'Laporan ini tidak bisa disetujui.'
+        );
+
+        $laporan->update([
+            'status' => 'disetujui',
+            'disetujui_oleh' => $request->user()->id,
+            'disetujui_pada' => now(),
+            'alasan_penolakan' => null,
         ]);
 
         return redirect()
             ->route('pimpinan.index')
-            ->with(
-                'success',
-                'Data berhasil ditandai sudah diperiksa.'
-            );
+            ->with('success', 'Laporan W' . $laporan->week . ' berhasil disetujui.');
     }
 
-    public function tolak(Request $request, PreventifPengiriman $pengiriman)
+    public function tolak(Request $request, PreventifLaporanMingguan $laporan)
     {
-        $request->validate([
+        abort_unless(
+            in_array($laporan->status, ['menunggu', 'diperiksa'], true),
+            422,
+            'Laporan ini tidak bisa ditolak.'
+        );
+
+        $data = $request->validate([
             'alasan_penolakan' => ['required', 'string', 'max:1000'],
         ]);
 
-        $pengiriman->update([
+        $laporan->update([
             'status' => 'ditolak',
-            'alasan_penolakan' => $request->alasan_penolakan,
+            'alasan_penolakan' => $data['alasan_penolakan'],
+            'snapshot' => null, // kembali ke angka live supaya admin bisa merevisi
         ]);
 
         return redirect()
             ->route('pimpinan.index')
-            ->with(
-                'success',
-                'Data berhasil ditolak dan alasan penolakan telah disimpan.'
-            );
+            ->with('success', 'Laporan ditolak dan alasan penolakan telah disimpan.');
     }
 
-    public function batalkanVerifikasi(PreventifPengiriman $pengiriman)
+    /** Batalkan persetujuan: laporan kembali ke admin untuk direvisi dan dikirim ulang. */
+    public function batalkan(PreventifLaporanMingguan $laporan)
     {
-        // Hanya yang sudah diperiksa yang bisa dibatalkan
-        if ($pengiriman->status !== 'diperiksa') {
-            return back()->with('error', 'Hanya data yang sudah diperiksa yang bisa dibatalkan.');
+        if ($laporan->status !== 'disetujui') {
+            return back()->with('error', 'Hanya laporan yang sudah disetujui yang bisa dibatalkan.');
         }
 
-        $pengiriman->update([
+        $laporan->update([
             'status' => 'ditolak',
-            'alasan_penolakan' => 'Verifikasi dibatalkan oleh pimpinan. Mohon periksa data dan kirim ulang.',
+            'alasan_penolakan' => 'Persetujuan dibatalkan oleh pimpinan. Mohon periksa data dan kirim ulang.',
+            'snapshot' => null,
+            'disetujui_oleh' => null,
+            'disetujui_pada' => null,
         ]);
 
         return redirect()
             ->route('pimpinan.index')
-            ->with('success', 'Verifikasi dibatalkan. Admin perlu mengirim ulang data.');
+            ->with('success', 'Persetujuan dibatalkan. Admin perlu merevisi dan mengirim ulang laporan.');
     }
 
-    private function formatRevisi(PreventifRevisi $revisi): array
+    // =====================================================
+    // HELPER
+    // =====================================================
+
+    /** Angka Bagian 1: snapshot kalau ada (dibekukan saat dikirim), kalau tidak hitungan live. */
+    private function bagian1(PreventifLaporanMingguan $laporan, $items): array
     {
-        return [
-            'id' => $revisi->id,
-            'item_id' => $revisi->preventif_mesin_id,
-            'item' => $revisi->item_label,
-            'jenis' => $revisi->jenis,
-            'keterangan' => $revisi->keterangan,
-            'nilai_lama' => $revisi->nilai_lama,
-            'nilai_baru' => $revisi->nilai_baru,
-            'oleh' => $revisi->pengubah?->name,
-            'waktu' => $revisi->created_at?->translatedFormat('d F Y'),
-            'baru' => $revisi->ditinjau_pada === null,
-        ];
-    }
+        $snapshot = $this->snapshotArray($laporan);
 
-    /**
-     * Nilai durasi/total_durasi/dot/hot/nama item untuk bulan pengiriman.
-     * Sama dengan di sisi admin: hanya dari tabel bulanan.
-     */
-    private function nilaiBulanan(PreventifMesin $preventif): array
-    {
-        $bulanan = $preventif->bulanans->first();
+        if ($laporan->sudahDikirim() && ! empty($snapshot)) {
+            $dasar = $snapshot;
+        } else {
+            $rentang = PreventifLaporanMingguan::rentang($laporan->tahun, $laporan->bulan, $laporan->week);
 
-        return [
-            'durasi' => $bulanan?->durasi,
-            'total_durasi' => $bulanan?->total_durasi,
-            'dot' => $bulanan?->dot,
-            'hot' => $bulanan?->hot,
-
-            'item_preventif' => filled($bulanan?->item_preventif)
-                ? $bulanan->item_preventif
-                : $preventif->getOriginal('item_preventif'),
-        ];
-    }
-
-    private function generateTanggalPlan(
-        PreventifMesin $preventifMesin,
-        int $tahun,
-        int $bulan
-    ): array {
-
-        if (empty($preventifMesin->tanggal_plan_awal)) {
-            return [];
+            $dasar = $rentang
+                ? $this->hitungBagian1($laporan->tahun, $laporan->bulan, $rentang['hari'])
+                : [];
         }
 
-        $tanggalAwal = Carbon::parse(
-            $preventifMesin->tanggal_plan_awal
-        );
+        $komentar = $items->where('bagian', 1)->keyBy('preventif_mesin_id');
 
-        $tanggalMulai = Carbon::create($tahun, $bulan, 1)->startOfMonth();
-        $tanggalAkhir = Carbon::create($tahun, $bulan, 1)->endOfMonth();
+        return array_map(function ($row) use ($komentar) {
+            $row['komentar'] = $komentar->get($row['no'])?->komentar;
 
-        $tanggalPlan = [];
-
-        $jumlahDilakukan = max(
-            1,
-            (int) ($preventifMesin->jumlah_dilakukan ?? 1)
-        );
-
-        // Tanpa periode: jadwal sekali saja (hari kerja berurutan)
-        if (
-            empty($preventifMesin->periode_nilai) ||
-            empty($preventifMesin->periode_satuan)
-        ) {
-            foreach ($this->generateHariKerja($tanggalAwal, $jumlahDilakukan) as $tgl) {
-                if ($tgl->gte($tanggalMulai) && $tgl->lte($tanggalAkhir)) {
-                    $tanggalPlan[] = $tgl->format('Y-m-d');
-                }
-            }
-
-            return $tanggalPlan;
-        }
-
-        $tanggal = $tanggalAwal->copy();
-
-        while ($tanggal->lte($tanggalAkhir)) {
-
-            foreach ($this->generateHariKerja($tanggal, $jumlahDilakukan) as $tanggalDilakukan) {
-                if (
-                    $tanggalDilakukan->gte($tanggalMulai)
-                    &&
-                    $tanggalDilakukan->lte($tanggalAkhir)
-                ) {
-                    $tanggalPlan[] = $tanggalDilakukan->format('Y-m-d');
-                }
-            }
-
-            $tanggalBerikutnya = $this->tambahPeriode(
-                $tanggal,
-                $preventifMesin->periode_nilai,
-                $preventifMesin->periode_satuan
-            );
-
-            if ($tanggalBerikutnya->lte($tanggal)) {
-                break;
-            }
-
-            $tanggal = $tanggalBerikutnya;
-        }
-
-        $tanggalPlan = array_values(array_unique($tanggalPlan));
-        sort($tanggalPlan);
-
-        return $tanggalPlan;
+            return $row;
+        }, $dasar);
     }
 
-    private function tambahPeriode(
-        Carbon $tanggal,
-        int $nilai,
-        ?string $satuan
-    ): Carbon {
-
-        $nilai = (float) $nilai;
-
-        return match ($satuan) {
-            'hari' => $tanggal->copy()->addDays($nilai),
-            'minggu' => $tanggal->copy()->addWeeks($nilai),
-            'bulan' => $tanggal->copy()->addMonths($nilai),
-            'tahun' => $tanggal->copy()->addYears($nilai),
-            default => $tanggal->copy(),
-        };
-    }
-
-    /**
-     * Ambil N hari kerja (Senin-Jumat) berurutan mulai dari tanggal tertentu.
-     */
-    private function generateHariKerja(Carbon $mulai, int $jumlah): array
+    /** Sama dengan perhitungan di sisi admin (PreventifLaporanMingguanController). */
+    private function hitungBagian1(int $tahun, int $bulan, array $hari): array
     {
+        $pertama = $hari[0];
+        $terakhir = end($hari);
+
+        $mesins = PreventifMesin::where('is_hidden', false)->with([
+            'checklists' => fn ($q) => $q->whereDate('tanggal', '>=', $pertama)
+                ->whereDate('tanggal', '<=', $terakhir),
+            'bulanans' => fn ($q) => $q->where('tahun', $tahun)->where('bulan', $bulan),
+        ])->orderBy('divisi')->orderBy('no_item')->get();
+
+        $ctrl = app(PreventifMesinController::class);
+
         $hasil = [];
-        $tanggal = $mulai->copy();
 
-        while (count($hasil) < $jumlah) {
-            if ($tanggal->isWeekday()) {
-                $hasil[] = $tanggal->copy();
+        foreach ($mesins as $pm) {
+            $plan = array_values(array_intersect(
+                $ctrl->getTanggalPlanEfektif($pm, $tahun, $bulan),
+                $hari
+            ));
+
+            if (count($plan) === 0) {
+                continue;
             }
 
-            $tanggal->addDay();
+            $byDate = $pm->checklists->keyBy(fn ($c) => substr((string) $c->tanggal, 0, 10));
+
+            $sudah = 0;
+
+            foreach ($plan as $tgl) {
+                $c = $byDate->get($tgl);
+
+                if ($c && (bool) $c->status) {
+                    $sudah++;
+                }
+            }
+
+            $jumlah = count($plan);
+
+            $hasil[] = [
+                'no' => $pm->no,
+                'divisi' => $pm->divisi,
+                'mesin' => $pm->bulanans->first()?->item_preventif ?: $pm->getOriginal('item_preventif'),
+                'jumlah' => $jumlah,
+                'sudah' => $sudah,
+                'belum' => $jumlah - $sudah,
+                'persen' => (int) round(($sudah / $jumlah) * 100),
+            ];
         }
 
         return $hasil;
     }
-    
+
+    private function itemKeArray($item): array
+    {
+        return [
+            'id' => $item->id,
+            'mesin' => $item->mesin,
+            'aktivitas' => $item->aktivitas,
+            'penanggulangan' => $item->penanggulangan,
+
+            // route foto yang sama dengan sisi admin
+            'foto_before_url' => $item->foto_before
+                ? route('laporan-mingguan.foto', ['item' => $item->id, 'jenis' => 'before'])
+                : null,
+
+            'foto_after_url' => $item->foto_after
+                ? route('laporan-mingguan.foto', ['item' => $item->id, 'jenis' => 'after'])
+                : null,
+        ];
+    }
+
+    private function snapshotArray(PreventifLaporanMingguan $laporan): array
+    {
+        $snapshot = $laporan->snapshot;
+
+        if (is_string($snapshot)) {
+            $snapshot = json_decode($snapshot, true);
+        }
+
+        return is_array($snapshot) ? $snapshot : [];
+    }
+
+    private function ringkasanSnapshot(PreventifLaporanMingguan $laporan): ?array
+    {
+        $snapshot = $this->snapshotArray($laporan);
+
+        if (empty($snapshot)) {
+            return null;
+        }
+
+        $jumlah = (int) array_sum(array_column($snapshot, 'jumlah'));
+        $sudah = (int) array_sum(array_column($snapshot, 'sudah'));
+
+        return [
+            'jumlah' => $jumlah,
+            'sudah' => $sudah,
+            'persen' => $jumlah > 0 ? (int) round(($sudah / $jumlah) * 100) : 0,
+        ];
+    }
+
+    private function labelPeriode(PreventifLaporanMingguan $laporan): string
+    {
+        $rentang = PreventifLaporanMingguan::rentang($laporan->tahun, $laporan->bulan, $laporan->week);
+        $bulanTahun = (self::NAMA_BULAN[$laporan->bulan] ?? '-') . ' ' . $laporan->tahun;
+
+        return $rentang
+            ? $rentang['awal'] . '-' . $rentang['akhir'] . ' ' . $bulanTahun
+            : $bulanTahun;
+    }
+
+    private function waktu($nilai): ?string
+    {
+        return $nilai ? Carbon::parse($nilai)->translatedFormat('d F Y') : null;
+    }
+
+    /** [id => nama] untuk beberapa user sekaligus (tanpa relasi). */
+    private function namaUser(Collection $ids): array
+    {
+        $ids = $ids->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return User::whereIn('id', $ids)->pluck('name', 'id')->all();
+    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\PreventifMesinController;
 use App\Http\Controllers\PreventifLaporanMingguanController;
+use App\Http\Controllers\PimpinanController;
 use App\Http\Controllers\CheckSheetController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CheckSheetImportController;
@@ -133,7 +134,7 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
             'export',
         ])->name('export');
 
-        // Menampilkan foto
+        // Menampilkan foto (admin + pimpinan, dipakai juga oleh halaman pimpinan)
         Route::get('/foto/{item}/{jenis}', [
             PreventifLaporanMingguanController::class,
             'foto',
@@ -179,6 +180,10 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         });
 
         // Pimpinan
+        // CATATAN: approval sekarang lewat PimpinanController (/pimpinan/laporan/...).
+        // Tiga route di bawah ini sudah tidak dipakai oleh halaman pimpinan dan
+        // boleh dihapus (beserta method periksa/setujui/tolak di
+        // PreventifLaporanMingguanController) kalau mau lebih bersih.
         Route::middleware('role:pimpinan')->group(function () {
 
             Route::post('/{laporan}/periksa', [
@@ -544,11 +549,37 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
 
 Route::middleware(['auth', 'role:pimpinan'])->group(function () {
 
-    // Alamat lama /pimpinan diarahkan ke Report Mingguan.
-    // Nama route 'pimpinan.index' dipertahankan supaya link lama di
-    // Sidebar / halaman lain tidak error.
-    Route::redirect('/pimpinan', '/laporan-mingguan')
-        ->name('pimpinan.index');
+    // Approval Report Mingguan Preventif (dikirim Admin)
+    // Nama route 'pimpinan.index' tetap dipakai supaya link lama tidak error.
+    Route::get('/pimpinan', [
+        PimpinanController::class,
+        'index',
+    ])->name('pimpinan.index');
+
+    Route::get('/pimpinan/laporan/{laporan}', [
+        PimpinanController::class,
+        'show',
+    ])->name('pimpinan.laporan.show');
+
+    Route::post('/pimpinan/laporan/{laporan}/periksa', [
+        PimpinanController::class,
+        'periksa',
+    ])->name('pimpinan.laporan.periksa');
+
+    Route::post('/pimpinan/laporan/{laporan}/setujui', [
+        PimpinanController::class,
+        'setujui',
+    ])->name('pimpinan.laporan.setujui');
+
+    Route::post('/pimpinan/laporan/{laporan}/tolak', [
+        PimpinanController::class,
+        'tolak',
+    ])->name('pimpinan.laporan.tolak');
+
+    Route::post('/pimpinan/laporan/{laporan}/batalkan', [
+        PimpinanController::class,
+        'batalkan',
+    ])->name('pimpinan.laporan.batalkan');
 
     // Pengiriman Check Sheet
     Route::get('/pimpinan/check-sheet', [

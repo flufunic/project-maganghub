@@ -21,6 +21,7 @@ const ICONS = {
     plus: { paths: ['M12 6v12m6-6H6'] },
     clock: { paths: ['M12 7v5l3 2'], circle: true },
     check: { paths: ['m8 12 2.5 2.5L16 9'], circle: true },
+    cross: { paths: ['m9 9 6 6m0-6-6 6'], circle: true },
     calendar: {
         paths: [
             'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z',
@@ -74,43 +75,64 @@ const glassCard =
 const thClass =
     'px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500';
 
-export default function Index({
-    user,
-    pengirimans = [],
-}) {
+/* Badge status laporan */
+const STATUS = {
+    menunggu: {
+        label: 'Menunggu Diperiksa',
+        cls: 'border-amber-200 bg-amber-50 text-amber-700',
+        dot: 'bg-amber-500',
+        icon: 'clockSmall',
+    },
+    diperiksa: {
+        label: 'Sedang Diperiksa',
+        cls: 'border-blue-200 bg-blue-50 text-blue-700',
+        dot: 'bg-blue-500',
+        icon: 'clockSmall',
+    },
+    disetujui: {
+        label: 'Disetujui',
+        cls: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        dot: 'bg-emerald-500',
+        icon: 'tick',
+    },
+    ditolak: {
+        label: 'Ditolak',
+        cls: 'border-red-200 bg-red-50 text-red-700',
+        dot: 'bg-red-500',
+        icon: 'x',
+    },
+};
+
+// "menunggu" mencakup yang masih menunggu dan yang sedang diperiksa
+const cocokFilter = (item, filter) => {
+    if (filter === 'semua') return true;
+    if (filter === 'menunggu') return ['menunggu', 'diperiksa'].includes(item.status);
+
+    return item.status === filter;
+};
+
+export default function Index({ user, laporans = [], flash }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // semua | menunggu | diperiksa
+    // semua | menunggu | disetujui | ditolak
     const [filter, setFilter] = useState('semua');
 
-    // Modal batalkan verifikasi
+    // Modal batalkan persetujuan
     const [itemBatal, setItemBatal] = useState(null);
     const [memproses, setMemproses] = useState(false);
 
-    const totalPengiriman = pengirimans.length;
+    const total = laporans.length;
+    const totalMenunggu = laporans.filter((i) => cocokFilter(i, 'menunggu')).length;
+    const totalDisetujui = laporans.filter((i) => i.status === 'disetujui').length;
+    const totalDitolak = laporans.filter((i) => i.status === 'ditolak').length;
 
-    const totalMenunggu = pengirimans.filter(
-        (item) => item.status === 'menunggu'
-    ).length;
-
-    const totalDiperiksa = pengirimans.filter(
-        (item) => item.status === 'diperiksa'
-    ).length;
-
-    const daftar =
-        filter === 'semua'
-            ? pengirimans
-            : pengirimans.filter((item) => item.status === filter);
+    const daftar = laporans.filter((item) => cocokFilter(item, filter));
 
     // Klik kartu yang sedang aktif -> kembali ke semua
     const pilihFilter = (nilai) => {
         setFilter((sekarang) =>
             sekarang === nilai || nilai === 'semua' ? 'semua' : nilai
         );
-    };
-
-    const batalkanVerifikasi = (item) => {
-        setItemBatal(item);
     };
 
     const tutupModal = () => {
@@ -122,7 +144,7 @@ export default function Index({
         if (!itemBatal || memproses) return;
 
         router.post(
-            `/pimpinan/pengiriman/${itemBatal.id}/batalkan`,
+            `/pimpinan/laporan/${itemBatal.id}/batalkan`,
             {},
             {
                 preserveScroll: true,
@@ -152,19 +174,23 @@ export default function Index({
     const judulTabel =
         filter === 'menunggu'
             ? 'Menunggu Diperiksa'
-            : filter === 'diperiksa'
-              ? 'Sudah Diperiksa'
-              : 'Riwayat Pengiriman';
+            : filter === 'disetujui'
+              ? 'Sudah Disetujui'
+              : filter === 'ditolak'
+                ? 'Ditolak'
+                : 'Riwayat Report Mingguan';
 
     // ============================================
-    // DATA KARTU STATISTIK (tampilan saja)
+    // DATA KARTU STATISTIK
     // ============================================
+    const persen = (n) => (total > 0 ? `${(n / total) * 100}%` : '0%');
+
     const statCards = [
         {
             key: 'semua',
-            label: 'Total Pengiriman',
-            value: totalPengiriman,
-            hint: 'Seluruh data yang dikirim',
+            label: 'Total Report',
+            value: total,
+            hint: 'Seluruh report yang dikirim',
             icon: 'plus',
             border: 'border-blue-100',
             accent: 'from-blue-400 to-blue-600',
@@ -178,7 +204,7 @@ export default function Index({
             key: 'menunggu',
             label: 'Menunggu Diperiksa',
             value: totalMenunggu,
-            hint: 'Belum diperiksa pimpinan',
+            hint: 'Perlu ditinjau pimpinan',
             icon: 'clock',
             border: 'border-amber-100',
             accent: 'from-amber-400 to-orange-500',
@@ -186,16 +212,13 @@ export default function Index({
             valueClass: 'text-amber-600',
             track: 'bg-amber-50',
             bar: 'bg-amber-400',
-            width:
-                totalPengiriman > 0
-                    ? `${(totalMenunggu / totalPengiriman) * 100}%`
-                    : '0%',
+            width: persen(totalMenunggu),
         },
         {
-            key: 'diperiksa',
-            label: 'Sudah Diperiksa',
-            value: totalDiperiksa,
-            hint: 'Telah diperiksa pimpinan',
+            key: 'disetujui',
+            label: 'Disetujui',
+            value: totalDisetujui,
+            hint: 'Telah disetujui pimpinan',
             icon: 'check',
             border: 'border-emerald-100',
             accent: 'from-emerald-400 to-green-600',
@@ -203,10 +226,21 @@ export default function Index({
             valueClass: 'text-emerald-600',
             track: 'bg-emerald-50',
             bar: 'bg-emerald-500',
-            width:
-                totalPengiriman > 0
-                    ? `${(totalDiperiksa / totalPengiriman) * 100}%`
-                    : '0%',
+            width: persen(totalDisetujui),
+        },
+        {
+            key: 'ditolak',
+            label: 'Ditolak',
+            value: totalDitolak,
+            hint: 'Menunggu revisi admin',
+            icon: 'cross',
+            border: 'border-red-100',
+            accent: 'from-red-400 to-rose-600',
+            iconBox: 'bg-red-50 text-red-600',
+            valueClass: 'text-red-600',
+            track: 'bg-red-50',
+            bar: 'bg-red-500',
+            width: persen(totalDitolak),
         },
     ];
 
@@ -285,7 +319,7 @@ export default function Index({
                                 </h1>
 
                                 <p className="hidden text-xs text-white/65 sm:block">
-                                    Approval dan Monitoring Harian
+                                    Approval Report Mingguan Preventif
                                 </p>
                             </div>
                         </div>
@@ -295,19 +329,26 @@ export default function Index({
                 {/* CONTENT */}
                 <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
 
+                    {flash?.success && (
+                        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">
+                            {flash.success}
+                        </div>
+                    )}
+
                     {/* JUDUL DATA */}
                     <div className="mb-5">
                         <h2 className="text-xl font-bold text-white">
-                            Data Preventif Mesin
+                            Report Mingguan Preventif
                         </h2>
 
                         <p className="mt-0.5 text-sm text-blue-100/90">
-                            Data yang telah dikirim oleh Admin untuk diperiksa.
+                            Report mingguan yang telah dikirim oleh Admin untuk diperiksa.
                         </p>
                     </div>
 
                     {/* STAT CARDS (bisa diklik untuk filter) */}
-                    <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-3">
+                    {/* STAT CARDS (kompak, bisa diklik untuk filter) */}
+                    <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
                         {statCards.map((card) => {
                             const aktif = filter === card.key;
 
@@ -315,45 +356,37 @@ export default function Index({
                                 <button
                                     key={card.key}
                                     type="button"
+                                    title={card.hint}
                                     onClick={() => pilihFilter(card.key)}
                                     aria-pressed={aktif}
-                                    className={`relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.93] p-5 text-left shadow-[0_16px_45px_rgba(2,6,23,0.30)] backdrop-blur-2xl transition-colors duration-200 hover:bg-white ${card.border} ${
+                                    className={`relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border bg-white/[0.93] py-2.5 pl-4 pr-3 text-left shadow-[0_10px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl transition-colors duration-200 hover:bg-white ${card.border} ${
                                         aktif ? 'ring-2 ring-white' : ''
                                     }`}
                                 >
                                     <div
-                                        className={`absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b ${card.accent}`}
+                                        className={`absolute left-0 top-0 h-full w-1 bg-gradient-to-b ${card.accent}`}
                                     />
 
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-500">
-                                                {card.label}
-                                            </p>
-
-                                            <p
-                                                className={`mt-2 text-3xl font-bold ${card.valueClass}`}
-                                            >
-                                                {card.value}
-                                            </p>
-
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                {card.hint}
-                                            </p>
-                                        </div>
-
-                                        <div
-                                            className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.iconBox}`}
-                                        >
-                                            <Icon type={card.icon} className="h-6 w-6" />
-                                        </div>
+                                    <div
+                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${card.iconBox}`}
+                                    >
+                                        <Icon type={card.icon} className="h-[18px] w-[18px]" />
                                     </div>
 
-                                    <div
-                                        className={`mt-4 h-1.5 overflow-hidden rounded-full ${card.track}`}
-                                    >
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-[11px] font-medium text-slate-500">
+                                            {card.label}
+                                        </p>
+
+                                        <p className={`text-xl font-bold leading-tight ${card.valueClass}`}>
+                                            {card.value}
+                                        </p>
+                                    </div>
+
+                                    {/* progress tipis di dasar kartu */}
+                                    <div className={`absolute inset-x-0 bottom-0 h-[3px] ${card.track}`}>
                                         <div
-                                            className={`h-full rounded-full ${card.bar}`}
+                                            className={`h-full ${card.bar}`}
                                             style={{ width: card.width }}
                                         />
                                     </div>
@@ -362,7 +395,8 @@ export default function Index({
                         })}
                     </div>
 
-                    {/* RIWAYAT PENGIRIMAN */}
+
+                    {/* RIWAYAT REPORT */}
                     <div className={`overflow-hidden rounded-3xl ${glassCard}`}>
 
                         {/* TABLE HEADER */}
@@ -379,14 +413,14 @@ export default function Index({
                                     </h3>
 
                                     <p className="mt-0.5 text-sm text-slate-500">
-                                        Daftar data preventif yang dikirim oleh Admin.
+                                        Daftar report mingguan yang dikirim oleh Admin.
                                     </p>
                                 </div>
                             </div>
 
                             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
                                 <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                {daftar.length} Pengiriman
+                                {daftar.length} Report
                             </div>
                         </div>
 
@@ -394,10 +428,7 @@ export default function Index({
                         {daftar.length === 0 ? (
                             <div className="px-6 py-16 text-center">
                                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-                                    <Icon
-                                        type="document"
-                                        className="h-8 w-8 text-slate-400"
-                                    />
+                                    <Icon type="document" className="h-8 w-8 text-slate-400" />
                                 </div>
 
                                 <h3 className="font-semibold text-slate-700">
@@ -406,20 +437,21 @@ export default function Index({
 
                                 <p className="mt-1 text-sm text-slate-500">
                                     {filter === 'semua'
-                                        ? 'Belum ada data preventif yang dikirim oleh Admin.'
-                                        : 'Tidak ada data pada kategori ini.'}
+                                        ? 'Belum ada report mingguan yang dikirim oleh Admin.'
+                                        : 'Tidak ada report pada kategori ini.'}
                                 </p>
                             </div>
                         ) : (
                             /* TABLE */
                             <div className="pmp-scroll overflow-x-auto">
-                                <table className="w-full min-w-[850px] text-sm">
+                                <table className="w-full min-w-[950px] text-sm">
                                     <thead>
                                         <tr className="bg-slate-50/80">
                                             <th className={thClass}>No</th>
-                                            <th className={thClass}>Tanggal</th>
+                                            <th className={thClass}>Periode</th>
                                             <th className={thClass}>Dikirim Oleh</th>
                                             <th className={thClass}>Waktu Pengiriman</th>
+                                            <th className={thClass}>Pencapaian</th>
                                             <th className={thClass}>Status</th>
                                             <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
                                                 Aksi
@@ -428,123 +460,125 @@ export default function Index({
                                     </thead>
 
                                     <tbody className="divide-y divide-slate-200/60">
-                                        {daftar.map((item, index) => (
-                                            <tr
-                                                key={item.id}
-                                                className="group transition-colors duration-200 hover:bg-blue-50/60"
-                                            >
-                                                {/* NO */}
-                                                <td className="px-6 py-4">
-                                                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 transition group-hover:bg-blue-100 group-hover:text-blue-600">
-                                                        {index + 1}
-                                                    </span>
-                                                </td>
+                                        {daftar.map((item, index) => {
+                                            const st = STATUS[item.status] ?? STATUS.menunggu;
 
-                                                {/* TANGGAL */}
-                                                <td className="px-6 py-4 font-semibold text-slate-800">
-                                                    {item.tanggal_format}
-                                                </td>
-
-                                                {/* DIKIRIM OLEH */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
-                                                            {(item.dikirim_oleh || 'A')
-                                                                .charAt(0)
-                                                                .toUpperCase()}
-                                                        </div>
-
-                                                        <span className="text-slate-600">
-                                                            {item.dikirim_oleh || '-'}
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    className="group transition-colors duration-200 hover:bg-blue-50/60"
+                                                >
+                                                    {/* NO */}
+                                                    <td className="px-6 py-4">
+                                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 transition group-hover:bg-blue-100 group-hover:text-blue-600">
+                                                            {index + 1}
                                                         </span>
-                                                    </div>
-                                                </td>
+                                                    </td>
 
-                                                {/* WAKTU */}
-                                                <td className="px-6 py-4 text-slate-600">
-                                                    {item.dikirim_pada || '-'}
-                                                </td>
+                                                    {/* PERIODE */}
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-semibold text-slate-800">
+                                                            Week {item.week}
+                                                        </p>
+                                                        <p className="mt-0.5 text-xs text-slate-500">
+                                                            {item.periode}
+                                                        </p>
+                                                    </td>
 
-                                                {/* STATUS + REVISI */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col items-start gap-2">
+                                                    {/* DIKIRIM OLEH */}
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+                                                                {(item.dikirim_oleh || 'A')
+                                                                    .charAt(0)
+                                                                    .toUpperCase()}
+                                                            </div>
 
-                                                        {item.status === 'diperiksa' ? (
-                                                            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                                                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
-                                                                    <Icon type="tick" className="h-2.5 w-2.5" />
-                                                                </span>
-                                                                Sudah Diperiksa
+                                                            <span className="text-slate-600">
+                                                                {item.dikirim_oleh || '-'}
                                                             </span>
-                                                        ) : item.status === 'ditolak' ? (
-                                                            <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
-                                                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white">
-                                                                    <Icon type="x" className="h-2.5 w-2.5" />
+                                                        </div>
+                                                    </td>
+
+                                                    {/* WAKTU */}
+                                                    <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                                                        {item.dikirim_pada || '-'}
+                                                    </td>
+
+                                                    {/* PENCAPAIAN */}
+                                                    <td className="min-w-[160px] px-6 py-4">
+                                                        {item.ringkasan ? (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs font-semibold text-slate-700">
+                                                                    {item.ringkasan.sudah}/{item.ringkasan.jumlah} item · {item.ringkasan.persen}%
                                                                 </span>
-                                                                Ditolak
-                                                            </span>
+                                                                <div className="h-1.5 w-full rounded bg-slate-200">
+                                                                    <div
+                                                                        className="h-full rounded bg-emerald-500"
+                                                                        style={{ width: `${item.ringkasan.persen}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         ) : (
-                                                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-                                                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white">
-                                                                    <Icon type="clockSmall" className="h-2.5 w-2.5" />
-                                                                </span>
-                                                                Menunggu Diperiksa
-                                                            </span>
+                                                            <span className="text-slate-300">-</span>
                                                         )}
+                                                    </td>
 
-                                                        {/* BADGE REVISI */}
-                                                        {(item.jumlah_revisi ?? 0) > 0 && (
-                                                            <div>
+                                                    {/* STATUS + REVISI */}
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col items-start gap-2">
+                                                            <span
+                                                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${st.cls}`}
+                                                            >
+                                                                <span
+                                                                    className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${st.dot}`}
+                                                                >
+                                                                    <Icon type={st.icon} className="h-2.5 w-2.5" />
+                                                                </span>
+                                                                {st.label}
+                                                            </span>
+
+                                                            {/* BADGE REVISI (perubahan admin setelah dikirim) */}
+                                                            {item.jumlah_revisi > 0 && (
                                                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
                                                                     <Icon type="revisi" className="h-3.5 w-3.5" />
-
                                                                     Ada Revisi ({item.jumlah_revisi})
-
-                                                                    {(item.revisi_baru ?? 0) > 0 && (
-                                                                        <span className="rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                                                                            {item.revisi_baru} baru
-                                                                        </span>
-                                                                    )}
                                                                 </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
 
-                                                                {item.revisi_terakhir && (
-                                                                    <p className="mt-1 pl-1 text-[11px] text-slate-400">
-                                                                        Direvisi: {item.revisi_terakhir}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                {/* AKSI */}
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="inline-flex items-center gap-2">
-                                                        <Link
-                                                            href={`/pimpinan/pengiriman/${item.id}`}
-                                                            className="group/btn inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-300/50 transition-all duration-200 hover:from-blue-700 hover:to-indigo-800 hover:shadow-md"
-                                                        >
-                                                            Lihat Data
-                                                            <Icon
-                                                                type="chevron"
-                                                                className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5"
-                                                            />
-                                                        </Link>
-
-                                                        {item.status === 'diperiksa' && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => batalkanVerifikasi(item)}
-                                                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700 transition-colors duration-200 hover:bg-red-100"
+                                                    {/* AKSI */}
+                                                    {/* AKSI */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        <div className="inline-flex items-center gap-1.5">
+                                                            <Link
+                                                                href={`/pimpinan/laporan/${item.id}`}
+                                                                className="group/btn inline-flex cursor-pointer items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-blue-300/50 transition-all duration-200 hover:from-blue-700 hover:to-indigo-800"
                                                             >
-                                                                <Icon type="undo" className="h-4 w-4" />
-                                                                Batalkan
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                                Lihat Report
+                                                                <Icon
+                                                                    type="chevron"
+                                                                    className="h-3 w-3 transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                                                                />
+                                                            </Link>
+
+                                                            {item.status === 'disetujui' && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setItemBatal(item)}
+                                                                    className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 transition-colors duration-200 hover:bg-red-100"
+                                                                >
+                                                                    <Icon type="undo" className="h-3 w-3" />
+                                                                    Batalkan
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -563,7 +597,7 @@ export default function Index({
             </div>
 
             {/* =====================================================
-                MODAL BATALKAN VERIFIKASI
+                MODAL BATALKAN PERSETUJUAN
             ====================================================== */}
             {itemBatal && (
                 <div
@@ -586,20 +620,19 @@ export default function Index({
                                 id="judul-modal-batal"
                                 className="text-lg font-bold text-slate-800"
                             >
-                                Batalkan Verifikasi?
+                                Batalkan Persetujuan?
                             </h3>
 
                             <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                                Data pengiriman tanggal{' '}
+                                Report{' '}
                                 <span className="font-semibold text-slate-700">
-                                    {itemBatal.tanggal_format}
+                                    Week {itemBatal.week} · {itemBatal.periode}
                                 </span>{' '}
-                                akan dikembalikan ke status belum terverifikasi, dan Admin
-                                harus mengirim ulang data.
+                                akan dikembalikan ke Admin untuk direvisi, lalu harus dikirim ulang.
                             </p>
 
                             <p className="mt-2 text-xs text-slate-400">
-                                Data checklist, durasi, DOT, dan HOT tidak dihapus.
+                                Isi report (teks dan foto) tidak dihapus.
                             </p>
                         </div>
 

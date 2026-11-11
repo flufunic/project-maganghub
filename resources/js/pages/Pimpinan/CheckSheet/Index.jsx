@@ -239,7 +239,7 @@ export default function Index({ pengirimans = [] }) {
                         </p>
                     </div>
 
-                    <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {statCards.map((card) => {
                             const aktif = filter === card.key;
 
@@ -247,30 +247,33 @@ export default function Index({ pengirimans = [] }) {
                                 <button
                                     key={card.key}
                                     type="button"
+                                    title={card.hint}
                                     onClick={() => pilihFilter(card.key)}
                                     aria-pressed={aktif}
-                                    className={`relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.93] p-5 text-left shadow-[0_16px_45px_rgba(2,6,23,0.30)] backdrop-blur-2xl transition hover:bg-white ${card.border} ${
+                                    className={`relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border bg-white/[0.93] py-2.5 pl-4 pr-3 text-left shadow-[0_10px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl transition hover:bg-white ${card.border} ${
                                         aktif ? 'ring-2 ring-white' : ''
                                     }`}
                                 >
-                                    <div className={`absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b ${card.accent}`} />
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-500">{card.label}</p>
-                                            <p className={`mt-2 text-3xl font-bold ${card.valueClass}`}>{card.value}</p>
-                                            <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
-                                        </div>
-                                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.iconBox}`}>
-                                            <Icon type={card.icon} className="h-6 w-6" />
-                                        </div>
+                                    <div className={`absolute left-0 top-0 h-full w-1 bg-gradient-to-b ${card.accent}`} />
+
+                                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${card.iconBox}`}>
+                                        <Icon type={card.icon} className="h-[18px] w-[18px]" />
                                     </div>
-                                    <div className={`mt-4 h-1.5 overflow-hidden rounded-full ${card.track}`}>
-                                        <div className={`h-full rounded-full ${card.bar}`} style={{ width: card.width }} />
+
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-[11px] font-medium text-slate-500">{card.label}</p>
+                                        <p className={`text-xl font-bold leading-tight ${card.valueClass}`}>{card.value}</p>
+                                    </div>
+
+                                    {/* progress tipis di dasar kartu */}
+                                    <div className={`absolute inset-x-0 bottom-0 h-[3px] ${card.track}`}>
+                                        <div className={`h-full ${card.bar}`} style={{ width: card.width }} />
                                     </div>
                                 </button>
                             );
                         })}
                     </div>
+
 
                     {/* <div className="mb-5 flex flex-wrap items-center gap-2">
                         <span className="mr-1 text-xs font-semibold text-white/70">Filter:</span>
