@@ -187,6 +187,17 @@ export default function Index({
 
     const tanggal = Array.from({ length: jumlahHari }, (_, index) => index + 1);
 
+    // Pembagian kalender menjadi Week 1-5, masing-masing 7 tanggal.
+    const weeks = Array.from(
+        { length: Math.ceil(jumlahHari / 7) },
+        (_, index) => ({
+            number: index + 1,
+            start: index * 7 + 1,
+            end: Math.min((index + 1) * 7, jumlahHari),
+            colSpan: Math.min(7, jumlahHari - index * 7),
+        })
+    );
+
     const getTanggalChecklist = (day) => {
         return `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     };
@@ -1205,13 +1216,6 @@ export default function Index({
                         <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </div>
 
-                    {/* KETERANGAN PLAN / ACT */}
-                    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] font-semibold">
-                        <span className="text-blue-600">○ Plan otomatis</span>
-                        <span className="text-orange-500">○ Plan manual</span>
-                        <span className="text-emerald-600">✓ ACT</span>
-                    </div>
-
                     {/* TABLE */}
                     <div
                         style={{ animationDelay: '100ms' }}
@@ -1234,7 +1238,7 @@ export default function Index({
                                         ].map((header) => (
                                             <th
                                                 key={header}
-                                                rowSpan="2"
+                                                rowSpan="3"
                                                 className={`border-b border-r border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap first:border-l ${
                                                     header === 'Item Preventif'
                                                         ? 'min-w-[300px] text-left'
@@ -1246,7 +1250,7 @@ export default function Index({
                                         ))}
 
                                         <th
-                                            rowSpan="2"
+                                            rowSpan="3"
                                             className="border-b border-r border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
                                             Status
@@ -1263,11 +1267,24 @@ export default function Index({
                                         </th>
 
                                         <th
-                                            rowSpan="2"
+                                            rowSpan="3"
                                             className="w-[120px] min-w-[120px] border-b border-white/10 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
                                         >
                                             Aksi
                                         </th>
+                                    </tr>
+
+                                    {/* HEADER MINGGU */}
+                                    <tr className="bg-[#13285f]">
+                                        {weeks.map((week) => (
+                                            <th
+                                                key={week.number}
+                                                colSpan={week.colSpan}
+                                                className="border-b border-r border-white/10 bg-[#13285f] px-2 py-2 text-center text-[10px] font-extrabold uppercase tracking-wider text-blue-100"
+                                            >
+                                                Week {week.number}
+                                            </th>
+                                        ))}
                                     </tr>
 
                                     {/* HEADER TANGGAL */}
@@ -1390,15 +1407,15 @@ export default function Index({
                                                                             key={`plan-${day}`}
                                                                             id={`plan-cell-${preventif.no}-${day}`}
                                                                             className={`border border-slate-200 px-1.5 py-2 text-center ${
-                                                                                cellHighlighted ? 'bg-amber-100' : plan ? (planManual ? 'bg-orange-50' : 'bg-blue-50/40') : 'bg-white'
+                                                                                cellHighlighted ? 'bg-amber-100' : plan ? 'bg-blue-50/40' : 'bg-white'
                                                                             }`}
                                                                         >
                                                                             <div
                                                                                 className={`mx-auto flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
                                                                                     plan
                                                                                         ? planManual
-                                                                                            ? 'border-orange-300 bg-orange-50 text-orange-500'
-                                                                                            : 'border-blue-300 bg-blue-50 text-blue-500'
+                                                                                            ? 'border-blue-300 bg-blue-50 text-blue-500'
+                                                                                            : 'border-slate-200 bg-white text-transparent'
                                                                                         : 'border-slate-200 bg-white text-transparent'
                                                                                 }`}
                                                                                 title={plan ? (planManual ? 'Plan manual' : 'Plan otomatis') : 'Tidak ada Plan'}
@@ -1423,7 +1440,7 @@ export default function Index({
                                                                             onClick={() => openPlanEditor(preventif)}
                                                                             className={`inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
                                                                                 planManual
-                                                                                    ? 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100'
+                                                                                    ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
                                                                                     : 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
                                                                             }`}
                                                                         >
@@ -1692,9 +1709,9 @@ export default function Index({
             {/* WARNING TOAST */}
             {warningMessage && (
                 <div className="fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
-                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-amber-400 to-blue-500" />
 
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 text-amber-600">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-blue-100 text-amber-600">
                         <Icon type="alert" className="h-5 w-5" />
                     </div>
 
@@ -1734,8 +1751,6 @@ export default function Index({
 
                         <div className="px-6 py-5">
                             <div className="mb-4 flex flex-wrap items-center gap-4 text-xs font-semibold">
-                                <span className="flex items-center gap-1.5 text-blue-600"><span className="text-lg">○</span> Plan otomatis</span>
-                                <span className="flex items-center gap-1.5 text-orange-500"><span className="text-lg">○</span> Plan manual</span>
                                 <span className="text-slate-500">Klik tanggal untuk menambah atau menghapus Plan.</span>
                             </div>
 
@@ -1757,7 +1772,7 @@ export default function Index({
                                             onClick={() => toggleDraftPlanDate(day)}
                                             className={`flex min-h-12 flex-col items-center justify-center rounded-xl border text-sm font-semibold transition ${
                                                 active
-                                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-sm'
+                                                    ? 'border-blue-300 bg-blue-50 text-blue-600 shadow-sm'
                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
                                             }`}
                                         >

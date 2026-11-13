@@ -39,14 +39,24 @@ class PreventifLaporanMingguanController extends Controller
         $tahun = (int) $request->input('tahun', now()->year);
         $bulan = (int) $request->input('bulan', now()->month);
 
-        $daftarWeek = PreventifLaporanMingguan::daftarWeek($tahun, $bulan);
+        $daftarWeek = PreventifLaporanMingguan::daftarWeek(
+            $tahun,
+            $bulan
+        );
 
         $default = $daftarWeek[0];
 
         if ($tahun === now()->year && $bulan === now()->month) {
-            $weekIni = min(5, intdiv(now()->day - 1, 7) + 1);
+            $weekIni = min(
+                5,
+                intdiv(now()->day - 1, 7) + 1
+            );
 
-            $default = in_array($weekIni, $daftarWeek, true)
+            $default = in_array(
+                $weekIni,
+                $daftarWeek,
+                true
+            )
                 ? $weekIni
                 : $default;
         }
@@ -89,7 +99,11 @@ class PreventifLaporanMingguanController extends Controller
             $this->sinkron($laporan, $hitung);
         }
 
-        $items = $laporan->items()->orderBy('bagian')->orderBy('urutan')->get();
+        $items = $laporan
+            ->items()
+            ->orderBy('bagian')
+            ->orderBy('urutan')
+            ->get();
 
         return Inertia::render('LaporanMingguan/Index', [
             'tahun' => $tahun,
@@ -151,42 +165,167 @@ class PreventifLaporanMingguanController extends Controller
         ]);
     }
 
+    // =====================================================
+    // RIWAYAT LAPORAN
+    // =====================================================
+
     public function riwayat(Request $request)
     {
-        $tahun = (int) $request->input('tahun', now()->year);
+        $tahun = (int) $request->input(
+            'tahun',
+            now()->year
+        );
 
+        $bulan = $request->input('bulan');
+
+        // Pastikan bulan yang diterima valid (1–12)
+        $bulan = is_numeric($bulan) &&
+            (int) $bulan >= 1 &&
+            (int) $bulan <= 12
+                ? (int) $bulan
+                : '';
+
+        /*
+        * Ambil item laporan sekaligus.
+        *
+        * Tidak perlu relasi tambahan ke PreventifMesin,
+        * karena nama item sudah tersimpan di field "mesin".
+        */
         $query = PreventifLaporanMingguan::query()
+            ->with([
+                'items' => function ($q) {
+                    $q->select([
+                        'id',
+                        'laporan_id',
+                        'bagian',
+                        'preventif_mesin_id',
+                        'mesin',
+                        'urutan',
+                    ])
+                    ->whereIn('bagian', [1, 2])
+                    ->orderBy('urutan')
+                    ->orderBy('id');
+                },
+            ])
             ->withCount('items')
-            ->where('tahun', $tahun)
+            ->where('tahun', $tahun);
+
+        /*
+        * FILTER BULAN
+        *
+        * Jika bulan kosong, tampilkan semua bulan.
+        * Jika bulan dipilih, tampilkan bulan tersebut saja.
+        */
+        if ($bulan !== '') {
+            $query->where('bulan', $bulan);
+        }
+
+        $query
             ->orderByDesc('bulan')
             ->orderByDesc('week');
 
-        $laporan = $query->paginate(15)->withQueryString();
+        /*
+        * PAGINATION
+        *
+        * withQueryString() mempertahankan filter
+        * tahun dan bulan ketika pindah halaman.
+        */
+        $laporan = $query
+            ->paginate(15)
+            ->withQueryString();
+
+        /*
+        * Tambahkan data yang dibutuhkan oleh halaman Riwayat:
+        *
+        * - periode_tanggal
+        * - hari_kerja
+        * - item_preventif
+        */
+        $laporan->through(function ($item) {
+
+            $rentang = PreventifLaporanMingguan::rentang(
+                (int) $item->tahun,
+                (int) $item->bulan,
+                (int) $item->week
+            );
+
+            // Format tanggal periode
+            if ($rentang) {
+                $item->periode_tanggal =
+                    $rentang['awal']
+                    . ' - '
+                    . $rentang['akhir']
+                    . ' '
+                    . self::NAMA_BULAN[$item->bulan];
+
+                $item->hari_kerja = $rentang['hari'];
+            } else {
+                $item->periode_tanggal = null;
+                $item->hari_kerja = [];
+            }
+
+            /*
+            * Ambil nama item preventif dari field "mesin".
+            *
+            * Gunakan unique() supaya item yang sama
+            * dari bagian 1 dan 2 tidak muncul dua kali.
+            */
+            $item->item_preventif = $item->items
+                ->pluck('mesin')
+                ->filter(function ($nama) {
+                    return filled($nama);
+                })
+                ->map(function ($nama) {
+                    return trim($nama);
+                })
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+
+            return [
+                'id' => $item->id,
+
+                'tahun' => $item->tahun,
+                'bulan' => $item->bulan,
+                'nama_bulan' => self::NAMA_BULAN[$item->bulan] ?? '-',
+
+                'week' => $item->week,
+
+                'periode_tanggal' => $item->periode_tanggal,
+                'hari_kerja' => $item->hari_kerja,
+
+                'items_count' => $item->items_count,
+                'item_preventif' => $item->item_preventif,
+
+                'status' => $item->status,
+
+                'dikirim_pada' =>
+                    $item->dikirim_pada?->translatedFormat('d F Y'),
+
+                'disetujui_pada' =>
+                    $item->disetujui_pada?->translatedFormat('d F Y'),
+
+                'alasan_penolakan' =>
+                    $item->alasan_penolakan,
+            ];
+        });
 
         return Inertia::render('LaporanMingguan/Riwayat', [
             'tahun' => $tahun,
 
-            'laporan' => $laporan->through(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'tahun' => $item->tahun,
-                    'bulan' => $item->bulan,
-                    'nama_bulan' => self::NAMA_BULAN[$item->bulan] ?? '-',
-                    'week' => $item->week,
-                    'status' => $item->status,
-                    'items_count' => $item->items_count,
-                    'dikirim_pada' => $item->dikirim_pada?->translatedFormat('d F Y'),
-                    'disetujui_pada' => $item->disetujui_pada?->translatedFormat('d F Y'),
-                    'alasan_penolakan' => $item->alasan_penolakan,
-                ];
-            }),
+            // Kirim bulan terpilih ke React
+            'bulan' => $bulan,
 
-            // Notifikasi berhasil
+            'laporan' => $laporan,
+
             'flash' => [
                 'success' => session('success'),
             ],
         ]);
     }
+
+
     // =====================================================
     // SIMPAN LAPORAN
     // =====================================================
@@ -218,7 +357,10 @@ class PreventifLaporanMingguanController extends Controller
 
         return redirect()
             ->route('laporan-mingguan.index')
-            ->with('success', 'Laporan berhasil disimpan sebagai draft.');
+            ->with(
+                'success',
+                'Laporan berhasil disimpan sebagai draft.'
+            );
     }
 
     // =====================================================
@@ -358,6 +500,7 @@ class PreventifLaporanMingguanController extends Controller
     // UPLOAD FOTO
     // =====================================================
 
+    
     public function uploadFoto(
         Request $request,
         PreventifLaporanItem $item
@@ -380,16 +523,16 @@ class PreventifLaporanMingguanController extends Controller
                 'required',
                 'image',
                 'mimes:jpg,jpeg,png',
-                'max:8192',
+                'max:10240',
             ],
         ], [
+            'foto.required' => 'Foto wajib dipilih.',
             'foto.image' => 'File harus berupa gambar.',
-            'foto.max' => 'Ukuran foto maksimal 8 MB.',
+            'foto.mimes' => 'Format foto harus JPG, JPEG, atau PNG.',
+            'foto.max' => 'Ukuran foto maksimal 10 MB.',
         ]);
 
-        /*
-         * Bagian 3 hanya memakai foto_before.
-         */
+        // Bagian 3 hanya menggunakan foto_before.
         $kolom = (
             $request->jenis === 'after'
             && $item->bagian === 2
@@ -397,13 +540,8 @@ class PreventifLaporanMingguanController extends Controller
             ? 'foto_after'
             : 'foto_before';
 
-        if ($item->{$kolom}) {
-            Storage::disk(self::DISK)->delete(
-                $item->{$kolom}
-            );
-        }
-
-        $path = $request
+        // Simpan foto baru terlebih dahulu.
+        $pathBaru = $request
             ->file('foto')
             ->store(
                 'laporan-mingguan/'
@@ -413,37 +551,135 @@ class PreventifLaporanMingguanController extends Controller
                 self::DISK
             );
 
+        // Jika penyimpanan berhasil, hapus foto lama.
+        $pathLama = $item->{$kolom};
+
         $item->update([
-            $kolom => $path,
+            $kolom => $pathBaru,
         ]);
+
+        if ($pathLama) {
+            Storage::disk(self::DISK)->delete($pathLama);
+        }
 
         $this->catatRevisi(
             $laporan,
-            'Foto ' . $request->jenis . ' diganti: '
+            'Foto ' . $request->jenis . ' diupload/diganti: '
                 . ($item->mesin ?: 'temuan'),
             $request
         );
 
-        return back();
+        return back()->with(
+            'success',
+            'Foto berhasil diupload.'
+        );
     }
+
+    // =====================================================
+    // HAPUS FOTO
+    // =====================================================
+    
+    public function hapusFoto(
+        Request $request,
+        PreventifLaporanItem $item
+    ) {
+        $laporan = $item->laporan;
+
+        abort_if(
+            $laporan->terkunci(),
+            403,
+            'Laporan sudah disetujui dan tidak bisa diubah.'
+        );
+
+        $data = $request->validate([
+            'jenis' => [
+                'required',
+                'in:before,after',
+            ],
+        ]);
+
+        // Foto hanya tersedia pada bagian 2 dan 3.
+        abort_unless(
+            in_array($item->bagian, [2, 3], true),
+            422,
+            'Item ini tidak memiliki foto.'
+        );
+
+        // Bagian 3 hanya memiliki foto_before.
+        if ($data['jenis'] === 'after' && $item->bagian !== 2) {
+            abort(
+                422,
+                'Foto after hanya tersedia untuk laporan preventif.'
+            );
+        }
+
+        $kolom = $data['jenis'] === 'after'
+            ? 'foto_after'
+            : 'foto_before';
+
+        $path = $item->{$kolom};
+
+        if (!$path) {
+            return back()->with(
+                'error',
+                'Foto belum tersedia atau sudah dihapus.'
+            );
+        }
+
+        // Hapus file fisik jika masih tersedia.
+        if (Storage::disk(self::DISK)->exists($path)) {
+            Storage::disk(self::DISK)->delete($path);
+        }
+
+        // Kosongkan kolom foto di database.
+        $item->update([
+            $kolom => null,
+        ]);
+
+        // Catat aktivitas perubahan.
+        $this->catatRevisi(
+            $laporan,
+            'Foto ' . $data['jenis'] . ' dihapus: '
+                . ($item->mesin ?: 'temuan'),
+            $request
+        );
+
+        return back()->with(
+            'success',
+            'Foto berhasil dihapus.'
+        );
+    }
+
 
     // =====================================================
     // TAMPILKAN FOTO
     // =====================================================
 
-    public function foto(PreventifLaporanItem $item, string $jenis)
-    {
-        abort_unless(in_array($jenis, ['before', 'after']), 404);
+    public function foto(
+        PreventifLaporanItem $item,
+        string $jenis
+    ) {
+        abort_unless(
+            in_array($jenis, ['before', 'after']),
+            404
+        );
 
         $path = $jenis === 'before'
             ? $item->foto_before
             : $item->foto_after;
 
-        abort_unless($path && Storage::disk(self::DISK)->exists($path), 404);
+        abort_unless(
+            $path
+            && Storage::disk(self::DISK)->exists($path),
+            404
+        );
 
         $filePath = Storage::disk(self::DISK)->path($path);
 
-        abort_unless(file_exists($filePath), 404);
+        abort_unless(
+            file_exists($filePath),
+            404
+        );
 
         return response()->file($filePath);
     }
@@ -686,6 +922,7 @@ class PreventifLaporanMingguanController extends Controller
         $hasil = [];
 
         foreach ($mesins as $pm) {
+
             $plan = array_values(
                 array_intersect(
                     $ctrl->getTanggalPlanEfektif(
@@ -746,7 +983,9 @@ class PreventifLaporanMingguanController extends Controller
         array $hitung
     ): void {
         foreach ($hitung as $i => $row) {
+
             foreach ([1, 2] as $bagian) {
+
                 PreventifLaporanItem::firstOrCreate(
                     [
                         'laporan_id' => $laporan->id,
@@ -795,6 +1034,7 @@ class PreventifLaporanMingguanController extends Controller
 
         return array_map(
             function ($row) use ($komentar) {
+
                 $item = $komentar->get(
                     $row['no']
                 );
@@ -886,14 +1126,26 @@ class PreventifLaporanMingguanController extends Controller
         );
     }
 
-    public function destroy(PreventifLaporanMingguan $laporan)
-    {
-        abort_if($laporan->status === 'disetujui', 403, 'Laporan yang sudah disetujui tidak dapat dihapus.');
+    // =====================================================
+    // HAPUS LAPORAN
+    // =====================================================
+
+    public function destroy(
+        PreventifLaporanMingguan $laporan
+    ) {
+        abort_if(
+            $laporan->status === 'disetujui',
+            403,
+            'Laporan yang sudah disetujui tidak dapat dihapus.'
+        );
 
         $laporan->delete();
 
         return redirect()
             ->route('laporan-mingguan.index')
-            ->with('success', 'Laporan mingguan berhasil dihapus.');
+            ->with(
+                'success',
+                'Laporan mingguan berhasil dihapus.'
+            );
     }
 }

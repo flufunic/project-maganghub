@@ -561,6 +561,19 @@ export default function Welcome({
         annualTotalPlan > 0
             ? ((annualTotalAct / annualTotalPlan) * 100).toFixed(1)
             : '0.0';
+    // Batas garis oranye penuh = persentase pencapaian ACT terhadap Plan
+    const planFirstX = annualPlanPoints[0]?.x ?? 0;
+    const planLastX = annualPlanPoints[annualPlanPoints.length - 1]?.x ?? 100;
+
+    const progressRatio =
+        annualTotalPlan > 0 ? Math.min(1, annualTotalAct / annualTotalPlan) : 0;
+    const lastActIndex = annualReport.reduce(
+        (acc, item, i) => (Number(item.act || 0) > 0 ? i : acc),
+        -1
+    );
+
+    const planProgressX =
+        lastActIndex >= 0 ? annualPlanPoints[lastActIndex].x : planFirstX;
 
     // Rincian item sudah diurutkan dari controller (divisi lalu no item).
     // Tandai baris pertama tiap divisi untuk sel Divisi yang digabung.
@@ -708,9 +721,8 @@ export default function Welcome({
                     animation: chartEntrance 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
                     transform-origin: center bottom;
                 }
-                .dashboard-plan-line {
-                    stroke-dasharray: 1000;
-                    transition: stroke-dashoffset 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease;
+                .dashboard-plan-svg {
+                    transition: clip-path 1400ms cubic-bezier(0.22, 1, 0.36, 1);
                 }
                 .dashboard-chart-bar {
                     transform-box: fill-box;
@@ -740,7 +752,7 @@ export default function Welcome({
                     .dashboard-float-reverse,
                     .dashboard-chart-enter,
                     .dashboard-chart-label { animation: none !important; }
-                    .dashboard-plan-line { transition: none !important; stroke-dashoffset: 0 !important; }
+                    .dashboard-plan-svg { transition: none !important; }
                     .dashboard-chart-bar { transform: none !important; }
                 }
 
@@ -1257,9 +1269,14 @@ export default function Welcome({
                                                             <div className="pointer-events-none absolute inset-x-0 bottom-11 top-7 z-10 px-3">
                                                                 <div className="relative h-full w-full">
                                                                     <svg
-                                                                        className="absolute inset-0 h-full w-full overflow-visible"
+                                                                        className="dashboard-plan-svg absolute inset-0 h-full w-full overflow-visible"
                                                                         viewBox="0 0 100 100"
                                                                         preserveAspectRatio="none"
+                                                                        style={{
+                                                                            clipPath: chartAnimated
+                                                                                ? 'inset(-15% -3% -15% 0%)'
+                                                                                : 'inset(-15% 100% -15% 0%)',
+                                                                        }}
                                                                     >
                                                                         <defs>
                                                                             <linearGradient id="annualPlanGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -1267,6 +1284,7 @@ export default function Welcome({
                                                                                 <stop offset="48%" stopColor="#f97316" />
                                                                                 <stop offset="100%" stopColor="#ea580c" />
                                                                             </linearGradient>
+
                                                                             <filter id="annualPlanGlow" x="-20%" y="-30%" width="140%" height="160%">
                                                                                 <feGaussianBlur stdDeviation="1.8" result="blur" />
                                                                                 <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.96 0 1 0 0 0.48 0 0 1 0 0.05 0 0 0 0.42 0" result="glow" />
@@ -1275,32 +1293,48 @@ export default function Welcome({
                                                                                     <feMergeNode in="SourceGraphic" />
                                                                                 </feMerge>
                                                                             </filter>
+
+                                                                            {/* hanya bagian garis sampai batas pencapaian yang ditampilkan oranye penuh */}
+                                                                            <clipPath id="annualPlanProgressClip">
+                                                                                <rect x="-5" y="-30" width={Math.max(planProgressX + 5, 0)} height="160" />
+                                                                            </clipPath>
                                                                         </defs>
+
+                                                                        {/* LAPISAN DASAR: seluruh garis Plan, pucat */}
                                                                         <polyline
                                                                             points={annualPlanLine}
                                                                             fill="none"
-                                                                            stroke="#fbbf24"
-                                                                            strokeWidth="7"
-                                                                            opacity={chartAnimated ? 0.18 : 0}
-                                                                            vectorEffect="non-scaling-stroke"
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                        />
-                                                                        <polyline
-                                                                            points={annualPlanLine}
-                                                                            fill="none"
-                                                                            stroke="url(#annualPlanGradient)"
+                                                                            stroke="#fdba74"
                                                                             strokeWidth="3"
+                                                                            opacity="0.35"
                                                                             vectorEffect="non-scaling-stroke"
                                                                             strokeLinecap="round"
                                                                             strokeLinejoin="round"
-                                                                            filter="url(#annualPlanGlow)"
-                                                                            className="dashboard-plan-line"
-                                                                            style={{
-                                                                                opacity: chartAnimated ? 1 : 0,
-                                                                                strokeDashoffset: chartAnimated ? 0 : 1000,
-                                                                            }}
                                                                         />
+
+                                                                        {/* LAPISAN PENCAPAIAN: oranye penuh sampai persentase ACT */}
+                                                                        <g clipPath="url(#annualPlanProgressClip)">
+                                                                            <polyline
+                                                                                points={annualPlanLine}
+                                                                                fill="none"
+                                                                                stroke="#fbbf24"
+                                                                                strokeWidth="7"
+                                                                                opacity="0.18"
+                                                                                vectorEffect="non-scaling-stroke"
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                            />
+                                                                            <polyline
+                                                                                points={annualPlanLine}
+                                                                                fill="none"
+                                                                                stroke="url(#annualPlanGradient)"
+                                                                                strokeWidth="3"
+                                                                                vectorEffect="non-scaling-stroke"
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                                filter="url(#annualPlanGlow)"
+                                                                            />
+                                                                        </g>
                                                                     </svg>
 
                                                                     {annualPlanPoints.map((point, index) => (
@@ -1629,12 +1663,16 @@ export default function Welcome({
                                                     <Legend
                                                         items={[
                                                             {
-                                                                label: 'ACT',
-                                                                className: 'bg-gradient-to-r from-blue-700 to-sky-400',
+                                                                label: `Plan tercapai ${annualTotalPct}%`,
+                                                                line: true,
+                                                                borderClass: 'border-orange-500',
+                                                                dotClass: 'bg-orange-500',
                                                             },
                                                             {
-                                                                label: 'Plan',
-                                                                className: 'bg-gradient-to-r from-amber-500 to-yellow-300',
+                                                                label: 'Sisa plan',
+                                                                line: true,
+                                                                borderClass: 'border-orange-200',
+                                                                dotClass: 'bg-orange-200',
                                                             },
                                                         ]}
                                                     />

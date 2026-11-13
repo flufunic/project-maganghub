@@ -496,13 +496,16 @@ class PreventifMesinController extends Controller
                 'query' => $request->query(),
             ]
         );
-
+        
         // =========================
         // NOTIFIKASI PREVENTIF (jadwal)
+        // Mengikuti Plan efektif: otomatis atau manual
         // =========================
         $hariIni = Carbon::today();
 
-        $semuaPreventif = PreventifMesin::where('is_hidden', false)->with('checklists')->get();
+        $semuaPreventif = PreventifMesin::where('is_hidden', false)
+            ->with('checklists')
+            ->get();
 
         $notifikasi = [];
 
@@ -510,19 +513,23 @@ class PreventifMesinController extends Controller
         $tanggalBesok = $hariIni->copy()->addDay();
 
         foreach ($semuaPreventif as $preventif) {
-            $planKemarin = $this->generateTanggalPlan(
+
+            // Ambil tanggal Plan yang benar-benar berlaku.
+            // Jika sudah diedit manual, gunakan daftar tanggal manual.
+            // Jika belum diedit, gunakan jadwal otomatis.
+            $planKemarin = $this->getTanggalPlanEfektif(
                 $preventif,
                 $tanggalKemarin->year,
                 $tanggalKemarin->month
             );
 
-            $planBesok = $this->generateTanggalPlan(
+            $planBesok = $this->getTanggalPlanEfektif(
                 $preventif,
                 $tanggalBesok->year,
                 $tanggalBesok->month
             );
 
-            // 1. Plan besok -> notif H-1
+            // 1. NOTIFIKASI H-1
             if (in_array($tanggalBesok->format('Y-m-d'), $planBesok, true)) {
                 $notifikasi[] = [
                     'tipe' => 'besok',
@@ -540,8 +547,9 @@ class PreventifMesinController extends Controller
                 ];
             }
 
-            // 2. Plan kemarin -> belum dilakukan
+            // 2. NOTIFIKASI TERLAMBAT
             if (in_array($tanggalKemarin->format('Y-m-d'), $planKemarin, true)) {
+
                 $sudahDilakukan = $preventif->checklists
                     ->contains(function ($checklist) use ($tanggalKemarin) {
                         return Carbon::parse($checklist->tanggal)
@@ -567,6 +575,8 @@ class PreventifMesinController extends Controller
                 }
             }
         }
+
+
 
         // =========================
         // NOTIFIKASI ABNORMALITY (dari checksheet)

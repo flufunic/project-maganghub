@@ -30,7 +30,10 @@ const thClass =
 const tdClass =
     'border border-slate-300 px-3 py-2 align-middle text-sm text-slate-700';
 
-/* Textarea yang menyimpan saat kehilangan fokus */
+/* =====================================================
+   TEXTAREA
+===================================================== */
+
 function TeksSel({ value, onSave, disabled, rows = 3, placeholder }) {
     const [teks, setTeks] = useState(value ?? '');
 
@@ -53,9 +56,70 @@ function TeksSel({ value, onSave, disabled, rows = 3, placeholder }) {
     );
 }
 
+/* =====================================================
+   KOMPONEN FOTO
+===================================================== */
+
 function FotoSel({ url, itemId, jenis, disabled, label }) {
+    const [dragActive, setDragActive] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [errorUpload, setErrorUpload] = useState('');
+    const [fileTerakhir, setFileTerakhir] = useState(null);
+    const [modalHapus, setModalHapus] = useState(false);
+
+    const maksimalUkuran = 10 * 1024 * 1024;
+
+    // =====================================================
+    // VALIDASI FILE
+    // =====================================================
+
+    const validasiFile = (file) => {
+        if (!file) {
+            setErrorUpload('Silakan pilih foto terlebih dahulu.');
+            return false;
+        }
+
+        const ekstensiValid = /\.(jpg|jpeg|png)$/i.test(file.name);
+
+        const formatValid = [
+            'image/jpeg',
+            'image/png',
+        ].includes(file.type);
+
+        if (!formatValid && !ekstensiValid) {
+            setErrorUpload('Format foto harus JPG, JPEG, atau PNG.');
+            return false;
+        }
+
+        if (file.size === 0) {
+            setErrorUpload('File foto kosong atau tidak dapat dibaca.');
+            return false;
+        }
+
+        if (file.size > maksimalUkuran) {
+            setErrorUpload(
+                `Ukuran foto ${(file.size / (1024 * 1024)).toFixed(2)} MB. Maksimal 10 MB.`
+            );
+            return false;
+        }
+
+        return true;
+    };
+
+    // =====================================================
+    // UPLOAD FOTO
+    // =====================================================
+
     const upload = (file) => {
-        if (!file) return;
+        if (!file || disabled || uploading || deleting) return;
+
+        setErrorUpload('');
+
+        if (!validasiFile(file)) return;
+
+        setFileTerakhir(file);
+        setUploading(true);
 
         router.post(
             `/laporan-mingguan/item/${itemId}/foto`,
@@ -66,62 +130,398 @@ function FotoSel({ url, itemId, jenis, disabled, label }) {
             {
                 forceFormData: true,
                 preserveScroll: true,
+
+                onSuccess: () => {
+                    setErrorUpload('');
+                    setFileTerakhir(null);
+                },
+
+                onError: (errors) => {
+                    setErrorUpload(
+                        errors?.foto ||
+                        errors?.message ||
+                        'Foto gagal diupload. Silakan coba upload ulang.'
+                    );
+                },
+
+                onFinish: () => {
+                    setUploading(false);
+                },
             }
         );
     };
 
+    // =====================================================
+    // PILIH FOTO
+    // =====================================================
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+
+        if (file) {
+            upload(file);
+        }
+
+        // Supaya file yang sama bisa dipilih kembali
+        e.target.value = '';
+    };
+
+    // =====================================================
+    // DRAG AND DROP
+    // =====================================================
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!disabled && !uploading && !deleting) {
+            setDragActive(true);
+        }
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        setDragActive(false);
+
+        if (disabled || uploading || deleting) return;
+
+        const file = e.dataTransfer.files?.[0];
+
+        if (file) {
+            upload(file);
+        }
+    };
+
+
+    // =====================================================
+    // COPY PASTE FOTO DARI CLIPBOARD
+    // =====================================================
+
+    const handlePaste = (e) => {
+        if (disabled || uploading || deleting) return;
+
+        const items = e.clipboardData?.items;
+
+        if (!items) return;
+
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                e.preventDefault();
+
+                const file = item.getAsFile();
+
+                if (!file) continue;
+
+                // Buat nama file untuk foto dari clipboard
+                const ekstensi = file.type === 'image/png'
+                    ? 'png'
+                    : 'jpg';
+
+                const fotoClipboard = new File(
+                    [file],
+                    `foto-clipboard-${Date.now()}.${ekstensi}`,
+                    { type: file.type }
+                );
+
+                upload(fotoClipboard);
+                return;
+            }
+        }
+    };
+
+
+    // =====================================================
+    // UPLOAD ULANG
+    // =====================================================
+
+    const cobaUploadLagi = () => {
+        if (!fileTerakhir || uploading || deleting) return;
+
+        upload(fileTerakhir);
+    };
+
+    // =====================================================
+    // HAPUS FOTO
+    // =====================================================
+
+    const hapusFoto = () => {
+        if (deleting || uploading) return;
+
+        setDeleting(true);
+        setErrorUpload('');
+
+        router.delete(
+            `/laporan-mingguan/item/${itemId}/foto`,
+            {
+                data: { jenis },
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    setModalHapus(false);
+                    setFileTerakhir(null);
+                    setErrorUpload('');
+                },
+
+                onError: (errors) => {
+                    setErrorUpload(
+                        errors?.foto ||
+                        errors?.error ||
+                        errors?.message ||
+                        'Foto gagal dihapus. Silakan coba lagi.'
+                    );
+                },
+
+                onFinish: () => {
+                    setDeleting(false);
+                },
+            }
+        );
+    };
+
+    // =====================================================
+    // TAMPILAN
+    // =====================================================
+
     return (
-        <div className="flex flex-col items-center gap-2">
-            {label && (
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    {label}
-                </span>
-            )}
+        <>
+            <div className="flex min-w-[180px] flex-col items-center gap-2">
 
-            {url ? (
-                <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative block"
-                >
-                    <img
-                        src={url}
-                        alt={label ?? 'Foto'}
-                        className="h-28 w-36 rounded-xl border border-slate-200 bg-slate-100 object-cover shadow-sm transition group-hover:scale-[1.02]"
-                        onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                        }}
-                    />
-
-                    <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-md bg-black/60 px-2 py-1 text-[9px] font-semibold text-white opacity-0 transition group-hover:opacity-100">
-                        Lihat foto
+                {label && (
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        {label}
                     </span>
-                </a>
-            ) : (
-                <div className="flex h-28 w-36 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-[10px] text-slate-400">
-                    Belum ada foto
+                )}
+
+                {/* AREA FOTO DAN DRAG DROP */}
+                <div
+                    tabIndex={disabled ? -1 : 0}
+                    onPaste={handlePaste}
+                    onDragEnter={handleDragOver}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative flex h-32 w-40 flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition ${
+                        dragActive
+                            ? 'border-violet-500 bg-violet-50'
+                            : 'border-slate-200 bg-slate-50'
+                    } ${
+                        disabled
+                            ? 'opacity-70'
+                            : 'hover:border-violet-300'
+                    }`}
+                >
+                    {url ? (
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex h-full w-full items-center justify-center p-1"
+                        >
+                            <img
+                                src={url}
+                                alt={label || 'Foto dokumentasi'}
+                                className="h-full w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                }}
+                            />
+                        </a>
+                    ) : (
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="30"
+                                height="30"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="18"
+                                    height="18"
+                                    rx="2"
+                                />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <path d="m21 15-5-5L5 21" />
+                            </svg>
+
+                            <span className="text-center text-[9px] text-slate-400">
+                                Drag & Drop / Ctrl + V · JPG / JPEG / PNG · Maks. 10 MB
+                            </span>
+                        </div>
+                    )}
+
+                    {/* INDIKATOR DRAG */}
+                    {dragActive && !disabled && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-violet-600/90">
+                            <span className="px-2 text-center text-xs font-bold text-white">
+                                Lepaskan foto di sini
+                            </span>
+                        </div>
+                    )}
+
+                    {/* INDIKATOR PROSES */}
+                    {(uploading || deleting) && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+
+                            <span className="mt-2 text-[10px] font-bold text-violet-700">
+                                {uploading
+                                    ? 'Mengupload foto...'
+                                    : 'Menghapus foto...'}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* TOMBOL HAPUS */}
+                {url && !disabled && (
+                    <button
+                        type="button"
+                        onClick={() => setModalHapus(true)}
+                        disabled={uploading || deleting}
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    >
+                        <Trash2 size={13} />
+                    </button>
+                )}
+
+                {/* KETERANGAN FORMAT */}
+                {!disabled && (
+                    <span className="text-center text-[9px] text-slate-400">
+                        JPG / JPEG / PNG · Maks. 10 MB
+                    </span>
+                )}
+
+                {/* PILIH ATAU GANTI FOTO */}
+                {!disabled && (
+                    <label
+                        className={`cursor-pointer rounded-lg px-3 py-2 text-[10px] font-bold text-white transition ${
+                            uploading || deleting
+                                ? 'pointer-events-none bg-slate-400'
+                                : 'bg-violet-600 hover:bg-violet-700'
+                        }`}
+                    >
+                        {uploading
+                            ? 'Sedang Upload...'
+                            : url
+                                ? 'Ganti Foto'
+                                : 'Pilih Foto'}
+
+                        <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            disabled={uploading || deleting}
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                    </label>
+                )}
+
+                {/* PESAN ERROR */}
+                {errorUpload && (
+                    <div className="w-full rounded-lg border border-red-200 bg-red-50 p-2 text-center">
+                        <p className="text-[10px] font-medium text-red-600">
+                            {errorUpload}
+                        </p>
+
+                        {fileTerakhir && (
+                            <button
+                                type="button"
+                                onClick={cobaUploadLagi}
+                                disabled={uploading || deleting}
+                                className="mt-2 inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+                            >
+                                ↻ Coba Upload Lagi
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* MODAL KONFIRMASI HAPUS FOTO */}
+            {modalHapus && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+                        <div className="flex justify-end px-4 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setModalHapus(false)}
+                                disabled={deleting}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                            >
+                                <X size={19} />
+                            </button>
+                        </div>
+
+                        <div className="px-6 pb-6 text-center">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+                                <Trash2 size={26} />
+                            </div>
+
+                            <h3 className="mt-4 text-lg font-bold text-slate-800">
+                                Hapus Foto?
+                            </h3>
+
+                            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                                Foto {label || 'dokumentasi'} ini akan dihapus secara permanen.
+                                Apakah kamu yakin ingin melanjutkan?
+                            </p>
+
+                            <div className="mt-6 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setModalHapus(false)}
+                                    disabled={deleting}
+                                    className="h-10 flex-1 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Batal
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={hapusFoto}
+                                    disabled={deleting}
+                                    className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {deleting ? (
+                                        <>
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                            Menghapus...
+                                        </>
+                                    ) : (
+                                        'Ya, Hapus'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
-
-            {!disabled && (
-                <label className="cursor-pointer rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-violet-700">
-                    {url ? 'Ganti Foto' : 'Upload Foto'}
-
-                    <input
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        className="hidden"
-                        onChange={(e) => {
-                            upload(e.target.files?.[0]);
-                            e.target.value = '';
-                        }}
-                    />
-                </label>
-            )}
-        </div>
+        </>
     );
 }
+
+/* =====================================================
+   HALAMAN INDEX
+===================================================== */
 
 export default function Index({
     tahun,
@@ -147,7 +547,10 @@ export default function Index({
     const status = STATUS[laporan.status] ?? STATUS.draft;
     const terkunci = laporan.status === 'disetujui';
 
+    // =====================================================
     // NOTIFIKASI TOAST
+    // =====================================================
+
     useEffect(() => {
         if (!flash?.success) return;
 
@@ -159,6 +562,10 @@ export default function Index({
 
         return () => clearTimeout(timer);
     }, [flash?.success]);
+
+    // =====================================================
+    // NAVIGASI DAN SIMPAN DATA
+    // =====================================================
 
     const pindah = (next) =>
         router.get(
@@ -177,7 +584,10 @@ export default function Index({
     const post = (url, data = {}) =>
         router.post(url, data, { preserveScroll: true });
 
+    // =====================================================
     // JALANKAN AKSI MODAL
+    // =====================================================
+
     const jalankanAksi = () => {
         if (!modalAksi || prosesAksi) return;
 
@@ -189,10 +599,12 @@ export default function Index({
 
         const options = {
             preserveScroll: true,
+
             onSuccess: () => {
                 setModalAksi(null);
                 setAlasanTolak('');
             },
+
             onFinish: () => setProsesAksi(false),
         };
 
@@ -238,9 +650,14 @@ export default function Index({
         setModalAksi({ type: 'tolak' });
     };
 
+    // =====================================================
+    // TOTAL PENCAPAIAN
+    // =====================================================
+
     const totalJumlah = bagian1.reduce((a, r) => a + r.jumlah, 0);
     const totalSudah = bagian1.reduce((a, r) => a + r.sudah, 0);
     const totalBelum = bagian1.reduce((a, r) => a + r.belum, 0);
+
     const totalPersen =
         totalJumlah > 0
             ? Math.round((totalSudah / totalJumlah) * 100)
@@ -267,6 +684,7 @@ export default function Index({
                         <p className="text-sm font-semibold text-slate-800">
                             Berhasil!
                         </p>
+
                         <p className="mt-1 text-sm text-slate-600">
                             {flash.success}
                         </p>
@@ -284,6 +702,8 @@ export default function Index({
             )}
 
             <div className="min-h-screen bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]">
+
+                {/* HEADER */}
                 <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/60 backdrop-blur-2xl">
                     <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
                         <button
@@ -302,6 +722,7 @@ export default function Index({
                 </header>
 
                 <main className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 sm:px-6">
+
                     {/* NAVIGASI KEMBALI */}
                     <div>
                         <Link
@@ -401,9 +822,7 @@ export default function Index({
                                     Export Excel
                                 </a>
 
-                                {['draft', 'ditolak'].includes(
-                                    laporan.status
-                                ) && (
+                                {['draft', 'ditolak'].includes(laporan.status) && (
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -416,9 +835,7 @@ export default function Index({
                                     </button>
                                 )}
 
-                                {['draft', 'ditolak'].includes(
-                                    laporan.status
-                                ) && (
+                                {['draft', 'ditolak'].includes(laporan.status) && (
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -434,9 +851,7 @@ export default function Index({
                                 )}
 
                                 {bisaPersetujuan &&
-                                    ['menunggu', 'diperiksa'].includes(
-                                        laporan.status
-                                    ) && (
+                                    ['menunggu', 'diperiksa'].includes(laporan.status) && (
                                         <>
                                             {laporan.status === 'menunggu' && (
                                                 <button
@@ -532,37 +947,31 @@ export default function Index({
 
                                     {bagian1.map((r, i) => (
                                         <tr key={r.no}>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+                                            <td className={`${tdClass} text-center`}>
                                                 {i + 1}
                                             </td>
+
                                             <td className={tdClass}>
                                                 {r.mesin}
                                             </td>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+
+                                            <td className={`${tdClass} text-center`}>
                                                 {r.jumlah}
                                             </td>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+
+                                            <td className={`${tdClass} text-center`}>
                                                 {r.sudah}
                                             </td>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+
+                                            <td className={`${tdClass} text-center`}>
                                                 {r.belum}
                                             </td>
-                                            <td
-                                                className={`${tdClass} text-center font-semibold`}
-                                            >
+
+                                            <td className={`${tdClass} text-center font-semibold`}>
                                                 {r.persen}%
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[220px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[220px]`}>
                                                 {r.item_id && (
                                                     <TeksSel
                                                         value={r.komentar}
@@ -583,31 +992,27 @@ export default function Index({
 
                                     <tr className="bg-slate-50 font-bold">
                                         <td className={tdClass} />
-                                        <td
-                                            className={`${tdClass} text-center`}
-                                        >
+
+                                        <td className={`${tdClass} text-center`}>
                                             TOTAL ITEM
                                         </td>
-                                        <td
-                                            className={`${tdClass} text-center`}
-                                        >
+
+                                        <td className={`${tdClass} text-center`}>
                                             {totalJumlah}
                                         </td>
-                                        <td
-                                            className={`${tdClass} text-center`}
-                                        >
+
+                                        <td className={`${tdClass} text-center`}>
                                             {totalSudah}
                                         </td>
-                                        <td
-                                            className={`${tdClass} text-center`}
-                                        >
+
+                                        <td className={`${tdClass} text-center`}>
                                             {totalBelum}
                                         </td>
-                                        <td
-                                            className={`${tdClass} text-center`}
-                                        >
+
+                                        <td className={`${tdClass} text-center`}>
                                             {totalPersen}%
                                         </td>
+
                                         <td className={tdClass} />
                                     </tr>
                                 </tbody>
@@ -654,19 +1059,15 @@ export default function Index({
 
                                     {bagian2.map((it, i) => (
                                         <tr key={it.id}>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+                                            <td className={`${tdClass} text-center`}>
                                                 {i + 1}
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[200px] font-medium`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[200px] font-medium`}>
                                                 {it.mesin}
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[240px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[240px]`}>
                                                 <TeksSel
                                                     value={it.aktivitas}
                                                     disabled={terkunci}
@@ -679,9 +1080,8 @@ export default function Index({
                                                     }
                                                 />
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[240px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[240px]`}>
                                                 <TeksSel
                                                     value={it.penanggulangan}
                                                     disabled={terkunci}
@@ -694,6 +1094,7 @@ export default function Index({
                                                     }
                                                 />
                                             </td>
+
                                             <td className={tdClass}>
                                                 <FotoSel
                                                     url={it.foto_before_url}
@@ -703,6 +1104,7 @@ export default function Index({
                                                     label="Before"
                                                 />
                                             </td>
+
                                             <td className={tdClass}>
                                                 <FotoSel
                                                     url={it.foto_after_url}
@@ -774,14 +1176,11 @@ export default function Index({
 
                                     {bagian3.map((it, i) => (
                                         <tr key={it.id}>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+                                            <td className={`${tdClass} text-center`}>
                                                 {i + 1}
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[200px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[200px]`}>
                                                 <TeksSel
                                                     value={it.mesin}
                                                     rows={2}
@@ -795,9 +1194,8 @@ export default function Index({
                                                     }
                                                 />
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[240px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[240px]`}>
                                                 <TeksSel
                                                     value={it.aktivitas}
                                                     disabled={terkunci}
@@ -810,9 +1208,8 @@ export default function Index({
                                                     }
                                                 />
                                             </td>
-                                            <td
-                                                className={`${tdClass} min-w-[240px]`}
-                                            >
+
+                                            <td className={`${tdClass} min-w-[240px]`}>
                                                 <TeksSel
                                                     value={it.penanggulangan}
                                                     disabled={terkunci}
@@ -825,6 +1222,7 @@ export default function Index({
                                                     }
                                                 />
                                             </td>
+
                                             <td className={tdClass}>
                                                 <FotoSel
                                                     url={it.foto_before_url}
@@ -833,9 +1231,8 @@ export default function Index({
                                                     disabled={terkunci}
                                                 />
                                             </td>
-                                            <td
-                                                className={`${tdClass} text-center`}
-                                            >
+
+                                            <td className={`${tdClass} text-center`}>
                                                 {!terkunci && (
                                                     <button
                                                         type="button"
@@ -881,7 +1278,10 @@ export default function Index({
                 </main>
             </div>
 
-            {/* MODAL KONFIRMASI */}
+            {/* =====================================================
+                MODAL AKSI HALAMAN
+            ===================================================== */}
+
             {modalAksi && (() => {
                 const konfigurasi = {
                     simpan: {
@@ -893,6 +1293,7 @@ export default function Index({
                             'Apakah kamu yakin ingin menyimpan laporan ini sebagai draft?',
                         aksi: 'Ya, Simpan',
                     },
+
                     kirim: {
                         icon: Send,
                         warna: 'bg-indigo-50 text-indigo-600',
@@ -902,6 +1303,7 @@ export default function Index({
                             'Laporan akan dikirim ke pimpinan untuk diperiksa. Pastikan data sudah benar.',
                         aksi: 'Ya, Kirim',
                     },
+
                     tolak: {
                         icon: AlertTriangle,
                         warna: 'bg-red-50 text-red-600',
@@ -910,6 +1312,7 @@ export default function Index({
                         deskripsi: 'Masukkan alasan penolakan laporan ini.',
                         aksi: 'Ya, Tolak',
                     },
+
                     hapusBaris: {
                         icon: Trash2,
                         warna: 'bg-red-50 text-red-600',
@@ -930,6 +1333,7 @@ export default function Index({
                 return (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
                         <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
                             <div className="flex justify-end px-4 pt-4">
                                 <button
                                     type="button"

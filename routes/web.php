@@ -114,94 +114,106 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     | (menggantikan tombol Kirim & Upload Dokumen per tanggal)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('laporan-mingguan')->name('laporan-mingguan.')->group(function () {
+    
+    Route::prefix('laporan-mingguan')
+        ->name('laporan-mingguan.')
+        ->group(function () {
 
-        // Halaman utama: tabel riwayat
-        Route::get('/', [
-            PreventifLaporanMingguanController::class,
-            'riwayat',
-        ])->name('index');
-
-        // Halaman form laporan
-        Route::get('/form', [
-            PreventifLaporanMingguanController::class,
-            'index',
-        ])->name('form');
-
-        // Export
-        Route::get('/export', [
-            PreventifLaporanMingguanController::class,
-            'export',
-        ])->name('export');
-
-        // Menampilkan foto (admin + pimpinan, dipakai juga oleh halaman pimpinan)
-        Route::get('/foto/{item}/{jenis}', [
-            PreventifLaporanMingguanController::class,
-            'foto',
-        ])->name('foto');
-
-        // Admin
-        Route::middleware('role:admin')->group(function () {
-
-            Route::put('/item/{item}', [
+            // Halaman riwayat laporan
+            Route::get('/', [
                 PreventifLaporanMingguanController::class,
-                'updateItem',
-            ])->name('item.update');
+                'riwayat',
+            ])->name('index');
 
-            Route::post('/item/{item}/foto', [
+            // Halaman form laporan
+            Route::get('/form', [
                 PreventifLaporanMingguanController::class,
-                'uploadFoto',
-            ])->name('item.foto');
+                'index',
+            ])->name('form');
 
-            Route::delete('/item/{item}', [
+            // Export laporan
+            Route::get('/export', [
                 PreventifLaporanMingguanController::class,
-                'destroyItem',
-            ])->name('item.destroy');
+                'export',
+            ])->name('export');
 
-            Route::delete('/{laporan}', [
+            // Tampilkan foto: admin dan pimpinan
+            Route::get('/foto/{item}/{jenis}', [
                 PreventifLaporanMingguanController::class,
-                'destroy',
-            ])->name('destroy');
+                'foto',
+            ])->name('foto');
 
-            Route::post('/{laporan}/temuan', [
-                PreventifLaporanMingguanController::class,
-                'storeTemuan',
-            ])->name('temuan.store');
+            // Semua aksi pengelolaan laporan hanya untuk admin
+            Route::middleware('role:admin')->group(function () {
 
-            Route::post('/{laporan}/simpan', [
-                PreventifLaporanMingguanController::class,
-                'simpan',
-            ])->name('simpan');
+                // Update item laporan
+                Route::put('/item/{item}', [
+                    PreventifLaporanMingguanController::class,
+                    'updateItem',
+                ])->name('item.update');
 
-            Route::post('/{laporan}/kirim', [
-                PreventifLaporanMingguanController::class,
-                'kirim',
-            ])->name('kirim');
+                // Upload atau ganti foto
+                Route::post('/item/{item}/foto', [
+                    PreventifLaporanMingguanController::class,
+                    'uploadFoto',
+                ])->name('item.foto');
+
+                // Hapus foto
+                Route::delete('/item/{item}/foto', [
+                    PreventifLaporanMingguanController::class,
+                    'hapusFoto',
+                ])->name('item.foto.destroy');
+
+                // Hapus item laporan
+                Route::delete('/item/{item}', [
+                    PreventifLaporanMingguanController::class,
+                    'destroyItem',
+                ])->name('item.destroy');
+
+                // Hapus laporan
+                Route::delete('/{laporan}', [
+                    PreventifLaporanMingguanController::class,
+                    'destroy',
+                ])->name('destroy');
+
+                // Tambah temuan
+                Route::post('/{laporan}/temuan', [
+                    PreventifLaporanMingguanController::class,
+                    'storeTemuan',
+                ])->name('temuan.store');
+
+                // Simpan laporan
+                Route::post('/{laporan}/simpan', [
+                    PreventifLaporanMingguanController::class,
+                    'simpan',
+                ])->name('simpan');
+
+                // Kirim laporan ke pimpinan
+                Route::post('/{laporan}/kirim', [
+                    PreventifLaporanMingguanController::class,
+                    'kirim',
+                ])->name('kirim');
+            });
+
+            // Aksi pimpinan
+            Route::middleware('role:pimpinan')->group(function () {
+
+                Route::post('/{laporan}/periksa', [
+                    PreventifLaporanMingguanController::class,
+                    'periksa',
+                ])->name('periksa');
+
+                Route::post('/{laporan}/setujui', [
+                    PreventifLaporanMingguanController::class,
+                    'setujui',
+                ])->name('setujui');
+
+                Route::post('/{laporan}/tolak', [
+                    PreventifLaporanMingguanController::class,
+                    'tolak',
+                ])->name('tolak');
+            });
         });
-
-        // Pimpinan
-        // CATATAN: approval sekarang lewat PimpinanController (/pimpinan/laporan/...).
-        // Tiga route di bawah ini sudah tidak dipakai oleh halaman pimpinan dan
-        // boleh dihapus (beserta method periksa/setujui/tolak di
-        // PreventifLaporanMingguanController) kalau mau lebih bersih.
-        Route::middleware('role:pimpinan')->group(function () {
-
-            Route::post('/{laporan}/periksa', [
-                PreventifLaporanMingguanController::class,
-                'periksa',
-            ])->name('periksa');
-
-            Route::post('/{laporan}/setujui', [
-                PreventifLaporanMingguanController::class,
-                'setujui',
-            ])->name('setujui');
-
-            Route::post('/{laporan}/tolak', [
-                PreventifLaporanMingguanController::class,
-                'tolak',
-            ])->name('tolak');
-        });
-    });
 
 
 
