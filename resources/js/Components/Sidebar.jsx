@@ -16,6 +16,7 @@ import {
     Cog,
     SlidersHorizontal,
     FileText,
+    Factory, 
 } from 'lucide-react';
 
 import SidebarPimpinan from './Pimpinan/Sidebar';
@@ -38,6 +39,7 @@ const ICONS = {
     overhaul: Cog,
     joken: SlidersHorizontal,
     sop: FileText,
+    mesin: Factory,
 };
 
 function Icon({ type, className = 'h-5 w-5' }) {
@@ -138,6 +140,14 @@ const GRUP = [
                 title: 'SOP/IK',
                 desc: 'Dokumen SOP & IK maintenance',
                 match: (p) => mulai(p, '/sop-ik'),
+            },
+            {
+                key: 'daftar-mesin',
+                href: '/machines',
+                icon: 'mesin',
+                title: 'Daftar Mesin',
+                desc: 'Inventaris mesin & barcode',
+                match: (p) => mulai(p, '/machines'),
             },
         ],
     },

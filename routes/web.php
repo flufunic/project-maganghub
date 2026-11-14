@@ -23,6 +23,7 @@ use App\Http\Controllers\RrfController;
 use App\Http\Controllers\RrfNotificationController;
 use App\Http\Controllers\MtcRrfController;
 use App\Http\Controllers\SopIkController;
+use App\Http\Controllers\MachineController;
 
 /*
 |--------------------------------------------------------------------------
@@ -550,7 +551,38 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     Route::put('/sop-ik/{sopDocument}', [SopIkController::class, 'update']);
     Route::delete('/sop-ik/{sopDocument}', [SopIkController::class, 'destroy']);
     Route::delete('/sop-ik/{sopDocument}/revisions/{revision}', [SopIkController::class, 'destroyRevision']);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Daftar Mesin
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('machines')->name('machines.')->group(function () {
+
+        // Lihat & print: admin dan pimpinan
+        Route::get('/', [MachineController::class, 'index'])->name('index');
+        Route::get('/print-barcodes', [MachineController::class, 'printBarcodes'])->name('print');
+        Route::get('/print-all', [MachineController::class, 'printAll'])->name('print-all');
+        Route::get('/type/{type}/units', [MachineController::class, 'units'])
+            ->whereNumber('type')->name('units');
+
+        // Tambah, edit, hapus, import: hanya admin
+        Route::middleware('role:admin')->group(function () {
+            Route::post('/type', [MachineController::class, 'store'])->name('store');
+            Route::put('/type/{type}', [MachineController::class, 'update'])
+                ->whereNumber('type')->name('update');
+            Route::delete('/type/{type}', [MachineController::class, 'destroy'])
+                ->whereNumber('type')->name('destroy');
+
+            Route::post('/import/preview', [MachineController::class, 'importPreview'])->name('import.preview');
+            Route::post('/import', [MachineController::class, 'import'])->name('import');
+        });
+    });
+
 });
+
+
 
 
 /*
