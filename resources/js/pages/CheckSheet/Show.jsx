@@ -1143,6 +1143,267 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
 };
 
 // =========================================================
+// PELUMASAN
+// =========================================================
+
+const INTERVALS = [
+    { key: 'day', label: 'Day' },
+    { key: 'week', label: 'Week' },
+    { key: 'month', label: 'Month' },
+    { key: 'year', label: 'Year' },
+];
+
+const LUB_KOSONG = {
+    sub_mesin: '',
+    jenis_pelumasan: '',
+    qty: '',
+    method: '',
+    tools: '',
+    time_minutes: '',
+    interval: 'month',
+    pic: '',
+};
+
+const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
+    const rows = checkSheet.lubrications ?? [];
+    const baseUrl = `/check-sheets/${checkSheet.id}/lubrications`;
+
+    // null = modal tutup, 'new' = tambah, object = edit
+    const [editing, setEditing] = useState(null);
+    const form = useForm(LUB_KOSONG);
+
+    const tutup = () => {
+        setEditing(null);
+        form.reset();
+        form.clearErrors();
+    };
+
+    const bukaTambah = () => {
+        form.setData(LUB_KOSONG);
+        setEditing('new');
+    };
+
+    const bukaEdit = (row) => {
+        form.setData({
+            sub_mesin: row.sub_mesin ?? '',
+            jenis_pelumasan: row.jenis_pelumasan ?? '',
+            qty: row.qty ?? '',
+            method: row.method ?? '',
+            tools: row.tools ?? '',
+            time_minutes: row.time_minutes ?? '',
+            interval: row.interval ?? '',
+            pic: row.pic ?? '',
+        });
+        setEditing(row);
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+
+        const baru = editing === 'new';
+
+        // line_id selalu ikut terkirim (data pelumasan milik line ini)
+        form.transform((data) => ({
+            ...data,
+            line_id: line?.id ?? null,
+        }));
+
+        const opsi = {
+            preserveScroll: true,
+            onSuccess: () => {
+                tutup();
+                notify(baru ? 'Data pelumasan berhasil ditambahkan.' : 'Data pelumasan berhasil diperbarui.');
+            },
+            onError: () => notify('Data gagal disimpan. Periksa kembali isian kamu.', 'error'),
+        };
+
+        if (baru) {
+            form.post(baseUrl, opsi);
+        } else {
+            form.put(`${baseUrl}/${editing.id}`, opsi);
+        }
+    };
+
+    const hapus = (row) =>
+        confirm({
+            title: 'Hapus data pelumasan?',
+            message: `Apakah kamu yakin ingin menghapus ${row.jenis_pelumasan}?`,
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            icon: 'trash',
+            onConfirm: () => {
+                confirm(null);
+
+                router.delete(`${baseUrl}/${row.id}`, {
+                    preserveScroll: true,
+                    onSuccess: () => notify('Data pelumasan berhasil dihapus.'),
+                    onError: () => notify('Data gagal dihapus.', 'error'),
+                });
+            },
+        });
+
+    const th = 'border-r border-white/10 px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
+    const td = 'border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600';
+
+    return (
+        <>
+            <section className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}>
+                <SectionHead
+                    tone="blue"
+                    title={`Pelumasan${line ? ' · ' + line.nama_line : ''}`}
+                    desc="Jadwal pelumasan per sub mesin untuk line ini."
+                    count={`${rows.length} data`}
+                    action={
+                        <button
+                            type="button"
+                            onClick={bukaTambah}
+                            className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
+                        >
+                            <Icon type="plus" className="h-3.5 w-3.5" />
+                            Tambah
+                        </button>
+                    }
+                />
+
+                <div className="idx-scroll overflow-x-auto">
+                    <table className="w-full min-w-[1000px] border-collapse text-sm">
+                        <thead>
+                            <tr className="bg-[#0a1a4d] text-white">
+                                <th rowSpan={2} className={`w-12 text-center ${th}`}>No</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>Sub Mesin</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>Jenis Pelumasan</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>Qty</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>Method</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>Tools</th>
+                                <th rowSpan={2} className={`text-center ${th}`}>Time (Min)</th>
+                                <th colSpan={4} className={`text-center ${th}`}>Interval</th>
+                                <th rowSpan={2} className={`text-left ${th}`}>PIC</th>
+                                <th rowSpan={2} className={`w-24 text-center ${th}`}>Aksi</th>
+                            </tr>
+                            <tr className="bg-[#13307a] text-blue-200">
+                                {INTERVALS.map((i) => (
+                                    <th key={i.key} className="w-14 border-r border-white/10 px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider">
+                                        {i.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={13} className="px-6 py-10 text-center text-xs text-slate-400">
+                                        Belum ada data pelumasan{line ? ` untuk ${line.nama_line}` : ''}.
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((row, idx) => (
+                                    <tr key={row.id} className="transition-colors hover:bg-blue-50/50">
+                                        <td className={`${td} text-center font-bold text-slate-500`}>{idx + 1}</td>
+                                        <td className={td}>{row.sub_mesin || '-'}</td>
+                                        <td className={`${td} font-semibold text-slate-800`}>{row.jenis_pelumasan}</td>
+                                        <td className={td}>{row.qty || '-'}</td>
+                                        <td className={td}>{row.method || '-'}</td>
+                                        <td className={td}>{row.tools || '-'}</td>
+                                        <td className={`${td} text-center`}>{row.time_minutes ?? '-'}</td>
+
+                                        {INTERVALS.map((i) => (
+                                            <td key={i.key} className={`${td} text-center font-bold text-indigo-600`}>
+                                                {row.interval === i.key ? 'o' : ''}
+                                            </td>
+                                        ))}
+
+                                        <td className={td}>{row.pic || '-'}</td>
+
+                                        <td className="border-b border-slate-100 px-2 py-2">
+                                            <div className="flex justify-center gap-1.5">
+                                                <IconButton title="Edit" variant="blue" onClick={() => bukaEdit(row)}>
+                                                    <Icon type="edit" />
+                                                </IconButton>
+                                                <IconButton title="Hapus" variant="red" onClick={() => hapus(row)}>
+                                                    <Icon type="trash" />
+                                                </IconButton>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {editing && (
+                <Modal
+                    title={editing === 'new' ? 'Tambah Pelumasan' : 'Edit Pelumasan'}
+                    description={`Isi data pelumasan${line ? ' untuk ' + line.nama_line : ''}.`}
+                    onClose={tutup}
+                >
+                    <form onSubmit={submit} className="space-y-5">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <Field label="Sub Mesin" error={form.errors.sub_mesin}>
+                                <input type="text" value={form.data.sub_mesin}
+                                    onChange={(e) => form.setData('sub_mesin', e.target.value)}
+                                    className={inputClass} placeholder="Contoh: Pompa Oli" />
+                            </Field>
+
+                            <Field label="Jenis Pelumasan" required error={form.errors.jenis_pelumasan}>
+                                <input type="text" value={form.data.jenis_pelumasan}
+                                    onChange={(e) => form.setData('jenis_pelumasan', e.target.value)}
+                                    className={inputClass} placeholder="Contoh: Pergantian oli" />
+                            </Field>
+
+                            <Field label="Qty Pelumasan" error={form.errors.qty}>
+                                <input type="text" value={form.data.qty}
+                                    onChange={(e) => form.setData('qty', e.target.value)}
+                                    className={inputClass} placeholder="Contoh: 2 Liter" />
+                            </Field>
+
+                            <Field label="Method" error={form.errors.method}>
+                                <input type="text" value={form.data.method}
+                                    onChange={(e) => form.setData('method', e.target.value)}
+                                    className={inputClass} />
+                            </Field>
+
+                            <Field label="Tools" error={form.errors.tools}>
+                                <input type="text" value={form.data.tools}
+                                    onChange={(e) => form.setData('tools', e.target.value)}
+                                    className={inputClass} />
+                            </Field>
+
+                            <Field label="Time (Menit)" error={form.errors.time_minutes}>
+                                <input type="number" min="0" value={form.data.time_minutes}
+                                    onChange={(e) => form.setData('time_minutes', e.target.value)}
+                                    className={inputClass} />
+                            </Field>
+
+                            <Field label="Interval" error={form.errors.interval}>
+                                <select value={form.data.interval}
+                                    onChange={(e) => form.setData('interval', e.target.value)}
+                                    className={`${inputClass} cursor-pointer`}>
+                                    <option value="">Pilih interval</option>
+                                    {INTERVALS.map((i) => (
+                                        <option key={i.key} value={i.key}>{i.label}</option>
+                                    ))}
+                                </select>
+                            </Field>
+
+                            <Field label="PIC" error={form.errors.pic}>
+                                <input type="text" value={form.data.pic}
+                                    onChange={(e) => form.setData('pic', e.target.value)}
+                                    className={inputClass} />
+                            </Field>
+                        </div>
+
+                        <FormActions onCancel={tutup} processing={form.processing} label="Simpan Data" />
+                    </form>
+                </Modal>
+            )}
+        </>
+    );
+};
+
+// =========================================================
 // MAIN
 // =========================================================
 
@@ -1181,6 +1442,8 @@ export default function Show({
 
     // Checksheet ini punya tabel Konsumsi Bahan Bakar (Solar)?
     const pakaiBbm = Boolean(checkSheet.pakai_bbm);
+
+    const pakaiPelumasan = Boolean(checkSheet.pakai_pelumasan);
 
     // Mode Plan/Act: tiap tanggal punya 2 kolom (Plan | Act), header 2 baris
     const duaBaris = pakaiPlanAct && !pakaiActual;
@@ -2646,6 +2909,16 @@ export default function Show({
                             tahun={tahun}
                             namaBulan={namaBulan[bulan - 1]}
                             pakaiBbm={pakaiBbm}
+                            notify={notify}
+                        />
+                    )}
+                    
+                    {/* PELUMASAN */}
+                    {pakaiPelumasan && (
+                        <LubrikasiSection
+                            checkSheet={checkSheet}
+                            line={line}
+                            confirm={setConfirmDialog}
                             notify={notify}
                         />
                     )}

@@ -401,6 +401,7 @@ class CheckSheetController extends Controller
             'pakai_monitoring' => ['nullable', 'boolean'],
             'pakai_bbm'        => ['nullable', 'boolean'],
             'bbm_kali_60'      => ['nullable', 'boolean'],
+            'pakai_pelumasan'  => ['nullable', 'boolean'],
         ]);
 
         $lineId = $this->tentukanLineId(
@@ -419,6 +420,7 @@ class CheckSheetController extends Controller
             // BBM hanya masuk akal kalau monitoring aktif
             'pakai_bbm'        => $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm'),
             'bbm_kali_60'      => $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60'),
+            'pakai_pelumasan'  => $request->boolean('pakai_pelumasan'),
         ]);
 
         $line = $lineId
@@ -449,6 +451,7 @@ class CheckSheetController extends Controller
             'pakai_plan_act'   => ['nullable', 'boolean'],
             'pakai_monitoring' => ['nullable', 'boolean'],
             'pakai_bbm'        => ['nullable', 'boolean'],
+            'pakai_pelumasan'  => ['nullable', 'boolean'],
         ]);
 
         // check sheet milik mesin tidak boleh pindah divisi
@@ -467,6 +470,7 @@ class CheckSheetController extends Controller
         $validated['pakai_monitoring'] = $request->boolean('pakai_monitoring');
         $validated['pakai_bbm']        = $request->boolean('pakai_monitoring') && $request->boolean('pakai_bbm');
         $validated['bbm_kali_60']      = $request->boolean('pakai_bbm') && $request->boolean('bbm_kali_60');
+        $validated['pakai_pelumasan'] = $request->boolean('pakai_pelumasan');
 
         $checkSheet->update($validated);
 
@@ -553,6 +557,12 @@ class CheckSheetController extends Controller
             },
             'bbmItems.weeks' => function ($query) use ($bulan, $tahun) {
                 $query->where('bulan', $bulan)->where('tahun', $tahun);
+            },
+            // pelumasan HANYA milik line ini
+            'lubrications' => function ($query) use ($lineId) {
+                $query->where('line_id', $lineId)
+                    ->orderBy('no')
+                    ->orderBy('id');
             },
         ]);
 
@@ -668,6 +678,8 @@ class CheckSheetController extends Controller
         return back()->with('success', 'Inspection Point berhasil dihapus.');
     }
 
+    
+
     // =====================================================
     // CHECKLIST (per line)
     // =====================================================
@@ -712,7 +724,76 @@ class CheckSheetController extends Controller
 
         return back();
     }
+    
+    // =====================================================
+    // PELUMASAN (dipakai bersama semua line, jadwal statis)
+    // =====================================================
 
+    private function aturanPelumasan(): array
+    {
+        return [
+            'sub_mesin'       => ['nullable', 'string', 'max:255'],
+            'jenis_pelumasan' => ['required', 'string', 'max:255'],
+            'qty'             => ['nullable', 'string', 'max:100'],
+            'method'          => ['nullable', 'string', 'max:255'],
+            'tools'           => ['nullable', 'string', 'max:255'],
+            'time_minutes'    => ['nullable', 'integer', 'min:0'],
+            'interval'        => ['nullable', 'in:day,week,month,year'],
+            'pic'             => ['nullable', 'string', 'max:100'],
+        ];
+    }
+
+    public function storeLubrication(Request $request, CheckSheet $checkSheet)
+    {
+        $validated = $request->validate(
+            $this->aturanPelumasan() + [
+                'line_id' => ['nullable', 'integer'],
+            ]
+        );
+
+        $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+
+        $validated['line_id'] = $line?->id;
+
+        // nomor urut dihitung per line
+        $validated['no'] = ((int) $checkSheet->lubrications()
+            ->where('line_id', $line?->id)
+            ->max('no')) + 1;
+
+        $checkSheet->lubrications()->create($validated);
+
+        return back()->with('success', 'Data pelumasan berhasil ditambahkan.');
+    }
+
+    public function updateLubrication(Request $request, CheckSheet $checkSheet, int $lubrication)
+    {
+        $validated = $request->validate($this->aturanPelumasan());
+
+        // line_id tidak diubah saat edit
+        $checkSheet->lubrications()->where('id', $lubrication)->firstOrFail()
+            ->update($validated);
+
+        return back()->with('success', 'Data pelumasan berhasil diperbarui.');
+    }
+
+    public function destroyLubrication(CheckSheet $checkSheet, int $lubrication)
+    {
+        $row = $checkSheet->lubrications()->where('id', $lubrication)->firstOrFail();
+
+        $lineId = $row->line_id;
+
+        $row->delete();
+
+        // rapikan nomor urut hanya untuk line yang sama
+        $checkSheet->lubrications()
+            ->where('line_id', $lineId)
+            ->orderBy('no')
+            ->orderBy('id')
+            ->get()
+            ->each(fn ($item, $i) => $item->update(['no' => $i + 1]));
+
+        return back()->with('success', 'Data pelumasan berhasil dihapus.');
+    }
     // =====================================================
     // CENTANG SEMUA (khusus pimpinan)
     // Satu bulan penuh, SKIP Sabtu, Minggu, dan tanggal yang belum datang.

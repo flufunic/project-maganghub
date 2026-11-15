@@ -4,6 +4,9 @@ import { Head, Link, router } from '@inertiajs/react';
 const glassCard =
     'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
 
+const thCls = 'border border-slate-200 bg-slate-50 px-2 py-2 text-center text-[11px] font-bold text-slate-600';
+const tdCls = 'border border-slate-200 px-2 py-2 align-middle text-sm text-slate-700';
+
 const STATUS = {
     menunggu: {
         label: 'Menunggu Diperiksa',
@@ -29,6 +32,13 @@ const warnaPersen = (p) => {
 };
 
 const teksPersen = (p) => (p === null || p === undefined ? '-' : `${p}%`);
+
+/*
+| Abnormality milik sebuah check sheet (dan line-nya kalau sheet dipecah per line).
+| Dicocokkan lewat divisi + nama check sheet + nama line.
+*/
+const abnormalityMilik = (a, divisi, sheet) =>
+    a.divisi === divisi.nama && a.check_sheet === sheet.nama && (!sheet.line || a.line === sheet.line);
 
 // Isi 1 sel (1 item x 1 hari)
 function Sel({ sel, mode }) {
@@ -69,9 +79,273 @@ function Sel({ sel, mode }) {
     );
 }
 
-// Satu blok check sheet (+ line), bisa dibuka / ditutup
-function SheetBlok({ sheet, hari }) {
+/* ------------------------------------------------------------------
+| PELUMASAN (opsi "Pakai tabel Pelumasan")
+------------------------------------------------------------------ */
+
+function TabelPelumasan({ data }) {
+    return (
+        <div>
+            <div className="border-y border-amber-100 bg-amber-50 px-5 py-2.5">
+                <h4 className="text-sm font-bold text-slate-800">Pelumasan</h4>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px] border-collapse">
+                    <thead>
+                        <tr>
+                            <th className={thCls} rowSpan={2}>No</th>
+                            <th className={thCls} rowSpan={2}>Sub Mesin</th>
+                            <th className={thCls} rowSpan={2}>Jenis Pelumasan</th>
+                            <th className={thCls} rowSpan={2}>Qty</th>
+                            <th className={thCls} rowSpan={2}>Method</th>
+                            <th className={thCls} rowSpan={2}>Tools</th>
+                            <th className={thCls} rowSpan={2}>Time (Min)</th>
+                            <th className={thCls} colSpan={4}>Interval</th>
+                            <th className={thCls} rowSpan={2}>PIC</th>
+                        </tr>
+                        <tr>
+                            {['Day', 'Week', 'Month', 'Year'].map((x) => (
+                                <th key={x} className={thCls}>{x}</th>
+                            ))}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {data.length === 0 && (
+                            <tr>
+                                <td colSpan={12} className={`${tdCls} text-center text-slate-400`}>
+                                    Belum ada data pelumasan.
+                                </td>
+                            </tr>
+                        )}
+
+                        {data.map((l, i) => (
+                            <tr key={l.id}>
+                                <td className={`${tdCls} text-center`}>{i + 1}</td>
+                                <td className={tdCls}>{l.sub_mesin}</td>
+                                <td className={tdCls}>{l.jenis}</td>
+                                <td className={tdCls}>{l.qty}</td>
+                                <td className={tdCls}>{l.method}</td>
+                                <td className={tdCls}>{l.tools}</td>
+                                <td className={`${tdCls} text-center`}>{l.time}</td>
+                                {['day', 'week', 'month', 'year'].map((k) => (
+                                    <td key={k} className={`${tdCls} text-center font-bold`}>
+                                        {l.interval === k ? 'o' : ''}
+                                    </td>
+                                ))}
+                                <td className={tdCls}>{l.pic}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------
+| MONITORING RUNNING HOURS / BBM (opsi "Pakai Monitoring Running Hours")
+|
+| Nama kolom tabel monitoring belum dipetakan, jadi semua field
+| ditampilkan apa adanya. File gambar otomatis jadi thumbnail.
+| Ganti dengan tabel khusus kalau nama kolomnya sudah pasti.
+------------------------------------------------------------------ */
+
+const SEMBUNYI = [
+    'id',
+    'check_sheet_id',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'weeks',
+    'monitoring_item_id',
+    'bbm_item_id',
+];
+
+const isFoto = (v) => typeof v === 'string' && /\.(jpe?g|png|webp|gif)$/i.test(v);
+const urlFoto = (v) => (v.startsWith('http') || v.startsWith('/') ? v : `/storage/${v}`);
+const judulKolom = (k) => k.replace(/_/g, ' ');
+
+function Nilai({ v }) {
+    if (v === null || v === undefined || v === '') {
+        return <span className="text-slate-300">-</span>;
+    }
+
+    if (isFoto(v)) {
+        return (
+            <a href={urlFoto(v)} target="_blank" rel="noopener noreferrer">
+                <img
+                    src={urlFoto(v)}
+                    alt="foto"
+                    className="h-16 w-24 rounded-md border border-slate-200 object-cover"
+                />
+            </a>
+        );
+    }
+
+    return <span>{String(v)}</span>;
+}
+
+function BlokMonitoring({ judul, data }) {
+    return (
+        <div>
+            <div className="border-y border-sky-100 bg-sky-50 px-5 py-2.5">
+                <h4 className="text-sm font-bold text-slate-800">{judul}</h4>
+            </div>
+
+            {data.length === 0 && (
+                <p className="px-5 py-4 text-sm text-slate-400">Belum ada data.</p>
+            )}
+
+            {data.map((m, idx) => {
+                const weeks = m.weeks ?? [];
+                const kolomItem = Object.keys(m).filter((k) => !SEMBUNYI.includes(k));
+                const kolomWeek = [...new Set(weeks.flatMap((w) => Object.keys(w)))].filter(
+                    (k) => !SEMBUNYI.includes(k)
+                );
+
+                return (
+                    <div key={m.id ?? idx} className="border-b border-slate-100 px-5 py-3">
+                        <p className="text-sm font-semibold text-slate-800">
+                            {kolomItem
+                                .map((k) => m[k])
+                                .filter((v) => v !== null && v !== '' && typeof v !== 'object')
+                                .join(' · ')}
+                        </p>
+
+                        {weeks.length === 0 ? (
+                            <p className="mt-1 text-xs text-slate-400">Tidak ada data pada week ini.</p>
+                        ) : (
+                            <div className="mt-2 overflow-x-auto">
+                                <table className="w-full min-w-[480px] border-collapse">
+                                    <thead>
+                                        <tr>
+                                            {kolomWeek.map((k) => (
+                                                <th key={k} className={`${thCls} capitalize`}>
+                                                    {judulKolom(k)}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {weeks.map((w, i) => (
+                                            <tr key={w.id ?? i}>
+                                                {kolomWeek.map((k) => (
+                                                    <td key={k} className={`${tdCls} text-center`}>
+                                                        <Nilai v={w[k]} />
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------
+| ABNORMALITY (per check sheet)
+| `tampilkanSheet` = true hanya untuk abnormality yang tidak punya
+| check sheet pasangan (bagian "Abnormality Lainnya").
+------------------------------------------------------------------ */
+
+function TabelAbnormality({ list, tampilkanSheet = false }) {
+    return (
+        <div>
+            <div className="border-y border-amber-100 bg-amber-50/70 px-5 py-2.5">
+                <h4 className="text-sm font-bold text-slate-800">
+                    Abnormality / Countermeasure ({list.length})
+                </h4>
+            </div>
+
+            {list.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-slate-400">
+                    Tidak ada abnormality pada minggu ini.
+                </p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-sm">
+                        <thead>
+                            <tr className="bg-slate-50/80 text-left text-xs font-bold text-slate-500">
+                                <th className="px-4 py-3">Tanggal</th>
+                                {tampilkanSheet && <th className="px-4 py-3">Check Sheet</th>}
+                                <th className="px-4 py-3">Abnormality</th>
+                                <th className="px-4 py-3">Countermeasure</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">PIC</th>
+                            </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-200/60">
+                            {list.map((a) => (
+                                <tr key={a.id} className="align-top">
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-700">
+                                        {a.tanggal_format}
+                                    </td>
+
+                                    {tampilkanSheet && (
+                                        <td className="px-4 py-3 text-xs text-slate-600">
+                                            <span className="font-semibold text-slate-800">{a.divisi}</span>
+                                            <br />
+                                            {a.check_sheet}
+                                            {a.line && <span className="font-bold text-blue-600"> · {a.line}</span>}
+                                        </td>
+                                    )}
+
+                                    <td className="px-4 py-3 text-slate-800">
+                                        {a.abnormality}
+                                        {(a.preventif ?? []).map((p) => (
+                                            <span
+                                                key={p}
+                                                className="mt-1 block w-fit rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700"
+                                            >
+                                                Preventif {p}
+                                            </span>
+                                        ))}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-600">{a.countermeasure || '-'}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={`text-xs font-bold ${a.selesai ? 'text-emerald-700' : 'text-red-700'}`}>
+                                            {a.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-600">{a.pic || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function Pil({ cls, children }) {
+    return (
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
+            {children}
+        </span>
+    );
+}
+
+/* ------------------------------------------------------------------
+| SATU BLOK CHECK SHEET (+ line), bisa dibuka / ditutup.
+| Isinya berurutan: tabel harian, Pelumasan, Monitoring, BBM, Abnormality.
+------------------------------------------------------------------ */
+
+function SheetBlok({ sheet, hari, extra, abnormalities }) {
     const [buka, setBuka] = useState(false);
+
+    const adaPelumasan = !!extra?.pakai_pelumasan;
+    const adaMonitoring = !!extra?.pakai_monitoring;
+    const adaBbm = adaMonitoring && !!extra?.pakai_bbm;
+    const abnTerbuka = abnormalities.filter((a) => !a.selesai).length;
 
     return (
         <div className="border-t border-slate-200/70">
@@ -92,6 +366,29 @@ function SheetBlok({ sheet, hari }) {
                     <p className="text-[11px] text-slate-400">
                         {sheet.nomor_dokumen || '-'} · {sheet.items.length} item
                     </p>
+
+                    {(adaPelumasan || adaMonitoring || abnormalities.length > 0) && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                            {adaPelumasan && (
+                                <Pil cls="border-amber-200 bg-amber-50 text-amber-700">Pelumasan</Pil>
+                            )}
+                            {adaMonitoring && (
+                                <Pil cls="border-sky-200 bg-sky-50 text-sky-700">Monitoring</Pil>
+                            )}
+                            {abnormalities.length > 0 && (
+                                <Pil
+                                    cls={
+                                        abnTerbuka > 0
+                                            ? 'border-red-200 bg-red-50 text-red-700'
+                                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    }
+                                >
+                                    Abnormality {abnormalities.length}
+                                    {abnTerbuka > 0 && ` · ${abnTerbuka} belum selesai`}
+                                </Pil>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-3">
@@ -106,65 +403,82 @@ function SheetBlok({ sheet, hari }) {
             </button>
 
             {buka && (
-                <div className="overflow-x-auto border-t border-slate-100 bg-white/60">
-                    <table className="w-full min-w-[640px] border-collapse text-xs">
-                        <thead>
-                            <tr className="bg-slate-50">
-                                <th className="w-10 border border-slate-200 px-2 py-2 text-center font-bold text-slate-600">
-                                    No
-                                </th>
-                                <th className="min-w-[220px] border border-slate-200 px-3 py-2 text-left font-bold text-slate-600">
-                                    Inspection Point
-                                </th>
-                                <th className="w-12 border border-slate-200 px-2 py-2 text-center font-bold text-slate-600">
-                                    Shift
-                                </th>
-                                {hari.map((h) => (
-                                    <th
-                                        key={h.tanggal}
-                                        className="w-14 border border-slate-200 bg-blue-50 px-2 py-2 text-center font-bold text-blue-700"
-                                    >
-                                        {h.nama}
-                                        <br />
-                                        <span className="text-[10px] font-semibold text-blue-400">{h.tgl}</span>
+                <div className="border-t border-slate-100 bg-white/60">
+                    {/* TABEL HARIAN */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[640px] border-collapse text-xs">
+                            <thead>
+                                <tr className="bg-slate-50">
+                                    <th className="w-10 border border-slate-200 px-2 py-2 text-center font-bold text-slate-600">
+                                        No
                                     </th>
-                                ))}
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {sheet.items.map((item) => (
-                                <tr key={item.id} className="hover:bg-blue-50/40">
-                                    <td className="border border-slate-200 px-2 py-1.5 text-center text-slate-500">
-                                        {item.no}
-                                    </td>
-                                    <td className="border border-slate-200 px-3 py-1.5 font-medium text-slate-700">
-                                        {item.inspection_point}
-                                    </td>
-                                    <td className="border border-slate-200 px-2 py-1.5 text-center font-bold text-indigo-600">
-                                        {item.shift || '-'}
-                                    </td>
-                                    {item.sel.map((sel, i) => (
-                                        <td
-                                            key={i}
-                                            className={`border border-slate-200 px-1 py-1.5 text-center ${
-                                                sel?.status ? 'bg-emerald-50/60' : ''
-                                            }`}
+                                    <th className="min-w-[220px] border border-slate-200 px-3 py-2 text-left font-bold text-slate-600">
+                                        Inspection Point
+                                    </th>
+                                    <th className="w-12 border border-slate-200 px-2 py-2 text-center font-bold text-slate-600">
+                                        Shift
+                                    </th>
+                                    {hari.map((h) => (
+                                        <th
+                                            key={h.tanggal}
+                                            className="w-14 border border-slate-200 bg-blue-50 px-2 py-2 text-center font-bold text-blue-700"
                                         >
-                                            <Sel sel={sel} mode={sheet.mode} />
-                                        </td>
+                                            {h.nama}
+                                            <br />
+                                            <span className="text-[10px] font-semibold text-blue-400">{h.tgl}</span>
+                                        </th>
                                     ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+
+                            <tbody>
+                                {sheet.items.map((item) => (
+                                    <tr key={item.id} className="hover:bg-blue-50/40">
+                                        <td className="border border-slate-200 px-2 py-1.5 text-center text-slate-500">
+                                            {item.no}
+                                        </td>
+                                        <td className="border border-slate-200 px-3 py-1.5 font-medium text-slate-700">
+                                            {item.inspection_point}
+                                        </td>
+                                        <td className="border border-slate-200 px-2 py-1.5 text-center font-bold text-indigo-600">
+                                            {item.shift || '-'}
+                                        </td>
+                                        {item.sel.map((sel, i) => (
+                                            <td
+                                                key={i}
+                                                className={`border border-slate-200 px-1 py-1.5 text-center ${
+                                                    sel?.status ? 'bg-emerald-50/60' : ''
+                                                }`}
+                                            >
+                                                <Sel sel={sel} mode={sheet.mode} />
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* PELUMASAN */}
+                    {adaPelumasan && <TabelPelumasan data={extra.pelumasan ?? []} />}
+
+                    {/* MONITORING RUNNING HOURS */}
+                    {adaMonitoring && (
+                        <BlokMonitoring judul="Monitoring Running Hours" data={extra.monitoring ?? []} />
+                    )}
+
+                    {/* BBM */}
+                    {adaBbm && <BlokMonitoring judul="BBM" data={extra.bbm ?? []} />}
+
+                    {/* ABNORMALITY CHECK SHEET INI */}
+                    <TabelAbnormality list={abnormalities} />
                 </div>
             )}
         </div>
     );
 }
 
-export default function Detail({ pengiriman, rekap }) {
+export default function Detail({ pengiriman, rekap, detail = [] }) {
     const [showTolak, setShowTolak] = useState(false);
     const [alasan, setAlasan] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -172,6 +486,11 @@ export default function Detail({ pengiriman, rekap }) {
 
     const { hari, divisis, abnormalities, ringkasan } = rekap;
     const s = STATUS[pengiriman.status] ?? STATUS.menunggu;
+
+    // Abnormality yang tidak cocok dengan check sheet mana pun (jaring pengaman)
+    const abnLainnya = abnormalities.filter(
+        (a) => !divisis.some((d) => d.sheets.some((sheet) => abnormalityMilik(a, d, sheet)))
+    );
 
     const periksa = () => {
         setShowPeriksa(true);
@@ -326,7 +645,7 @@ export default function Detail({ pengiriman, rekap }) {
                         ))}
                     </div>
 
-                    {/* PER DIVISI */}
+                    {/* PER DIVISI -> PER CHECK SHEET */}
                     {divisis.length === 0 ? (
                         <div className={`rounded-2xl px-6 py-14 text-center ${glassCard}`}>
                             <p className="font-semibold text-slate-700">Belum ada check sheet</p>
@@ -347,77 +666,24 @@ export default function Detail({ pengiriman, rekap }) {
                                 </div>
 
                                 {d.sheets.map((sheet) => (
-                                    <SheetBlok key={sheet.key} sheet={sheet} hari={hari} />
+                                    <SheetBlok
+                                        key={sheet.key}
+                                        sheet={sheet}
+                                        hari={hari}
+                                        extra={detail.find((cs) => cs.nama_checksheet === sheet.nama)}
+                                        abnormalities={abnormalities.filter((a) => abnormalityMilik(a, d, sheet))}
+                                    />
                                 ))}
                             </section>
                         ))
                     )}
 
-                    {/* ABNORMALITY */}
-                    <section className={`overflow-hidden rounded-2xl ${glassCard}`}>
-                        <div className="bg-amber-50/50 px-5 py-4">
-                            <h2 className="font-bold text-slate-800">
-                                Abnormality Minggu Ini ({abnormalities.length})
-                            </h2>
-                        </div>
-
-                        {abnormalities.length === 0 ? (
-                            <p className="px-5 py-10 text-center text-sm text-slate-500">
-                                Tidak ada abnormality pada minggu ini.
-                            </p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full min-w-[820px] text-sm">
-                                    <thead>
-                                        <tr className="bg-slate-50/80 text-left text-xs font-bold text-slate-500">
-                                            <th className="px-4 py-3">Tanggal</th>
-                                            <th className="px-4 py-3">Check Sheet</th>
-                                            <th className="px-4 py-3">Abnormality</th>
-                                            <th className="px-4 py-3">Countermeasure</th>
-                                            <th className="px-4 py-3">Status</th>
-                                            <th className="px-4 py-3">PIC</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="divide-y divide-slate-200/60">
-                                        {abnormalities.map((a) => (
-                                            <tr key={a.id} className="align-top">
-                                                <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-700">
-                                                    {a.tanggal_format}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-slate-600">
-                                                    <span className="font-semibold text-slate-800">{a.divisi}</span>
-                                                    <br />
-                                                    {a.check_sheet}
-                                                    {a.line && <span className="font-bold text-blue-600"> · {a.line}</span>}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-800">
-                                                    {a.abnormality}
-                                                    {a.preventif.map((p) => (
-                                                        <span
-                                                            key={p}
-                                                            className="mt-1 block w-fit rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700"
-                                                        >
-                                                            Preventif {p}
-                                                        </span>
-                                                    ))}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">
-                                                    {a.countermeasure || '-'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`text-xs font-bold ${a.selesai ? 'text-emerald-700' : 'text-red-700'}`}>
-                                                        {a.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">{a.pic || '-'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
+                    {/* ABNORMALITY TANPA CHECK SHEET PASANGAN (jarang terjadi) */}
+                    {abnLainnya.length > 0 && (
+                        <section className={`overflow-hidden rounded-2xl ${glassCard}`}>
+                            <TabelAbnormality list={abnLainnya} tampilkanSheet />
+                        </section>
+                    )}
                 </main>
 
                 <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">

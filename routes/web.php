@@ -115,7 +115,7 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     | (menggantikan tombol Kirim & Upload Dokumen per tanggal)
     |--------------------------------------------------------------------------
     */
-    
+
     Route::prefix('laporan-mingguan')
         ->name('laporan-mingguan.')
         ->group(function () {
@@ -353,6 +353,22 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
             CheckSheetBbmController::class,
             'storeRunning',
         ]);
+
+        // Pelumasan
+        Route::post('/lubrications', [
+            CheckSheetController::class,
+            'storeLubrication',
+        ])->name('check-sheets.lubrications.store');
+
+        Route::put('/lubrications/{lubrication}', [
+            CheckSheetController::class,
+            'updateLubrication',
+        ])->name('check-sheets.lubrications.update');
+
+        Route::delete('/lubrications/{lubrication}', [
+            CheckSheetController::class,
+            'destroyLubrication',
+        ])->name('check-sheets.lubrications.destroy');
     });
 
     // CRUD Check Sheet
@@ -552,7 +568,7 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     Route::delete('/sop-ik/{sopDocument}', [SopIkController::class, 'destroy']);
     Route::delete('/sop-ik/{sopDocument}/revisions/{revision}', [SopIkController::class, 'destroyRevision']);
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Daftar Mesin
     |--------------------------------------------------------------------------

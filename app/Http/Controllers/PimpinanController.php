@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\CheckSheet;
 
 /**
  * Sisi Pimpinan untuk Report Mingguan Preventif yang dikirim Admin.
@@ -367,5 +368,30 @@ class PimpinanController extends Controller
         }
 
         return User::whereIn('id', $ids)->pluck('name', 'id')->all();
+    }
+
+    private function pelumasan(int $divisiId): array
+    {
+        return CheckSheet::with(['lubrications' => fn ($q) => $q->orderBy('no')->orderBy('id')])
+            ->where('divisi_id', $divisiId)
+            ->where('pakai_pelumasan', true)
+            ->get()
+            ->map(fn ($cs) => [
+                'id'              => $cs->id,
+                'nama_checksheet' => $cs->nama_checksheet,
+                'items'           => $cs->lubrications->map(fn ($l) => [
+                    'id'        => $l->id,
+                    'sub_mesin' => $l->sub_mesin,
+                    'jenis'     => $l->jenis_pelumasan,
+                    'qty'       => $l->qty,
+                    'method'    => $l->method,
+                    'tools'     => $l->tools,
+                    'time'      => $l->time_minutes,
+                    'interval'  => $l->interval, // day | week | month | year
+                    'pic'       => $l->pic,
+                ])->values(),
+            ])
+            ->values()
+            ->all();
     }
 }

@@ -197,6 +197,7 @@ export default function Create({ divisis, mesins = [], line }) {
         pakai_monitoring: false,
         pakai_bbm: false,
         bbm_kali_60: false,
+        pakai_pelumasan: false,
     });
 
     // Mesin yang tampil hanya milik divisi yang sedang dipilih
@@ -226,6 +227,7 @@ export default function Create({ divisis, mesins = [], line }) {
             bbm_kali_60: value ? data.bbm_kali_60 : false,
         });
     };
+    
 
     // Tujuan tombol kembali / batal: daftar line yang tadi di-scan
     const backUrl = line ? `/check-sheets/line/${line.kode}` : '/check-sheets';
@@ -461,6 +463,15 @@ export default function Create({ divisis, mesins = [], line }) {
                                 error={errors.bbm_kali_60}
                             />
                         )}
+
+                        {/* OPSI: Tabel Pelumasan */}
+                        <CheckboxField
+                            label="Pakai tabel Pelumasan"
+                            hint="Menambah tabel pelumasan di bawah daftar item (Sub Mesin, Jenis, Qty, Method, Tools, Time, Interval, PIC)."
+                            checked={data.pakai_pelumasan}
+                            onChange={(value) => setData('pakai_pelumasan', value)}
+                            error={errors.pakai_pelumasan}
+                        />
 
                         {/* TOMBOL */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">

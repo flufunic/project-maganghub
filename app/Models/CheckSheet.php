@@ -22,6 +22,7 @@ class CheckSheet extends Model
         'pakai_monitoring',
         'pakai_bbm',
         'bbm_kali_60',
+        'pakai_pelumasan',
     ];
 
     protected static function booted(): void
@@ -35,6 +36,7 @@ class CheckSheet extends Model
             $cs->abnormalities()->update(['deleted_at' => $cs->deleted_at]);
             $cs->monitoringItems()->update(['deleted_at' => $cs->deleted_at]);
             $cs->bbmItems()->update(['deleted_at' => $cs->deleted_at]);
+            $cs->lubrications()->update(['deleted_at' => $cs->deleted_at]);
         });
 
         static::restoring(function (CheckSheet $cs) {
@@ -49,6 +51,8 @@ class CheckSheet extends Model
 
             $cs->bbmItems()->onlyTrashed()
                 ->where('deleted_at', $cs->deleted_at)->restore();
+            $cs->lubrications()->onlyTrashed()
+                ->where('deleted_at', $cs->deleted_at)->restore();
         });
     }
 
@@ -60,6 +64,7 @@ class CheckSheet extends Model
             'pakai_monitoring' => 'boolean',
             'pakai_bbm'        => 'boolean',
             'bbm_kali_60' => 'boolean',
+            'pakai_pelumasan'  => 'boolean',
         ];
     }
 
@@ -91,6 +96,10 @@ class CheckSheet extends Model
     public function line()
     {
         return $this->belongsTo(Line::class);
+    }
+    public function lubrications(): HasMany
+    {
+        return $this->hasMany(CheckSheetLubrication::class);
     }
 
     /**

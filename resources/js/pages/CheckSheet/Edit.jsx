@@ -190,6 +190,7 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
         pakai_monitoring: Boolean(checkSheet.pakai_monitoring),
         pakai_bbm: Boolean(checkSheet.pakai_bbm),
         bbm_kali_60: Boolean(checkSheet.bbm_kali_60),
+        pakai_pelumasan: Boolean(checkSheet.pakai_pelumasan),
     });
 
     // Mesin yang tampil hanya milik divisi yang sedang dipilih
@@ -454,6 +455,15 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
                                 error={errors.bbm_kali_60}
                             />
                         )}
+
+                        {/* OPSI: Tabel Pelumasan */}
+                        <CheckboxField
+                            label="Pakai tabel Pelumasan"
+                            hint="Menambah tabel pelumasan di bawah daftar item (Sub Mesin, Jenis, Qty, Method, Tools, Time, Interval, PIC). Data pelumasan tidak terhapus kalau opsi ini dimatikan lagi."
+                            checked={data.pakai_pelumasan}
+                            onChange={(value) => setData('pakai_pelumasan', value)}
+                            error={errors.pakai_pelumasan}
+                        />
 
                         {/* TOMBOL */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
