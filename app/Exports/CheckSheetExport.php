@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Models\CheckSheet;
 use App\Models\Line;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithTitle;
@@ -12,6 +13,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class CheckSheetExport implements FromArray, WithEvents, WithTitle
@@ -27,6 +29,9 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     protected bool $pakaiActual = false;
     protected bool $pakaiPlanAct = false;
     protected bool $pakaiPelumasan = false;
+    protected bool $pakaiMonitoring = false;
+    protected bool $pakaiBbm = false;
+    protected bool $bbmKali60 = false;
     protected bool $adaSubHeader = false; // header tabel 2 baris (KWH atau Plan/Act)
     protected int $perTanggal = 1;
 
@@ -60,13 +65,31 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     // Baris data pelumasan (dipakai lagi saat styling untuk tinggi baris)
     protected array $lubData = [];
 
-    // Baris data abnormality (dipakai lagi saat styling untuk tinggi baris)
-    protected array $abnData = [];
+    // Bagian "MONITORING RUNNING HOURS" (opsi Monitoring)
+    protected int $monTitleRow = 0;
+    protected int $monHeaderRow = 0;
+    protected int $monStartRow = 0;
+    protected int $monEndRow = 0;
+    protected array $monItems = [];
+
+    // Foto monitoring: [koordinat sel, path file, lebar segmen]
+    protected array $monFotos = [];
+
+    // Bagian "KONSUMSI BAHAN BAKAR" (opsi Monitoring + BBM)
+    protected int $bbmTitleRow = 0;
+    protected int $bbmHeaderRow = 0;
+    protected int $bbmStartRow = 0;
+    protected int $bbmEndRow = 0;
+    protected int $bbmCatatanRow = 0;
+    protected array $bbmItems = [];
 
     protected int $abnormalityTitleRow = 0;
     protected int $abnormalityHeaderRow = 0;
     protected int $abnormalityStartRow = 0;
     protected int $abnormalityEndRow = 0;
+
+    // Data abnormality (dipakai lagi saat styling untuk tinggi baris)
+    protected $abnormalities;
 
     // Sel Selisih yang perlu diberi warna merah (diisi saat array() dibuat)
     protected array $redCells = [];
@@ -97,6 +120,16 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
         $this->pakaiPelumasan = (bool) CheckSheet::whereKey($checkSheetId)
             ->value('pakai_pelumasan');
+
+        $this->pakaiMonitoring = (bool) CheckSheet::whereKey($checkSheetId)
+            ->value('pakai_monitoring');
+
+        // BBM hanya ada kalau monitoring aktif
+        $this->pakaiBbm = $this->pakaiMonitoring
+            && (bool) CheckSheet::whereKey($checkSheetId)->value('pakai_bbm');
+
+        $this->bbmKali60 = $this->pakaiBbm
+            && (bool) CheckSheet::whereKey($checkSheetId)->value('bbm_kali_60');
 
         $this->perTanggal = $this->pakaiActual
             ? 3
@@ -146,88 +179,67 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     }
 
     /**
-     * Lebar satu kolom (sama dengan pengaturan lebar kolom di registerEvents).
+     * Lebar rata-rata satu kolom tanggal (sesuai pengaturan lebar kolom di bawah).
      */
-    private function columnWidth(int $kolom): float
+    private function rataLebarKolomTanggal(): float
     {
-        if ($kolom <= 4) {
-            return [6, 32, 20, 18][$kolom - 1];
-        }
-
-        $sub = ($kolom - 5) % $this->perTanggal;
-
         if ($this->pakaiActual) {
-            return [9, 7, 16][$sub];
+            return (9 + 7 + 16) / 3;
         }
 
         return $this->pakaiPlanAct ? 5.5 : 4.2;
     }
 
     /**
-     * Bagi kolom $mulai..$akhir menjadi beberapa segmen sesuai bobot,
-     * supaya tabel selebar tabel item di atas (sampai kolom terakhir).
+     * Bagi kolom $mulai..$akhir ke beberapa field sesuai bobot.
+     * Field terakhir selalu sampai $akhir, jadi tabel penuh sampai ujung
+     * (sama lebarnya dengan tabel Shift di atas).
      *
      * Hasil: [ 'kunci' => ['start' => 5, 'end' => 9, 'width' => 21.0], ... ]
      */
-    private function splitKolom(int $mulai, int $akhir, array $bobot): array
+    private function distribusiKolom(array $bobot, int $mulai, int $akhir): array
     {
-        $kunci = array_keys($bobot);
-        $jumlah = count($kunci);
-        $totalBobot = array_sum($bobot);
-
-        $totalLebar = 0.0;
-        for ($c = $mulai; $c <= $akhir; $c++) {
-            $totalLebar += $this->columnWidth($c);
-        }
+        $total = $akhir - $mulai + 1;
+        $jumlahBobot = array_sum($bobot);
+        $rata = $this->rataLebarKolomTanggal();
 
         $hasil = [];
-        $kolom = $mulai;
-        $akum = 0.0;
-        $bobotAkum = 0;
+        $cursor = $mulai;
+        $sisa = count($bobot);
 
-        foreach ($kunci as $i => $k) {
-            $bobotAkum += $bobot[$k];
-            $target = $totalLebar * $bobotAkum / $totalBobot;
-            $awal = $kolom;
+        foreach ($bobot as $kunci => $b) {
+            $sisa--;
 
-            if ($i === $jumlah - 1) {
-                $ujung = $akhir;
+            if ($sisa === 0) {
+                $end = $akhir;
             } else {
-                // sisakan minimal 1 kolom untuk tiap segmen yang belum dibagi
-                $maks = $akhir - ($jumlah - 1 - $i);
-
-                $ujung = $awal;
-                $akum += $this->columnWidth($ujung);
-
-                while (
-                    $ujung < $maks
-                    && ($akum + $this->columnWidth($ujung + 1) / 2) < $target
-                ) {
-                    $ujung++;
-                    $akum += $this->columnWidth($ujung);
-                }
+                $span = max(1, (int) round($total * $b / $jumlahBobot));
+                // sisakan minimal 1 kolom untuk tiap field berikutnya
+                $end = min($cursor + $span - 1, $akhir - $sisa);
             }
 
-            $lebar = 0.0;
-            for ($c = $awal; $c <= $ujung; $c++) {
-                $lebar += $this->columnWidth($c);
-            }
+            $hasil[$kunci] = [
+                'start' => $cursor,
+                'end'   => $end,
+                'width' => ($end - $cursor + 1) * $rata,
+            ];
 
-            $hasil[$k] = ['start' => $awal, 'end' => $ujung, 'width' => $lebar];
-            $kolom = $ujung + 1;
+            $cursor = $end + 1;
         }
 
         return $hasil;
     }
 
     /**
-     * Pembagian kolom tabel pelumasan.
-     * Kolom A-D dipakai No, Sub Mesin, Jenis Pelumasan, Qty. Sisanya (Method sampai PIC)
-     * dibagi rata-proporsional sampai kolom terakhir, jadi selebar tabel item di atas.
+     * Pembagian kolom untuk tabel pelumasan.
+     *
+     * Kolom A-D dipakai No, Sub Mesin, Jenis Pelumasan, Qty (lebarnya sudah tetap).
+     * Sisanya (Method, Tools, Time, Day, Week, Month, Year, PIC) dibagi rata sesuai
+     * bobot dari kolom E sampai kolom terakhir, jadi tabel penuh selebar tabel Shift.
      */
     private function lubSegments(): array
     {
-        return $this->splitKolom(5, $this->lastColumnNumber, [
+        return $this->distribusiKolom([
             'method' => 18,
             'tools'  => 18,
             'time'   => 8,
@@ -236,39 +248,22 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
             'month'  => 6,
             'year'   => 6,
             'pic'    => 14,
-        ]);
+        ], 5, $this->lastColumnNumber);
     }
 
     /**
-     * Pembagian kolom tabel abnormality.
-     * A = No, B = Tanggal, sisanya (C sampai kolom terakhir) dibagi untuk
-     * Abnormality, Countermeasure, Status, PIC.
+     * Pembagian kolom untuk tabel abnormality.
+     *
+     * No = A, Tanggal = B, Abnormality = C:D (merge),
+     * sisanya (Countermeasure, Status, PIC) dibagi di E sampai kolom terakhir.
      */
     private function abnSegments(): array
     {
-        return $this->splitKolom(3, $this->lastColumnNumber, [
-            'abnormality'    => 40,
-            'countermeasure' => 40,
-            'status'         => 8,
-            'pic'            => 12,
-        ]);
-    }
-
-    /**
-     * Baris tabel abnormality (header maupun data).
-     */
-    private function makeAbnRow(array $nilai): array
-    {
-        $row = $this->emptyRow();
-
-        $row[0] = $nilai['no'] ?? '';
-        $row[1] = $nilai['tanggal'] ?? '';
-
-        foreach ($this->abnSegments() as $kunci => $segmen) {
-            $row[$segmen['start'] - 1] = $nilai[$kunci] ?? '';
-        }
-
-        return $row;
+        return $this->distribusiKolom([
+            'countermeasure' => 55,
+            'status'         => 20,
+            'pic'            => 25,
+        ], 5, $this->lastColumnNumber);
     }
 
     /**
@@ -292,6 +287,95 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
     }
 
     /**
+     * Tabel Monitoring Running Hours: Week 1-5 sama lebar,
+     * dari kolom E sampai kolom terakhir (sama lebarnya dengan tabel Shift).
+     */
+    private function monSegments(): array
+    {
+        return $this->distribusiKolom([
+            'w1' => 1,
+            'w2' => 1,
+            'w3' => 1,
+            'w4' => 1,
+            'w5' => 1,
+        ], 5, $this->lastColumnNumber);
+    }
+
+    /**
+     * Tabel Konsumsi Bahan Bakar: keterangan, W1-W5, Total.
+     */
+    private function bbmSegments(): array
+    {
+        return $this->distribusiKolom([
+            'label' => 18,
+            'w1'    => 12,
+            'w2'    => 12,
+            'w3'    => 12,
+            'w4'    => 12,
+            'w5'    => 12,
+            'total' => 14,
+        ], 5, $this->lastColumnNumber);
+    }
+
+    /**
+     * Baris tabel monitoring.
+     * $nilai = [ 'no','item','ket','w1'..'w5' ]
+     */
+    private function makeMonRow(array $nilai): array
+    {
+        $row = $this->emptyRow();
+
+        $row[0] = $nilai['no'] ?? '';
+        $row[1] = $nilai['item'] ?? '';
+        $row[2] = $nilai['ket'] ?? '';
+
+        foreach ($this->monSegments() as $kunci => $segmen) {
+            $row[$segmen['start'] - 1] = $nilai[$kunci] ?? '';
+        }
+
+        return $row;
+    }
+
+    /**
+     * Baris tabel konsumsi bahan bakar.
+     * $nilai = [ 'no','type','kap','solar','label','w1'..'w5','total' ]
+     */
+    private function makeBbmRow(array $nilai): array
+    {
+        $row = $this->emptyRow();
+
+        $row[0] = $nilai['no'] ?? '';
+        $row[1] = $nilai['type'] ?? '';
+        $row[2] = $nilai['kap'] ?? '';
+        $row[3] = $nilai['solar'] ?? '';
+
+        foreach ($this->bbmSegments() as $kunci => $segmen) {
+            $row[$segmen['start'] - 1] = $nilai[$kunci] ?? '';
+        }
+
+        return $row;
+    }
+
+    /**
+     * Baris tabel abnormality (header maupun data).
+     * $nilai = [ 'no','tanggal','abnormality','countermeasure','status','pic' ]
+     */
+    private function makeAbnRow(array $nilai): array
+    {
+        $row = $this->emptyRow();
+
+        $row[0] = $nilai['no'] ?? '';
+        $row[1] = $nilai['tanggal'] ?? '';
+        $row[2] = $nilai['abnormality'] ?? '';
+
+        foreach ($this->abnSegments() as $kunci => $segmen) {
+            $row[$segmen['start'] - 1] = $nilai[$kunci] ?? '';
+        }
+
+        return $row;
+    }
+
+    /**
      * Membuat seluruh isi Excel sebagai array.
      */
     public function array(): array
@@ -301,11 +385,18 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
         $this->catatanSorted = [];
         $this->noteCells = [];
         $this->lubData = [];
-        $this->abnData = [];
+        $this->monItems = [];
+        $this->monFotos = [];
+        $this->bbmItems = [];
 
         // Rentang tanggal bulan yang diexport
         $awalBulan = Carbon::create($this->tahun, $this->bulan, 1)->startOfMonth();
         $akhirBulan = $awalBulan->copy()->endOfMonth();
+
+        // data monitoring / BBM hanya untuk bulan & tahun yang diexport
+        $filterBulan = fn ($query) => $query
+            ->where('bulan', $this->bulan)
+            ->where('tahun', $this->tahun);
 
         $checkSheet = CheckSheet::with([
             'divisi',
@@ -335,13 +426,16 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     ->orderBy('id');
             },
 
-            // pelumasan HANYA milik line / mesin yang diexport
+            // pelumasan dipakai bersama semua line (jadwal statis)
             'lubrications' => function ($query) {
-                $query
-                    ->where('line_id', $this->lineId)
-                    ->orderBy('no')
-                    ->orderBy('id');
+                $query->orderBy('no')->orderBy('id');
             },
+
+            // monitoring running hours + konsumsi bahan bakar
+            'monitoringItems' => fn ($query) => $query->orderBy('no')->orderBy('id'),
+            'monitoringItems.weeks' => $filterBulan,
+            'bbmItems' => fn ($query) => $query->orderBy('no')->orderBy('id'),
+            'bbmItems.weeks' => $filterBulan,
 
         ])->findOrFail($this->checkSheetId);
 
@@ -359,7 +453,8 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
         $abnormalities = $checkSheet->abnormalities ?? collect();
 
-        $this->abnData = collect($abnormalities)->values()->all();
+        // simpan supaya bisa dipakai lagi di registerEvents()
+        $this->abnormalities = $abnormalities;
 
         $jumlahHari = cal_days_in_month(
             CAL_GREGORIAN,
@@ -529,6 +624,170 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
             }
 
             $this->catatanEndRow = count($rows);
+
+            /*
+            | JARAK
+            */
+
+            $rows[] = $this->emptyRow();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | MONITORING RUNNING HOURS (hanya kalau opsi Monitoring dicentang)
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->pakaiMonitoring) {
+            $this->monItems = ($checkSheet->monitoringItems ?? collect())
+                ->values()
+                ->all();
+
+            $segMon = $this->monSegments();
+
+            $this->monTitleRow = count($rows) + 1;
+
+            $rows[] = $this->makeRow([
+                'MONITORING RUNNING HOURS - ' . $checkSheet->nama_checksheet . ' | ' . $namaBulan,
+            ]);
+
+            $this->monHeaderRow = count($rows) + 1;
+
+            $rows[] = $this->makeMonRow([
+                'no'   => 'No',
+                'item' => 'Item',
+                'ket'  => 'Keterangan',
+                'w1'   => 'Week 1',
+                'w2'   => 'Week 2',
+                'w3'   => 'Week 3',
+                'w4'   => 'Week 4',
+                'w5'   => 'Week 5',
+            ]);
+
+            $this->monStartRow = count($rows) + 1;
+
+            foreach ($this->monItems as $item) {
+                $weeks = $item->weeks->keyBy('week');
+
+                $r1 = count($rows) + 1; // baris foto
+
+                $barisFoto = [
+                    'no'   => $item->no,
+                    'item' => $item->nama_item,
+                    'ket'  => 'Foto',
+                ];
+
+                $barisAct = [
+                    'ket' => 'Actual Running (jam)',
+                ];
+
+                for ($n = 1; $n <= 5; $n++) {
+                    $wk = $weeks->get($n);
+
+                    $barisAct['w' . $n] = ($wk && $wk->running_hours !== null)
+                        ? (float) $wk->running_hours
+                        : '';
+
+                    if ($wk && $wk->foto_path
+                        && Storage::disk('public')->exists($wk->foto_path)) {
+                        $this->monFotos[] = [
+                            $r1,
+                            $segMon['w' . $n]['start'],
+                            $segMon['w' . $n]['end'],
+                            Storage::disk('public')->path($wk->foto_path),
+                        ];
+                    }
+                }
+
+                $rows[] = $this->makeMonRow($barisFoto);
+                $rows[] = $this->makeMonRow($barisAct);
+            }
+
+            $this->monEndRow = count($rows);
+
+            /*
+            | JARAK
+            */
+
+            $rows[] = $this->emptyRow();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KONSUMSI BAHAN BAKAR (hanya kalau Monitoring + BBM dicentang)
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->pakaiMonitoring && $this->pakaiBbm) {
+            $this->bbmItems = ($checkSheet->bbmItems ?? collect())
+                ->values()
+                ->all();
+
+            // Generator     : Solar (L/jam)   x Running Hours
+            // Pompa Hydrant : Solar (L/menit) x Running Hours x 60
+            $satuanSolar = $this->bbmKali60 ? 'L/menit' : 'L/jam';
+
+            $this->bbmTitleRow = count($rows) + 1;
+
+            $rows[] = $this->makeRow([
+                'MONITORING KONSUMSI BAHAN BAKAR (SOLAR) - ' . $namaBulan,
+            ]);
+
+            $this->bbmHeaderRow = count($rows) + 1;
+
+            $rows[] = $this->makeBbmRow([
+                'no'    => 'No',
+                'type'  => 'Type / Merk',
+                'kap'   => 'Kapasitas',
+                'solar' => "Solar ({$satuanSolar})",
+                'label' => 'Keterangan',
+                'w1'    => 'W1',
+                'w2'    => 'W2',
+                'w3'    => 'W3',
+                'w4'    => 'W4',
+                'w5'    => 'W5',
+                'total' => 'Total',
+            ]);
+
+            $this->bbmStartRow = count($rows) + 1;
+
+            foreach ($this->bbmItems as $item) {
+                // sumber hitungan yang sama dengan tampilan web
+                $ring = $item->ringkasan;
+
+                $barisRh = [
+                    'no'    => $item->no,
+                    'type'  => $item->nama_item,
+                    'kap'   => $item->kapasitas ?? '',
+                    'solar' => (float) $item->solar_per_menit,
+                    'label' => 'Running Hours (jam)',
+                ];
+
+                $barisKons = [
+                    'label' => 'Konsumsi Solar (L)',
+                ];
+
+                for ($n = 1; $n <= 5; $n++) {
+                    $barisRh['w' . $n]   = $ring['per_minggu'][$n]['running_hours'] ?? '';
+                    $barisKons['w' . $n] = $ring['per_minggu'][$n]['konsumsi'] ?? '';
+                }
+
+                $barisRh['total']   = $ring['total_running'] ?? '';
+                $barisKons['total'] = $ring['total_konsumsi'] ?? '';
+
+                $rows[] = $this->makeBbmRow($barisRh);
+                $rows[] = $this->makeBbmRow($barisKons);
+            }
+
+            $this->bbmEndRow = count($rows);
+
+            $this->bbmCatatanRow = count($rows) + 1;
+
+            $rows[] = $this->makeRow([
+                $this->bbmKali60
+                    ? 'Rumus: Konsumsi Solar (L) = Solar (L/menit) x Running Hours (jam) x 60'
+                    : 'Rumus: Konsumsi Solar (L) = Solar (L/jam) x Running Hours (jam)',
+            ]);
 
             /*
             | JARAK
@@ -905,13 +1164,18 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
         $abnormality
     ): array {
         return $this->makeAbnRow([
-            'no'      => $no,
-            'tanggal' => $abnormality->tanggal
+            'no'             => $no,
+
+            'tanggal'        => $abnormality->tanggal
                 ? Carbon::parse($abnormality->tanggal)->format('d/m/Y')
                 : '',
+
             'abnormality'    => $abnormality->abnormality ?? '',
+
             'countermeasure' => $abnormality->countermeasure ?? '',
+
             'status'         => $abnormality->status ?? '',
+
             'pic'            => $abnormality->pic ?? '',
         ]);
     }
@@ -958,6 +1222,8 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 $sheet = $event->sheet->getDelegate();
 
+                $abnormalities = $this->abnormalities ?? collect();
+
                 $highestRow = $sheet->getHighestRow();
 
                 // jumlah baris header tabel (2 di mode KWH / Plan-Act, 1 di mode biasa)
@@ -981,12 +1247,9 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     "A1:{$this->lastColumn}{$highestRow}"
                 )->getFont()->setName('Calibri');
 
-                // Judul rata tengah. Di mode lebar (KWH / Plan-Act), merge dibatasi
-                // (lihat $judulAkhir) supaya posisi tengahnya tetap ada di layar pertama.
+                // Judul rata tengah.
                 $alignJudul = Alignment::HORIZONTAL_CENTER;
 
-                // Merge judul tidak perlu selebar seluruh tabel di mode lebar
-                // (bisa 90+ kolom). Batasi sampai kolom ke-22 supaya tetap tampil.
                 // Judul di-merge selebar seluruh tabel (A sampai kolom terakhir)
                 // supaya tepat berada di tengah-tengah tabel.
                 $judulAkhir = $this->lastColumn;
@@ -1436,7 +1699,323 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 /*
                 |--------------------------------------------------------------------------
+                | MONITORING RUNNING HOURS (selebar tabel Shift)
+                |--------------------------------------------------------------------------
+                */
+
+                $barisMon = [];
+
+                if ($this->pakaiMonitoring && $this->monTitleRow > 0) {
+                    $mseg = $this->monSegments();
+                    $hM = $this->monHeaderRow;
+
+                    $barisMon[] = $this->monTitleRow;
+                    $barisMon[] = $hM;
+
+                    // Judul
+                    $sheet->mergeCells(
+                        "A{$this->monTitleRow}:{$this->lastColumn}{$this->monTitleRow}"
+                    );
+
+                    $sheet->getStyle(
+                        "A{$this->monTitleRow}:{$this->lastColumn}{$this->monTitleRow}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                            'size' => 12,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'DDEBF7',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'outline' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '7F7F7F',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($this->monTitleRow)->setRowHeight(24);
+
+                    // Header
+                    $sheet->getStyle(
+                        "A{$hM}:{$this->lastColumn}{$hM}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                            'wrapText' => true,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'EDEDED',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'allBorders' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '808080',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($hM)->setRowHeight(26);
+
+                    $sheet->mergeCells("C{$hM}:D{$hM}");
+
+                    foreach ($mseg as $segmen) {
+                        $s = $this->columnLetter($segmen['start']);
+                        $e = $this->columnLetter($segmen['end']);
+
+                        if ($s !== $e) {
+                            $sheet->mergeCells("{$s}{$hM}:{$e}{$hM}");
+                        }
+                    }
+
+                    // Data (tiap item = 2 baris: Foto + Actual Running)
+                    if ($this->monStartRow <= $this->monEndRow) {
+                        $sheet->getStyle(
+                            "A{$this->monStartRow}:{$this->lastColumn}{$this->monEndRow}"
+                        )->applyFromArray([
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                                'vertical' => Alignment::VERTICAL_CENTER,
+                                'wrapText' => true,
+                            ],
+
+                            'borders' => [
+                                'allBorders' => [
+                                    'borderStyle' => Border::BORDER_THIN,
+                                    'color' => [
+                                        'rgb' => 'BFBFBF',
+                                    ],
+                                ],
+                            ],
+                        ]);
+
+                        $sheet->getStyle(
+                            "B{$this->monStartRow}:B{$this->monEndRow}"
+                        )->getAlignment()->setHorizontal(
+                            Alignment::HORIZONTAL_LEFT
+                        );
+
+                        foreach ($this->monItems as $i => $item) {
+                            $r1 = $this->monStartRow + ($i * 2); // foto
+                            $r2 = $r1 + 1;                       // actual running
+
+                            $sheet->mergeCells("A{$r1}:A{$r2}");
+                            $sheet->mergeCells("B{$r1}:B{$r2}");
+                            $sheet->mergeCells("C{$r1}:D{$r1}");
+                            $sheet->mergeCells("C{$r2}:D{$r2}");
+
+                            foreach ($mseg as $segmen) {
+                                $s = $this->columnLetter($segmen['start']);
+                                $e = $this->columnLetter($segmen['end']);
+
+                                if ($s !== $e) {
+                                    $sheet->mergeCells("{$s}{$r1}:{$e}{$r1}");
+                                    $sheet->mergeCells("{$s}{$r2}:{$e}{$r2}");
+                                }
+                            }
+
+                            // baris foto lebih tinggi supaya foto muat
+                            $sheet->getRowDimension($r1)->setRowHeight(82);
+                            $sheet->getRowDimension($r2)->setRowHeight(22);
+
+                            $barisMon[] = $r1;
+                            $barisMon[] = $r2;
+                        }
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | KONSUMSI BAHAN BAKAR (selebar tabel Shift)
+                |--------------------------------------------------------------------------
+                */
+
+                $barisBbm = [];
+
+                if ($this->pakaiMonitoring && $this->pakaiBbm && $this->bbmTitleRow > 0) {
+                    $bseg = $this->bbmSegments();
+                    $hB = $this->bbmHeaderRow;
+
+                    $barisBbm[] = $this->bbmTitleRow;
+                    $barisBbm[] = $hB;
+
+                    // Judul
+                    $sheet->mergeCells(
+                        "A{$this->bbmTitleRow}:{$this->lastColumn}{$this->bbmTitleRow}"
+                    );
+
+                    $sheet->getStyle(
+                        "A{$this->bbmTitleRow}:{$this->lastColumn}{$this->bbmTitleRow}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                            'size' => 12,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'EAF1DD',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'outline' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '7F7F7F',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($this->bbmTitleRow)->setRowHeight(24);
+
+                    // Header
+                    $sheet->getStyle(
+                        "A{$hB}:{$this->lastColumn}{$hB}"
+                    )->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                        ],
+
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER,
+                            'wrapText' => true,
+                        ],
+
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'color' => [
+                                'rgb' => 'EDEDED',
+                            ],
+                        ],
+
+                        'borders' => [
+                            'allBorders' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => [
+                                    'rgb' => '808080',
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    $sheet->getRowDimension($hB)->setRowHeight(30);
+
+                    foreach ($bseg as $segmen) {
+                        $s = $this->columnLetter($segmen['start']);
+                        $e = $this->columnLetter($segmen['end']);
+
+                        if ($s !== $e) {
+                            $sheet->mergeCells("{$s}{$hB}:{$e}{$hB}");
+                        }
+                    }
+
+                    // Data (tiap item = 2 baris: Running Hours + Konsumsi Solar)
+                    if ($this->bbmStartRow <= $this->bbmEndRow) {
+                        $sheet->getStyle(
+                            "A{$this->bbmStartRow}:{$this->lastColumn}{$this->bbmEndRow}"
+                        )->applyFromArray([
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                                'vertical' => Alignment::VERTICAL_CENTER,
+                                'wrapText' => true,
+                            ],
+
+                            'borders' => [
+                                'allBorders' => [
+                                    'borderStyle' => Border::BORDER_THIN,
+                                    'color' => [
+                                        'rgb' => 'BFBFBF',
+                                    ],
+                                ],
+                            ],
+                        ]);
+
+                        $sheet->getStyle(
+                            "B{$this->bbmStartRow}:B{$this->bbmEndRow}"
+                        )->getAlignment()->setHorizontal(
+                            Alignment::HORIZONTAL_LEFT
+                        );
+
+                        foreach ($this->bbmItems as $i => $item) {
+                            $r1 = $this->bbmStartRow + ($i * 2); // running hours
+                            $r2 = $r1 + 1;                       // konsumsi solar
+
+                            foreach (['A', 'B', 'C', 'D'] as $col) {
+                                $sheet->mergeCells("{$col}{$r1}:{$col}{$r2}");
+                            }
+
+                            foreach ($bseg as $segmen) {
+                                $s = $this->columnLetter($segmen['start']);
+                                $e = $this->columnLetter($segmen['end']);
+
+                                if ($s !== $e) {
+                                    $sheet->mergeCells("{$s}{$r1}:{$e}{$r1}");
+                                    $sheet->mergeCells("{$s}{$r2}:{$e}{$r2}");
+                                }
+                            }
+
+                            $sheet->getRowDimension($r1)->setRowHeight(22);
+                            $sheet->getRowDimension($r2)->setRowHeight(22);
+
+                            $barisBbm[] = $r1;
+                            $barisBbm[] = $r2;
+                        }
+                    }
+
+                    // Catatan rumus
+                    if ($this->bbmCatatanRow > 0) {
+                        $rc = $this->bbmCatatanRow;
+
+                        $sheet->mergeCells("A{$rc}:{$this->lastColumn}{$rc}");
+
+                        $sheet->getStyle("A{$rc}")->getFont()
+                            ->setItalic(true)
+                            ->setSize(10);
+
+                        $sheet->getRowDimension($rc)->setRowHeight(20);
+
+                        $barisBbm[] = $rc;
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
                 | PELUMASAN (tabel di bawah catatan, sebelum abnormality)
+                | Selebar tabel Shift (A sampai kolom terakhir).
                 |--------------------------------------------------------------------------
                 */
 
@@ -1667,15 +2246,17 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
 
                 /*
                 |--------------------------------------------------------------------------
-                | ABNORMALITY HEADER + DATA (selebar tabel di atas)
+                | ABNORMALITY HEADER + DATA (selebar tabel Shift)
                 |--------------------------------------------------------------------------
                 */
 
+                $abn = $this->abnSegments();
                 $barisAbn = [];
-                $segAbn = $this->abnSegments();
+
+                $hAbn = $this->abnormalityHeaderRow;
 
                 $sheet->getStyle(
-                    "A{$this->abnormalityHeaderRow}:{$this->lastColumn}{$this->abnormalityHeaderRow}"
+                    "A{$hAbn}:{$this->lastColumn}{$hAbn}"
                 )->applyFromArray([
                     'font' => [
                         'bold' => true,
@@ -1704,49 +2285,24 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     ],
                 ]);
 
-                $sheet->getRowDimension($this->abnormalityHeaderRow)->setRowHeight(24);
+                $sheet->getRowDimension($hAbn)->setRowHeight(22);
+                $barisAbn[] = $hAbn;
 
-                foreach ($segAbn as $segmen) {
-                    $s = $this->columnLetter($segmen['start']);
-                    $e = $this->columnLetter($segmen['end']);
+                // header + semua baris data: merge C:D (Abnormality) dan tiap segmen
+                for ($r = $hAbn; $r <= max($hAbn, $this->abnormalityEndRow); $r++) {
+                    $sheet->mergeCells("C{$r}:D{$r}");
 
-                    if ($s !== $e) {
-                        $sheet->mergeCells(
-                            "{$s}{$this->abnormalityHeaderRow}:{$e}{$this->abnormalityHeaderRow}"
-                        );
+                    foreach ($abn as $segmen) {
+                        $s = $this->columnLetter($segmen['start']);
+                        $e = $this->columnLetter($segmen['end']);
+
+                        if ($s !== $e) {
+                            $sheet->mergeCells("{$s}{$r}:{$e}{$r}");
+                        }
                     }
                 }
 
-                if (
-                    $this->abnormalityStartRow <=
-                    $this->abnormalityEndRow
-                ) {
-
-                    foreach ($this->abnData as $i => $abn) {
-                        $r = $this->abnormalityStartRow + $i;
-
-                        foreach ($segAbn as $segmen) {
-                            $s = $this->columnLetter($segmen['start']);
-                            $e = $this->columnLetter($segmen['end']);
-
-                            if ($s !== $e) {
-                                $sheet->mergeCells("{$s}{$r}:{$e}{$r}");
-                            }
-                        }
-
-                        // merge tidak auto-tinggi, jadi tinggi baris dihitung dari panjang teks
-                        $baris = max(
-                            1,
-                            (int) ceil(mb_strlen((string) $abn->abnormality) / ($segAbn['abnormality']['width'] * 0.95)),
-                            (int) ceil(mb_strlen((string) $abn->countermeasure) / ($segAbn['countermeasure']['width'] * 0.95)),
-                            (int) ceil(mb_strlen((string) $abn->status) / ($segAbn['status']['width'] * 0.95)),
-                            (int) ceil(mb_strlen((string) $abn->pic) / ($segAbn['pic']['width'] * 0.95))
-                        );
-
-                        $sheet->getRowDimension($r)->setRowHeight(max(22, $baris * 15));
-
-                        $barisAbn[] = $r;
-                    }
+                if ($this->abnormalityStartRow <= $this->abnormalityEndRow) {
 
                     $sheet->getStyle(
                         "A{$this->abnormalityStartRow}:{$this->lastColumn}{$this->abnormalityEndRow}"
@@ -1774,21 +2330,29 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     );
 
                     // Status rata tengah
+                    $stS = $this->columnLetter($abn['status']['start']);
+                    $stE = $this->columnLetter($abn['status']['end']);
+
                     $sheet->getStyle(
-                        $this->columnLetter($segAbn['status']['start']) . $this->abnormalityStartRow
-                        . ':' . $this->columnLetter($segAbn['status']['end']) . $this->abnormalityEndRow
+                        "{$stS}{$this->abnormalityStartRow}:{$stE}{$this->abnormalityEndRow}"
                     )->getAlignment()->setHorizontal(
                         Alignment::HORIZONTAL_CENTER
                     );
 
-                    // Abnormality, Countermeasure, PIC rata kiri
-                    foreach (['abnormality', 'countermeasure', 'pic'] as $kunci) {
-                        $sheet->getStyle(
-                            $this->columnLetter($segAbn[$kunci]['start']) . $this->abnormalityStartRow
-                            . ':' . $this->columnLetter($segAbn[$kunci]['end']) . $this->abnormalityEndRow
-                        )->getAlignment()->setHorizontal(
-                            Alignment::HORIZONTAL_LEFT
+                    // tinggi baris dihitung dari panjang teks (merge tidak auto-tinggi)
+                    foreach ($abnormalities as $i => $ab) {
+                        $r = $this->abnormalityStartRow + $i;
+
+                        $baris = max(
+                            1,
+                            (int) ceil(mb_strlen((string) $ab->abnormality) / 36),
+                            (int) ceil(mb_strlen((string) $ab->countermeasure) / ($abn['countermeasure']['width'] * 0.95)),
+                            (int) ceil(mb_strlen((string) $ab->pic) / ($abn['pic']['width'] * 0.95))
                         );
+
+                        $sheet->getRowDimension($r)->setRowHeight(max(22, $baris * 15));
+
+                        $barisAbn[] = $r;
                     }
                 }
 
@@ -1858,6 +2422,15 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                     }
                 }
 
+                // tinggi baris monitoring & bahan bakar juga sudah dihitung sendiri di atas
+                foreach ($barisMon as $r) {
+                    $barisKhusus[] = $r;
+                }
+
+                foreach ($barisBbm as $r) {
+                    $barisKhusus[] = $r;
+                }
+
                 // tinggi baris pelumasan juga sudah dihitung sendiri di atas
                 foreach ($barisLub as $r) {
                     $barisKhusus[] = $r;
@@ -1883,6 +2456,73 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                         $sheet->getRowDimension($row)
                             ->setRowHeight(22);
                     }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | FOTO MONITORING (maks 110 x 100 px, proporsional)
+                |--------------------------------------------------------------------------
+                */
+
+                // tinggi baris foto 82 pt = sekitar 109 px
+                $tinggiBarisPx = (int) round(82 * 96 / 72);
+
+                foreach ($this->monFotos as [$barisFoto, $kolomAwal, $kolomAkhir, $pathFoto]) {
+                    $ukuran = @getimagesize($pathFoto);
+
+                    // lebar seluruh kotak Week (gabungan beberapa kolom)
+                    $lebarKotakPx = 0;
+
+                    for ($c = $kolomAwal; $c <= $kolomAkhir; $c++) {
+                        $lebarKotakPx += $this->lebarKolomPx($c);
+                    }
+
+                    $maksLebar = max(40, min(110, $lebarKotakPx - 8));
+
+                    $lebarFoto = $maksLebar;
+                    $tinggiFoto = 100;
+
+                    if ($ukuran && $ukuran[0] && $ukuran[1]) {
+                        $skala = min($maksLebar / $ukuran[0], 100 / $ukuran[1]);
+
+                        $lebarFoto = (int) ($ukuran[0] * $skala);
+                        $tinggiFoto = (int) ($ukuran[1] * $skala);
+                    }
+
+                    // posisi kiri foto (dari tepi kiri kotak) supaya tepat di tengah
+                    $targetX = max(0, (int) (($lebarKotakPx - $lebarFoto) / 2));
+
+                    // Excel hanya menerima geseran di dalam kolom tempat foto menempel,
+                    // jadi cari kolom yang berisi titik targetX lalu geser di dalamnya.
+                    $kolomTempel = $kolomAwal;
+                    $sudahLewat = 0;
+
+                    for ($c = $kolomAwal; $c <= $kolomAkhir; $c++) {
+                        $lebarKolom = $this->lebarKolomPx($c);
+
+                        if ($targetX < $sudahLewat + $lebarKolom) {
+                            $kolomTempel = $c;
+                            break;
+                        }
+
+                        $sudahLewat += $lebarKolom;
+                        $kolomTempel = $c;
+                    }
+
+                    $d = new Drawing();
+                    $d->setPath($pathFoto);
+                    $d->setCoordinates($this->columnLetter($kolomTempel) . $barisFoto);
+
+                    if ($ukuran && $ukuran[0] && $ukuran[1]) {
+                        $d->setResizeProportional(false);
+                        $d->setWidth($lebarFoto);
+                        $d->setHeight($tinggiFoto);
+                    }
+
+                    $d->setOffsetX(max(0, $targetX - $sudahLewat));
+                    $d->setOffsetY(max(2, (int) (($tinggiBarisPx - $tinggiFoto) / 2)));
+
+                    $d->setWorksheet($sheet);
                 }
 
                 /*
@@ -2051,6 +2691,22 @@ class CheckSheetExport implements FromArray, WithEvents, WithTitle
                 );
             }
         }
+    }
+
+    /**
+     * Perkiraan lebar kolom (px) sesuai pengaturan lebar kolom di registerEvents().
+     */
+    private function lebarKolomPx(int $kolom): int
+    {
+        if ($kolom <= 4) {
+            $karakter = [6, 32, 20, 18][$kolom - 1];
+        } elseif ($this->pakaiActual) {
+            $karakter = [9, 7, 16][($kolom - 5) % 3];
+        } else {
+            $karakter = $this->pakaiPlanAct ? 5.5 : 4.2;
+        }
+
+        return (int) round($karakter * 7 + 5);
     }
 
     /**

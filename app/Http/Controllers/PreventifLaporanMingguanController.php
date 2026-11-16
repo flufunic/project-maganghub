@@ -6,6 +6,7 @@ use App\Exports\LaporanMingguanExport;
 use App\Models\PreventifLaporanItem;
 use App\Models\PreventifLaporanMingguan;
 use App\Models\PreventifMesin;
+use App\Services\ImageCompressor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -498,9 +499,9 @@ class PreventifLaporanMingguanController extends Controller
 
     // =====================================================
     // UPLOAD FOTO
+    // (foto otomatis dikompres jadi JPEG maks. ~1 MB)
     // =====================================================
 
-    
     public function uploadFoto(
         Request $request,
         PreventifLaporanItem $item
@@ -519,16 +520,17 @@ class PreventifLaporanMingguanController extends Controller
                 'in:before,after',
             ],
 
+            // batas upload dilonggarkan karena foto dikompres setelah diterima
             'foto' => [
                 'required',
                 'image',
-                'mimes:jpg,jpeg,png',
+                'mimes:jpg,jpeg,png,webp',
                 'max:10240',
             ],
         ], [
             'foto.required' => 'Foto wajib dipilih.',
             'foto.image' => 'File harus berupa gambar.',
-            'foto.mimes' => 'Format foto harus JPG, JPEG, atau PNG.',
+            'foto.mimes' => 'Format foto harus JPG, PNG, atau WEBP.',
             'foto.max' => 'Ukuran foto maksimal 10 MB.',
         ]);
 
@@ -540,16 +542,24 @@ class PreventifLaporanMingguanController extends Controller
             ? 'foto_after'
             : 'foto_before';
 
-        // Simpan foto baru terlebih dahulu.
-        $pathBaru = $request
-            ->file('foto')
-            ->store(
+        // Kompres lalu simpan foto baru terlebih dahulu.
+        // Kalau gagal, foto lama tetap aman.
+        try {
+            $pathBaru = app(ImageCompressor::class)->simpan(
+                $request->file('foto'),
                 'laporan-mingguan/'
-                . $laporan->tahun
-                . '/'
-                . $laporan->bulan,
+                    . $laporan->tahun
+                    . '/'
+                    . $laporan->bulan,
                 self::DISK
             );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors([
+                'foto' => 'Foto tidak bisa diproses. Coba foto lain.',
+            ]);
+        }
 
         // Jika penyimpanan berhasil, hapus foto lama.
         $pathLama = $item->{$kolom};
@@ -578,7 +588,7 @@ class PreventifLaporanMingguanController extends Controller
     // =====================================================
     // HAPUS FOTO
     // =====================================================
-    
+
     public function hapusFoto(
         Request $request,
         PreventifLaporanItem $item

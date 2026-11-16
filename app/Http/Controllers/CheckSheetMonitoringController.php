@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CheckSheet;
 use App\Models\CheckSheetMonitoringItem;
 use App\Models\CheckSheetMonitoringWeek;
+use App\Services\ImageCompressor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -88,6 +89,8 @@ class CheckSheetMonitoringController extends Controller
 
     // =====================================================
     // FOTO PER MINGGU
+    // (upload biasa, drag & drop, dan paste dari clipboard
+    //  semuanya masuk ke endpoint ini; foto otomatis dikompres <= 1 MB)
     // =====================================================
 
     public function storeFoto(Request $request, CheckSheet $checkSheet, int $item)
@@ -96,7 +99,13 @@ class CheckSheetMonitoringController extends Controller
             'tahun' => ['required', 'integer', 'between:2000,2100'],
             'bulan' => ['required', 'integer', 'between:1,12'],
             'week'  => ['required', 'integer', 'between:1,5'],
-            'foto'  => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+            // batas upload dilonggarkan karena foto dikompres setelah diterima
+            'foto'  => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ], [
+            'foto.required' => 'Foto wajib dipilih.',
+            'foto.image'    => 'File harus berupa gambar.',
+            'foto.mimes'    => 'Format foto harus JPG, PNG, atau WEBP.',
+            'foto.max'      => 'Ukuran foto maksimal 10 MB.',
         ]);
 
         $it = $this->cariItem($checkSheet, $item);
@@ -108,13 +117,29 @@ class CheckSheetMonitoringController extends Controller
             'week'               => $validated['week'],
         ]);
 
-        if ($row->foto_path) {
-            Storage::disk('public')->delete($row->foto_path);
+        // Simpan foto baru dulu. Kalau gagal, foto lama tetap aman.
+        try {
+            $pathBaru = app(ImageCompressor::class)->simpan(
+                $request->file('foto'),
+                "monitoring/{$checkSheet->id}",
+                'public'
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors([
+                'foto' => 'Foto tidak bisa diproses. Coba foto lain.',
+            ]);
         }
 
-        $row->foto_path = $request->file('foto')
-            ->store("monitoring/{$checkSheet->id}", 'public');
+        $pathLama = $row->foto_path;
+
+        $row->foto_path = $pathBaru;
         $row->save();
+
+        if ($pathLama) {
+            Storage::disk('public')->delete($pathLama);
+        }
 
         return back()->with('success', 'Foto berhasil diupload.');
     }

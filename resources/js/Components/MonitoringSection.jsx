@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
+import FotoDropzone from '@/Components/FotoDropzone';
 
 const MINGGU = [1, 2, 3, 4, 5];
 
@@ -199,12 +200,16 @@ function RunningInput({ value, onSave }) {
 
 // =========================================================
 // SEL FOTO PER MINGGU
+// Upload lewat: klik, drag & drop, atau Ctrl+V (kursor di atas kotak).
+// Foto otomatis dikompres (maks. 1 MB) di server.
+// Kalau sudah ada foto, drag / paste baru akan MENGGANTI foto lama.
 // =========================================================
 function FotoCell({ base, item, week, bulan, tahun, notify, konfirmasi }) {
     const data = dataMinggu(item, week);
+    const [uploading, setUploading] = useState(false);
 
     const upload = (file) => {
-        if (!file) return;
+        if (!file || uploading) return;
 
         router.post(
             `${base}/monitoring/${item.id}/foto`,
@@ -212,6 +217,8 @@ function FotoCell({ base, item, week, bulan, tahun, notify, konfirmasi }) {
             {
                 forceFormData: true,
                 preserveScroll: true,
+                onStart: () => setUploading(true),
+                onFinish: () => setUploading(false),
                 onError: (errs) =>
                     notify(Object.values(errs)[0] || 'Foto gagal diupload.', 'error'),
             }
@@ -236,8 +243,19 @@ function FotoCell({ base, item, week, bulan, tahun, notify, konfirmasi }) {
     };
 
     return (
-        <div className="mx-auto flex h-24 w-28 flex-col items-center justify-center gap-1">
-            {data?.foto_url ? (
+        <FotoDropzone
+            onFile={upload}
+            onError={(pesan) => notify(pesan, 'error')}
+            disabled={uploading}
+            klik={!data?.foto_url}
+            className="mx-auto flex h-24 w-28 items-center justify-center"
+        >
+            {uploading ? (
+                <div className="flex h-20 w-28 flex-col items-center justify-center gap-1 rounded-lg bg-slate-50 text-[11px] font-semibold text-slate-500">
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                    Mengupload...
+                </div>
+            ) : data?.foto_url ? (
                 <div className="relative">
                     <a href={data.foto_url} target="_blank" rel="noreferrer">
                         <img
@@ -249,7 +267,10 @@ function FotoCell({ base, item, week, bulan, tahun, notify, konfirmasi }) {
 
                     <button
                         type="button"
-                        onClick={hapus}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            hapus();
+                        }}
                         title="Hapus foto"
                         className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow"
                     >
@@ -257,21 +278,15 @@ function FotoCell({ base, item, week, bulan, tahun, notify, konfirmasi }) {
                     </button>
                 </div>
             ) : (
-                <label className="flex h-20 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-[11px] font-semibold text-slate-400 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600">
+                <div className="flex h-20 w-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-1 text-center text-[11px] font-semibold leading-tight text-slate-400 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600">
                     <Icon type="plus" className="h-4 w-4" />
                     Upload foto
-                    <input
-                        type="file"
-                        accept="image/png,image/jpeg"
-                        className="hidden"
-                        onChange={(e) => {
-                            upload(e.target.files[0]);
-                            e.target.value = '';
-                        }}
-                    />
-                </label>
+                    <span className="mt-0.5 text-[9px] font-medium opacity-80">
+                        klik · drag · Ctrl+V
+                    </span>
+                </div>
             )}
-        </div>
+        </FotoDropzone>
     );
 }
 
@@ -565,6 +580,10 @@ export default function MonitoringSection({
                         <h2 className="text-sm font-bold text-slate-900">
                             Monitoring Running Hours {namaBulan} {tahun}
                         </h2>
+                        <span className="text-xs text-slate-400">
+                            · Foto: klik, drag &amp; drop, atau arahkan kursor ke kotak lalu
+                            Ctrl+V. Otomatis dikompres maks. 1 MB.
+                        </span>
                     </div>
 
                     <TombolTambah onClick={() => setModal({ kind: 'monitoring', item: null })} />

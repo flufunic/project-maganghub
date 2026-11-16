@@ -2,15 +2,15 @@
 
 namespace App\Exports;
 
-use App\Models\CheckSheet;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
- * Menggabungkan beberapa sheet dalam satu file Excel:
- * - Sheet 1 "Check Sheet" : tabel checklist harian (Plan / Act / KWH / centang)
- * - Sheet 2 "Monitoring"  : Running Hours + Konsumsi Solar
- *                           (hanya kalau pakai_monitoring aktif)
+ * Membungkus export check sheet dalam satu file Excel.
+ *
+ * Sekarang hanya ada 1 sheet "Check Sheet". Monitoring Running Hours,
+ * Konsumsi Solar, Pelumasan, dan Abnormality sudah ada di dalam sheet itu
+ * (lihat CheckSheetExport), jadi tidak ada sheet "Monitoring" terpisah lagi.
  */
 class CheckSheetWorkbookExport implements Export, WithMultipleSheets
 {
@@ -24,9 +24,7 @@ class CheckSheetWorkbookExport implements Export, WithMultipleSheets
 
     public function sheets(): array
     {
-        $checkSheet = CheckSheet::findOrFail($this->checkSheetId);
-
-        $sheets = [
+        return [
             new CheckSheetExport(
                 $this->checkSheetId,
                 $this->bulan,
@@ -34,17 +32,5 @@ class CheckSheetWorkbookExport implements Export, WithMultipleSheets
                 $this->lineId
             ),
         ];
-
-        if ($checkSheet->pakai_monitoring) {
-            $sheets[] = new CheckSheetMonitoringExport(
-                (int) $checkSheet->id,
-                (int) $this->bulan,
-                (int) $this->tahun,
-                (bool) $checkSheet->pakai_bbm,
-                (bool) $checkSheet->bbm_kali_60
-            );
-        }
-
-        return $sheets;
     }
 }
