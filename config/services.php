@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'mtc' => [
+        'url'             => env('MTC_API_URL'),
+        'key'             => env('MTC_API_KEY'),
+        'callback_path'   => env('MTC_CALLBACK_PATH', '/repairs/{id}/callback'),
+        'callback_method' => env('MTC_CALLBACK_METHOD', 'POST'),
+    ],
 ];

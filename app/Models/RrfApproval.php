@@ -7,11 +7,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RrfApproval extends Model
 {
-    protected $fillable = ['rrf_id', 'tahap', 'user_id', 'status', 'catatan', 'acted_at'];
+    protected $table = 'rrf_approvals';
+
+    protected $fillable = [
+        'rrf_id',
+        'tahap',
+        'user_id',
+        'status',
+        'catatan',
+        'acted_at',
+    ];
 
     protected function casts(): array
     {
-        return ['acted_at' => 'datetime'];
+        return [
+            'acted_at' => 'datetime',
+        ];
     }
 
     public function rrf(): BelongsTo
@@ -21,6 +32,6 @@ class RrfApproval extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

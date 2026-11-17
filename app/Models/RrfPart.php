@@ -7,7 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RrfPart extends Model
 {
-    protected $fillable = ['rrf_id', 'part_name', 'model_type', 'maker', 'qty', 'other'];
+    protected $table = 'rrf_parts';
+
+    protected $fillable = [
+        'rrf_id',
+        'part_name',
+        'model_type',
+        'maker',
+        'qty',
+        'other',
+    ];
 
     public function rrf(): BelongsTo
     {

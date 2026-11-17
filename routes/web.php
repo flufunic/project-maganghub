@@ -19,11 +19,11 @@ use App\Http\Controllers\ScheduleBarisController;
 use App\Http\Controllers\ScheduleZonaController;
 use App\Http\Controllers\SchedulePreventifController;
 use App\Http\Controllers\JokenController;
-use App\Http\Controllers\RrfController;
 use App\Http\Controllers\RrfNotificationController;
-use App\Http\Controllers\MtcRrfController;
 use App\Http\Controllers\SopIkController;
 use App\Http\Controllers\MachineController;
+use App\Http\Controllers\RepairMtcController;
+use App\Http\Controllers\Mtc\MtcRrfController;
 
 /*
 |--------------------------------------------------------------------------
@@ -583,16 +583,24 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         Route::get('/type/{type}/units', [MachineController::class, 'units'])
             ->whereNumber('type')->name('units');
 
-        // Tambah, edit, hapus, import: hanya admin
-        Route::middleware('role:admin')->group(function () {
+        // Tambah dan edit: admin dan pimpinan
+        Route::middleware('role:admin,pimpinan')->group(function () {
             Route::post('/type', [MachineController::class, 'store'])->name('store');
+
             Route::put('/type/{type}', [MachineController::class, 'update'])
                 ->whereNumber('type')->name('update');
+        });
+
+        // Hapus dan import: hanya admin
+        Route::middleware('role:admin')->group(function () {
             Route::delete('/type/{type}', [MachineController::class, 'destroy'])
                 ->whereNumber('type')->name('destroy');
 
-            Route::post('/import/preview', [MachineController::class, 'importPreview'])->name('import.preview');
-            Route::post('/import', [MachineController::class, 'import'])->name('import');
+            Route::post('/import/preview', [MachineController::class, 'importPreview'])
+                ->name('import.preview');
+
+            Route::post('/import', [MachineController::class, 'import'])
+                ->name('import');
         });
     });
 
@@ -671,98 +679,78 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| RRF sisi Produksi
+| RRF MAINTENANCE - INTEGRASI QMOS
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:spv_produksi,operator_produksi'])
-    ->prefix('rrf')
-    ->name('rrf.')
+// Admin saja: sinkron API, buat RRF, isi & kirim RRF
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
     ->group(function () {
-        Route::get('/', [RrfController::class, 'index'])->name('index');
-        Route::get('/create', [RrfController::class, 'create'])->name('create');
-        Route::post('/', [RrfController::class, 'store'])->name('store');
 
-        Route::get('/{rrf}', [RrfController::class, 'show'])
-            ->whereNumber('rrf')->name('show');
-        Route::get('/{rrf}/edit', [RrfController::class, 'edit'])
-            ->whereNumber('rrf')->name('edit');
-        Route::put('/{rrf}', [RrfController::class, 'update'])
-            ->whereNumber('rrf')->name('update');
-        Route::delete('/{rrf}', [RrfController::class, 'destroy'])
-            ->whereNumber('rrf')->name('destroy');
+        Route::post('/repair-mtc/sync', [RepairMtcController::class, 'sync'])
+            ->name('repair-mtc.sync');
 
-        // Hanya SPV produksi
-        Route::middleware('role:spv_produksi')->group(function () {
-            Route::post('/{rrf}/approve', [RrfController::class, 'approve'])
-                ->whereNumber('rrf')->name('approve');
-            Route::post('/{rrf}/reject', [RrfController::class, 'reject'])
-                ->whereNumber('rrf')->name('reject');
-        });
+        Route::post('/repair-mtc/{repair}/buat-rrf', [MtcRrfController::class, 'buatDariRepair'])
+            ->whereNumber('repair')
+            ->name('repair-mtc.buat-rrf');
+
+        Route::put('/{rrf}/simpan', [MtcRrfController::class, 'simpan'])
+            ->whereNumber('rrf')
+            ->name('simpan');
+
+        Route::post('/{rrf}/kirim', [MtcRrfController::class, 'kirim'])
+            ->whereNumber('rrf')
+            ->name('kirim');
     });
 
-
-/*
-|--------------------------------------------------------------------------
-| Notifikasi RRF (semua role yang memakai menu RRF)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['auth', 'role:admin,pimpinan,spv_produksi,operator_produksi'])
+// Admin dan Pimpinan: Data QMOS (hanya lihat), daftar RRF, dan detail RRF
+Route::middleware(['auth', 'role:admin,pimpinan'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
     ->group(function () {
+
+        Route::get('/repair-mtc', [RepairMtcController::class, 'index'])
+            ->name('repair-mtc.index');
+
+        Route::get('/', [MtcRrfController::class, 'index'])
+            ->name('index');
+
+        Route::get('/{rrf}', [MtcRrfController::class, 'show'])
+            ->whereNumber('rrf')
+            ->name('show');
+        Route::post('/{rrf}/callback-ulang', [MtcRrfController::class, 'callbackUlang'])
+            ->whereNumber('rrf')
+            ->name('callback-ulang');
+    });
+
+// Pimpinan: keputusan verifikasi
+Route::middleware(['auth', 'role:pimpinan'])
+    ->prefix('mtc/rrf')
+    ->name('mtc.rrf.')
+    ->group(function () {
+
+        Route::post('/{rrf}/verifikasi', [MtcRrfController::class, 'verifikasi'])
+            ->whereNumber('rrf')
+            ->name('verifikasi');
+
+        Route::post('/{rrf}/kembalikan', [MtcRrfController::class, 'kembalikan'])
+            ->whereNumber('rrf')
+            ->name('kembalikan');
+    });
+
+// Notifikasi RRF untuk Admin dan Pimpinan Maintenance
+Route::middleware(['auth', 'role:admin,pimpinan'])
+    ->group(function () {
+
         Route::post('/notifikasi/{notification}/baca', [
             RrfNotificationController::class,
             'baca',
         ])->name('notifikasi.baca');
 
-        // Alamat lama dipertahankan supaya lonceng yang sudah ada tidak rusak
         Route::post('/rrf/notifikasi/{notification}/baca', [
             RrfNotificationController::class,
             'baca',
         ])->name('rrf.notifikasi.baca');
-    });
-
-
-/*
-|--------------------------------------------------------------------------
-| RRF sisi Maintenance
-|--------------------------------------------------------------------------
-*/
-
-// Daftar, detail, dan hapus: Admin dan Pimpinan
-Route::middleware(['auth', 'role:admin,pimpinan'])
-    ->prefix('mtc/rrf')
-    ->name('mtc.rrf.')
-    ->group(function () {
-        Route::get('/', [MtcRrfController::class, 'index'])->name('index');
-        Route::get('/{rrf}', [MtcRrfController::class, 'show'])
-            ->whereNumber('rrf')->name('show');
-        Route::delete('/{rrf}', [MtcRrfController::class, 'destroy'])
-            ->whereNumber('rrf')->name('destroy');
-    });
-
-// Aksi Admin
-Route::middleware(['auth', 'role:admin'])
-    ->prefix('mtc/rrf')
-    ->name('mtc.rrf.')
-    ->group(function () {
-        Route::post('/{rrf}/terima', [MtcRrfController::class, 'terima'])
-            ->whereNumber('rrf')->name('terima');
-        Route::post('/{rrf}/tolak', [MtcRrfController::class, 'tolak'])
-            ->whereNumber('rrf')->name('tolak');
-        Route::post('/{rrf}/mulai', [MtcRrfController::class, 'mulai'])
-            ->whereNumber('rrf')->name('mulai');
-        Route::post('/{rrf}/penanganan', [MtcRrfController::class, 'simpan'])
-            ->whereNumber('rrf')->name('penanganan');
-    });
-
-// Aksi Pimpinan
-Route::middleware(['auth', 'role:pimpinan'])
-    ->prefix('mtc/rrf')
-    ->name('mtc.rrf.')
-    ->group(function () {
-        Route::post('/{rrf}/close', [MtcRrfController::class, 'close'])
-            ->whereNumber('rrf')->name('close');
-        Route::post('/{rrf}/kembalikan', [MtcRrfController::class, 'kembalikan'])
-            ->whereNumber('rrf')->name('kembalikan');
     });

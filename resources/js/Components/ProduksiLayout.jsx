@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { Menu } from 'lucide-react';
 import FlashToast from './FlashToast';
@@ -43,7 +43,10 @@ export default function ProduksiLayout({ children }) {
     const [notifikasiTerbuka, setNotifikasiTerbuka] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // ========================================
     // ROLE MAINTENANCE
+    // ========================================
+
     const isAdminMtc = user?.role === 'admin';
     const isPimpinanMtc = user?.role === 'pimpinan';
 
@@ -54,6 +57,153 @@ export default function ProduksiLayout({ children }) {
         rrfNotifications?.daftar ?? [];
 
     const adaNotifikasi = jumlahBelumDibaca > 0;
+
+    // ========================================
+    // AUDIO NOTIFIKASI
+    // ========================================
+
+    const audioContextRef = useRef(null);
+    const suaraAktifRef = useRef(false);
+    const notifikasiMenungguRef = useRef(false);
+
+    const idNotifikasiSebelumnya = useRef(
+        new Set((rrfNotifications?.daftar ?? []).map(item => item.id))
+    );
+
+    const pollingBerjalan = useRef(false);
+
+    // ========================================
+    // FUNGSI DING DONG
+    // ========================================
+
+    const putarSuaraNotifikasi = async () => {
+        try {
+            const context = audioContextRef.current;
+
+            if (!context) return;
+
+            if (context.state === 'suspended') {
+                await context.resume();
+            }
+
+            if (context.state !== 'running') return;
+
+            const bunyikanNada = (frekuensi, waktuMulai, durasi) => {
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+
+                oscillator.type = 'sine';
+
+                oscillator.frequency.setValueAtTime(
+                    frekuensi,
+                    waktuMulai
+                );
+
+                gain.gain.setValueAtTime(0.001, waktuMulai);
+
+                gain.gain.exponentialRampToValueAtTime(
+                    0.35,
+                    waktuMulai + 0.04
+                );
+
+                gain.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    waktuMulai + durasi
+                );
+
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+
+                oscillator.start(waktuMulai);
+                oscillator.stop(waktuMulai + durasi);
+            };
+
+            const sekarang = context.currentTime;
+
+            bunyikanNada(880, sekarang, 0.45);
+            bunyikanNada(659.25, sekarang + 0.5, 0.65);
+
+        } catch (error) {
+            console.error('Gagal memutar suara notifikasi:', error);
+        }
+    };
+
+    // ========================================
+    // POLLING NOTIFIKASI SETIAP 10 DETIK
+    // ========================================
+
+    useEffect(() => {
+        if (!isAdminMtc && !isPimpinanMtc) return;
+
+        const cekNotifikasi = () => {
+            if (pollingBerjalan.current) return;
+
+            pollingBerjalan.current = true;
+
+            router.reload({
+                only: ['rrfNotifications'],
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => {
+                    pollingBerjalan.current = false;
+                },
+            });
+        };
+
+        const interval = setInterval(cekNotifikasi, 10000);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                cekNotifikasi();
+            }
+        };
+
+        document.addEventListener(
+            'visibilitychange',
+            handleVisibilityChange
+        );
+
+        return () => {
+            clearInterval(interval);
+
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibilityChange
+            );
+
+            pollingBerjalan.current = false;
+        };
+    }, [isAdminMtc, isPimpinanMtc]);
+
+    // ========================================
+    // DETEKSI NOTIFIKASI BARU
+    // ========================================
+
+    useEffect(() => {
+        if (!isAdminMtc && !isPimpinanMtc) return;
+
+        const daftarIDSekarang = new Set(
+            daftarNotifikasi.map(item => item.id)
+        );
+
+        const adaNotifikasiBaru = daftarNotifikasi.some(
+            item => !idNotifikasiSebelumnya.current.has(item.id)
+        );
+
+        idNotifikasiSebelumnya.current = daftarIDSekarang;
+
+        if (!adaNotifikasiBaru) return;
+
+        if (suaraAktifRef.current) {
+            putarSuaraNotifikasi();
+        } else {
+            notifikasiMenungguRef.current = true;
+        }
+    }, [daftarNotifikasi, isAdminMtc, isPimpinanMtc]);
+
+    // ========================================
+    // BACA NOTIFIKASI
+    // ========================================
 
     const bacaNotifikasi = (notification) => {
         router.post(
@@ -120,18 +270,10 @@ export default function ProduksiLayout({ children }) {
                 }
 
                 @keyframes rrfBellShake {
-                    0%, 100% {
-                        transform: rotate(0deg);
-                    }
-                    10%, 30%, 50%, 70% {
-                        transform: rotate(12deg);
-                    }
-                    20%, 40%, 60%, 80% {
-                        transform: rotate(-12deg);
-                    }
-                    90% {
-                        transform: rotate(0deg);
-                    }
+                    0%, 100% { transform: rotate(0deg); }
+                    10%, 30%, 50%, 70% { transform: rotate(12deg); }
+                    20%, 40%, 60%, 80% { transform: rotate(-12deg); }
+                    90% { transform: rotate(0deg); }
                 }
 
                 @keyframes rrfNotificationPulse {
@@ -146,24 +288,14 @@ export default function ProduksiLayout({ children }) {
                 }
 
                 @keyframes rrfBadgePop {
-                    0% {
-                        transform: scale(0);
-                    }
-                    60% {
-                        transform: scale(1.25);
-                    }
-                    100% {
-                        transform: scale(1);
-                    }
+                    0% { transform: scale(0); }
+                    60% { transform: scale(1.25); }
+                    100% { transform: scale(1); }
                 }
 
                 @keyframes rrfBadgePulse {
-                    0%, 100% {
-                        transform: scale(1);
-                    }
-                    50% {
-                        transform: scale(1.12);
-                    }
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.12); }
                 }
 
                 .rrf-gradient {
@@ -209,7 +341,9 @@ export default function ProduksiLayout({ children }) {
                     }
                 }
             `}</style>
+
             <FlashToast />
+
             <div className="relative flex min-h-screen flex-col overflow-x-hidden text-slate-800">
 
                 {/* BACKGROUND */}
@@ -266,7 +400,7 @@ export default function ProduksiLayout({ children }) {
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        setNotifikasiTerbuka((prev) => !prev)
+                                        setNotifikasiTerbuka(prev => !prev)
                                     }
                                     className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-all duration-300 hover:bg-white/20 ${
                                         adaNotifikasi
@@ -331,6 +465,7 @@ export default function ProduksiLayout({ children }) {
                                                     <p className="text-sm font-extrabold text-slate-800">
                                                         Notifikasi
                                                     </p>
+
                                                     <p className="text-xs text-slate-500">
                                                         {jumlahBelumDibaca} belum dibaca
                                                     </p>
@@ -366,12 +501,13 @@ export default function ProduksiLayout({ children }) {
                                                         <p className="text-sm font-semibold text-slate-600">
                                                             Belum ada notifikasi
                                                         </p>
+
                                                         <p className="mt-1 text-xs text-slate-400">
                                                             Notifikasi RRF akan muncul di sini.
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    daftarNotifikasi.map((item) => (
+                                                    daftarNotifikasi.map(item => (
                                                         <button
                                                             key={item.id}
                                                             type="button"
@@ -437,34 +573,12 @@ export default function ProduksiLayout({ children }) {
                                     </>
                                 )}
                             </div>
-
-                            {/* LOGOUT */}
-                            <button
-                                type="button"
-                                onClick={() => router.post('/logout')}
-                                className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-red-300/25 bg-red-500/15 px-3.5 py-2.5 text-xs font-bold text-white transition hover:border-red-300/50 hover:bg-red-500/30 sm:px-4"
-                            >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    className="h-4 w-4"
-                                >
-                                    <path d="M10 17l5-5-5-5" />
-                                    <path d="M15 12H3" />
-                                    <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-                                </svg>
-                                Logout
-                            </button>
                         </div>
                     </div>
                 </header>
 
                 {/* MAIN */}
                 <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-
-
                     <div className="rrf-rise">
                         {children}
                     </div>

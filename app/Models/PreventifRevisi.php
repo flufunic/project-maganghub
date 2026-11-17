@@ -28,7 +28,7 @@ class PreventifRevisi extends Model
     public function pengiriman(): BelongsTo
     {
         return $this->belongsTo(
-            PreventifPengiriman::class,
+            'App\\Models\\PreventifPengiriman',
             'preventif_pengiriman_id'
         );
     }

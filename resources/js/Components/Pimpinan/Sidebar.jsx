@@ -73,7 +73,7 @@ const GRUP = [
             },
             {
                 key: 'rrf',
-                href: '/mtc/rrf',
+                href: '/mtc/rrf/repair-mtc',
                 icon: 'rrfVerifikasi',
                 title: 'Repair Request Form',
                 desc: 'Verifikasi permintaan perbaikan',

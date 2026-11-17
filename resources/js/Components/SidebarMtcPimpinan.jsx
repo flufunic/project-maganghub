@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
+
 import {
     X,
     ChevronRight,
@@ -12,7 +14,13 @@ import {
     Activity,
     Cog,
     SlidersHorizontal,
+    FileText,
+    Factory,
 } from 'lucide-react';
+
+/* ------------------------------------------------------------------
+| ICON
+------------------------------------------------------------------ */
 
 const ICONS = {
     close: X,
@@ -26,6 +34,8 @@ const ICONS = {
     checksheet: Activity,
     overhaul: Cog,
     joken: SlidersHorizontal,
+    sop: FileText,
+    mesin: Factory,
 };
 
 function Icon({ type, className = 'h-5 w-5' }) {
@@ -37,13 +47,25 @@ function Icon({ type, className = 'h-5 w-5' }) {
 
     const strokeWidth = type === 'close' || type === 'chevron' ? 2 : 1.75;
 
-    return <Comp className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
+    return (
+        <Comp
+            className={className}
+            strokeWidth={strokeWidth}
+            aria-hidden="true"
+        />
+    );
 }
 
 /* ------------------------------------------------------------------
-| DAFTAR MENU
-| match(path) -> true kalau menu ini sedang aktif
+| HELPER ACTIVE MENU
 ------------------------------------------------------------------ */
+
+const mulai = (p, base) => p === base || p.startsWith(`${base}/`);
+
+/* ------------------------------------------------------------------
+| DAFTAR MENU PIMPINAN
+------------------------------------------------------------------ */
+
 const GRUP = [
     {
         judul: 'Menu Pimpinan',
@@ -55,7 +77,8 @@ const GRUP = [
                 title: 'Approval Preventif',
                 desc: 'Approval & monitoring',
                 match: (p) =>
-                    p === '/pimpinan' || p.startsWith('/pimpinan/pengiriman'),
+                    p === '/pimpinan' ||
+                    p.startsWith('/pimpinan/pengiriman'),
             },
             {
                 key: 'checksheet-mingguan',
@@ -63,7 +86,7 @@ const GRUP = [
                 icon: 'checksheetMingguan',
                 title: 'Check Sheet Mingguan',
                 desc: 'Rekap & pemeriksaan mingguan',
-                match: (p) => p.startsWith('/pimpinan/check-sheet'),
+                match: (p) => mulai(p, '/pimpinan/check-sheet'),
             },
             {
                 key: 'rrf',
@@ -71,7 +94,7 @@ const GRUP = [
                 icon: 'rrfVerifikasi',
                 title: 'Repair Request Form',
                 desc: 'Verifikasi permintaan perbaikan',
-                match: (p) => p.startsWith('/mtc/rrf'),
+                match: (p) => mulai(p, '/mtc/rrf'),
             },
         ],
     },
@@ -84,8 +107,7 @@ const GRUP = [
                 icon: 'preventif',
                 title: 'Preventif Mesin',
                 desc: 'Maintenance schedule',
-                match: (p) =>
-                    p === '/preventif-mesin' || p.startsWith('/preventif-mesin/'),
+                match: (p) => mulai(p, '/preventif-mesin'),
             },
             {
                 key: 'schedule-preventif',
@@ -93,9 +115,7 @@ const GRUP = [
                 icon: 'schedule',
                 title: 'Schedule Preventif Mingguan',
                 desc: 'Plan & act per week',
-                match: (p) =>
-                    p === '/schedule-preventif' ||
-                    p.startsWith('/schedule-preventif/'),
+                match: (p) => mulai(p, '/schedule-preventif'),
             },
             {
                 key: 'check-sheets',
@@ -103,8 +123,7 @@ const GRUP = [
                 icon: 'checksheet',
                 title: 'Check Sheet Prediktif',
                 desc: 'Check sheet maintenance',
-                match: (p) =>
-                    p === '/check-sheets' || p.startsWith('/check-sheets/'),
+                match: (p) => mulai(p, '/check-sheets'),
             },
             {
                 key: 'overhaul',
@@ -112,8 +131,7 @@ const GRUP = [
                 icon: 'overhaul',
                 title: 'Schedule Overhaul',
                 desc: 'Jadwal overhaul mesin',
-                match: (p) =>
-                    p === '/overhaul-sc2' || p.startsWith('/overhaul-sc2/'),
+                match: (p) => mulai(p, '/overhaul-sc2'),
             },
             {
                 key: 'joken',
@@ -121,18 +139,45 @@ const GRUP = [
                 icon: 'joken',
                 title: 'Joken Mesin',
                 desc: 'Standarisasi setting mesin',
-                match: (p) => p === '/joken' || p.startsWith('/joken/'),
+                match: (p) => mulai(p, '/joken'),
+            },
+            {
+                key: 'sop-ik',
+                href: '/sop-ik',
+                icon: 'sop',
+                title: 'SOP/IK',
+                desc: 'Dokumen SOP & IK maintenance',
+                match: (p) => mulai(p, '/sop-ik'),
+            },
+            {
+                key: 'daftar-mesin',
+                href: '/machines',
+                icon: 'mesin',
+                title: 'Daftar Mesin',
+                desc: 'Inventaris mesin & barcode',
+                match: (p) => mulai(p, '/machines'),
             },
         ],
     },
 ];
 
+/* ------------------------------------------------------------------
+| SIDEBAR PIMPINAN
+------------------------------------------------------------------ */
+
 export default function Sidebar({ open, onClose }) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+
     const { url } = usePage();
 
-    // buang query string (?a=b) supaya pencocokan aman
+    // Buang query string (?a=b)
     const path = url.split('?')[0];
+
+    const logout = () => {
+        router.post('/logout', {}, {
+            onFinish: () => setShowLogoutModal(false),
+        });
+    };
 
     return (
         <>
@@ -150,9 +195,11 @@ export default function Sidebar({ open, onClose }) {
                     open ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >
+                {/* DEKORASI */}
                 <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
                 <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-blue-400/25 blur-[80px]" />
+
                 <div className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/25 blur-[80px]" />
 
                 {/* HEADER */}
@@ -193,6 +240,7 @@ export default function Sidebar({ open, onClose }) {
                 <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
                     {GRUP.map((grup) => (
                         <div key={grup.judul}>
+                            {/* JUDUL GRUP */}
                             <div className="mb-2.5 flex items-center gap-2 px-3">
                                 <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">
                                     {grup.judul}
@@ -221,6 +269,7 @@ export default function Sidebar({ open, onClose }) {
                                                 <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
                                             )}
 
+                                            {/* ICON MENU */}
                                             <div
                                                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
                                                     active
@@ -228,9 +277,13 @@ export default function Sidebar({ open, onClose }) {
                                                         : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
                                                 }`}
                                             >
-                                                <Icon type={item.icon} className="h-5 w-5" />
+                                                <Icon
+                                                    type={item.icon}
+                                                    className="h-5 w-5"
+                                                />
                                             </div>
 
+                                            {/* INFORMASI MENU */}
                                             <div className="min-w-0 flex-1">
                                                 <p
                                                     title={item.title}
@@ -254,8 +307,12 @@ export default function Sidebar({ open, onClose }) {
                                                 </p>
                                             </div>
 
+                                            {/* PANAH */}
                                             <div className="absolute right-2 top-1/2 flex h-7 w-7 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100">
-                                                <Icon type="chevron" className="h-3.5 w-3.5" />
+                                                <Icon
+                                                    type="chevron"
+                                                    className="h-3.5 w-3.5"
+                                                />
                                             </div>
                                         </Link>
                                     );
@@ -339,7 +396,7 @@ export default function Sidebar({ open, onClose }) {
 
                             <button
                                 type="button"
-                                onClick={() => router.post('/logout')}
+                                onClick={logout}
                                 className="flex-1 cursor-pointer rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600"
                             >
                                 Logout

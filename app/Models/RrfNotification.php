@@ -12,6 +12,7 @@ class RrfNotification extends Model
     protected $fillable = [
         'user_id',
         'rrf_id',
+        'mtc_repair_id',
         'judul',
         'pesan',
         'dibaca_pada',
@@ -23,11 +24,16 @@ class RrfNotification extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function rrf(): BelongsTo
     {
-        return $this->belongsTo(Rrf::class);
+        return $this->belongsTo(Rrf::class, 'rrf_id');
+    }
+
+    public function mtcRepair(): BelongsTo
+    {
+        return $this->belongsTo(MtcRepair::class, 'mtc_repair_id');
     }
 }

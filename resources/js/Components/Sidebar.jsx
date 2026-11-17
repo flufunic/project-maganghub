@@ -126,10 +126,10 @@ const GRUP = [
 
             {
                 key: 'rrf',
-                href: '/mtc/rrf',
+                href: '/mtc/rrf/repair-mtc',
                 icon: 'rrf',
                 title: 'Repair Request Form',
-                desc: 'Request perbaikan mesin',
+                desc: 'Kelola data repair QMOS dan buat RRF Maintenance',
                 match: (p) => mulai(p, '/mtc/rrf'),
             },
 
