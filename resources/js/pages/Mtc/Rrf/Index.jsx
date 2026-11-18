@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     CalendarDays,
@@ -7,6 +7,7 @@ import {
     ClipboardList,
     Clock3,
     Eye,
+    FileSpreadsheet,
     FileText,
     Layers,
     RotateCcw,
@@ -23,7 +24,7 @@ import ProduksiLayout from '../../../Components/ProduksiLayout';
  *  draft               = RRF sudah dibuat dari data QMOS, Admin belum selesai mengisi / belum mengirim.
  *  menunggu_verifikasi = Admin sudah mengirim, menunggu keputusan Pimpinan.
  *  revisi              = Pimpinan mengembalikan RRF, Admin harus memperbaiki lalu kirim ulang.
- *  terverifikasi       = Pimpinan sudah menyetujui (selesai).
+ *  terverifikasi       = Pimpinan sudah menyetujui (selesai / Completed).
  */
 const STATUS = {
     draft: {
@@ -66,7 +67,8 @@ const formatTanggal = (tanggal) => {
     const date = new Date(tanggal);
     if (Number.isNaN(date.getTime())) return tanggal;
 
-    return new Intl.DateTimeFormat('id-ID', {
+   return new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -78,7 +80,8 @@ const formatTanggalWaktu = (tanggal) => {
     const date = new Date(tanggal);
     if (Number.isNaN(date.getTime())) return tanggal;
 
-    return new Intl.DateTimeFormat('id-ID', {
+     return new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'UTC',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -115,9 +118,16 @@ export default function Index({
     const isPimpinan = role === 'pimpinan';
     const isAdmin = role === 'admin';
 
+    const { flash = {} } = usePage().props;
+
     const [search, setSearch] = useState(filters.search ?? '');
 
     const statusAktif = filters.status ?? '';
+
+    /* ---------- EXPORT EXCEL ---------- */
+
+    // Repair Request Form 1 RRF
+    const urlExportRrf = (id) => `/mtc/rrf/${id}/export`;
 
     // Kirim filter ke server (parameter kosong tidak ikut dikirim)
     const kirim = (s, st) => {
@@ -164,17 +174,11 @@ export default function Index({
     const menunggu = Number(ringkasan.menunggu_verifikasi ?? 0);
 
     const daftarStatus = isAdmin
-    ? ['draft', 'menunggu_verifikasi', 'revisi', 'terverifikasi']
-    : ['menunggu_verifikasi', 'terverifikasi'];
+        ? ['draft', 'menunggu_verifikasi', 'revisi', 'terverifikasi']
+        : ['menunggu_verifikasi', 'terverifikasi'];
 
     const kartu = [
-        [
-            '',
-            'Semua RRF',
-            totalSemua,
-            Layers,
-            'from-blue-500 to-indigo-600',
-        ],
+        ['', 'Semua RRF', totalSemua, Layers, 'from-blue-500 to-indigo-600'],
         ...daftarStatus.map((k) => [
             k,
             labelStatus(k, isPimpinan),
@@ -214,16 +218,32 @@ export default function Index({
                         </div>
                     </div>
 
-                    {isAdmin && (
-                        <Link
-                            href="/mtc/rrf/repair-mtc"
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700"
-                        >
-                            <Wrench className="h-4 w-4" />
-                            Data Repair QMOS
-                        </Link>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+
+                        {isAdmin && (
+                            <Link
+                                href="/mtc/rrf/repair-mtc"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700"
+                            >
+                                <Wrench className="h-4 w-4" />
+                                Data Repair QMOS
+                            </Link>
+                        )}
+                    </div>
                 </div>
+
+                {/* FLASH */}
+                {flash.success && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        {flash.success}
+                    </div>
+                )}
+
+                {flash.error && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                        {flash.error}
+                    </div>
+                )}
 
                 {/* BANNER PIMPINAN */}
                 {isPimpinan && menunggu > 0 && (
@@ -366,6 +386,7 @@ export default function Index({
                                     rrfs.data.map((rrf, index) => {
                                         const repair = rrf.mtc_repair ?? {};
                                         const perluVerifikasi = isPimpinan && rrf.status === 'menunggu_verifikasi';
+                                        const bisaExport = rrf.status === 'terverifikasi';
 
                                         return (
                                             <tr
@@ -419,22 +440,37 @@ export default function Index({
                                                 </td>
 
                                                 <td className="border-b border-slate-100 px-4 py-3">
-                                                    <div className="flex justify-center">
+                                                    <div className="flex items-center justify-center gap-2">
                                                         <Link
-                                                            href={`/mtc/rrf/${rrf.id}`}
-                                                            className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-bold text-white transition ${
-                                                                perluVerifikasi
-                                                                    ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700'
-                                                                    : 'bg-blue-600 hover:bg-blue-700'
-                                                            }`}
-                                                        >
-                                                            {perluVerifikasi ? (
-                                                                <ShieldCheck className="h-3.5 w-3.5" />
-                                                            ) : (
-                                                                <Eye className="h-3.5 w-3.5" />
-                                                            )}
-                                                            {perluVerifikasi ? 'Verifikasi' : 'Detail RRF'}
-                                                        </Link>
+                                                                href={`/mtc/rrf/${rrf.id}`}
+                                                                title={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
+                                                                aria-label={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
+                                                                className={
+                                                                    perluVerifikasi
+                                                                        ? 'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-3 text-[11px] font-bold text-white transition hover:from-amber-600 hover:to-orange-700'
+                                                                        : 'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition bg-blue-600 text-white hover:bg-blue-700'
+                                                                }
+                                                            >
+                                                                {perluVerifikasi ? (
+                                                                    <>
+                                                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                                                        Verifikasi
+                                                                    </>
+                                                                ) : (
+                                                                    <Eye className="h-4 w-4" />
+                                                                )}
+                                                            </Link>
+
+                                                        {bisaExport && (
+                                                            <a
+                                                                href={urlExportRrf(rrf.id)}
+                                                                title="Export Excel"
+                                                                aria-label="Export Excel"
+                                                                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                            >
+                                                                <FileSpreadsheet className="h-4 w-4" />
+                                                            </a>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

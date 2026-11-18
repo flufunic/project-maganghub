@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use App\Support\RrfNotifier;
+use App\Support\Waktu;
 
 class MtcRrfController extends Controller
 {
@@ -104,24 +105,14 @@ class MtcRrfController extends Controller
         $repair = $rrf->mtcRepair;
 
         $serv = $rrf->serv_schedule_at
-            ? Carbon::parse($rrf->serv_schedule_at)
+            ? Carbon::parse($rrf->serv_schedule_at)->timezone('Asia/Jakarta')
             : null;
-
+        
         $menit = $rrf->downtime_detik !== null
             ? intdiv((int) $rrf->downtime_detik, 60)
             : null;
 
-        $fmt = function ($dt) {
-            if (empty($dt)) {
-                return null;
-            }
-
-            try {
-                return \Carbon\Carbon::parse($dt)->format('d/m/Y H:i');
-            } catch (\Throwable) {
-                return null;
-            }
-        };
+        $fmt = fn ($dt) => Waktu::wib($dt);
 
         // Supervisor = Pimpinan Maintenance yang memverifikasi
         $supervisor = $rrf->approvals
@@ -138,7 +129,7 @@ class MtcRrfController extends Controller
                 'rev'        => $rrf->rev ?? 0,
                 'status'     => $rrf->status,
                 'created_at' => $fmt($rrf->created_at),
-                'updated_at' => $rrf->updated_at ? \Carbon\Carbon::parse($rrf->updated_at)->format('Y-m-d H:i:s') : null,
+                'updated_at' => $rrf->updated_at ? $rrf->updated_at->format('Y-m-d H:i:s') : null, // key saja, boleh UTC
 
                 'serv_tanggal'    => $serv?->format('Y-m-d'),
                 'serv_jam'        => $serv?->format('H:i'),
@@ -149,7 +140,7 @@ class MtcRrfController extends Controller
                 'remark'          => $rrf->remark,
                 'downtime_menit'  => $menit,
 
-                'req_start_raw' => $repair?->req_start_at ? \Carbon\Carbon::parse($repair->req_start_at)->format('Y-m-d H:i') : null,
+                'req_start_raw' => Waktu::wib($repair?->req_start_at, 'Y-m-d H:i'),
 
                 'callback_status'  => $repair?->callback_status,
                 'callback_error'   => $repair?->callback_error,
@@ -318,7 +309,8 @@ class MtcRrfController extends Controller
             'fotos_after.*.max'     => 'Ukuran tiap foto maksimal 5 MB.',
         ]);
 
-        $serv      = Carbon::parse($data['serv_tanggal'] . ' ' . $data['serv_jam']);
+        $serv    = Carbon::parse($data['serv_tanggal'] . ' ' . $data['serv_jam']);              // disimpan apa adanya
+        $servWib = Carbon::parse($data['serv_tanggal'] . ' ' . $data['serv_jam'], 'Asia/Jakarta'); // untuk hitung
         $parts     = $this->olahParts($data);
         $gantiPart = $request->has('parts');
         $hapusIds  = collect($data['hapus_foto_ids'] ?? [])->map(fn ($i) => (int) $i)->all();
@@ -327,7 +319,7 @@ class MtcRrfController extends Controller
 
         try {
             DB::transaction(function () use (
-                $rrf, $user, $data, $serv, $parts, $gantiPart,
+                $rrf, $user, $data, $serv, $servWib, $parts, $gantiPart,
                 $hapusIds, $kirim, $request, &$stored, &$hapusPath
             ) {
                 $fresh = Rrf::whereKey($rrf->id)->lockForUpdate()->firstOrFail();
@@ -357,7 +349,7 @@ class MtcRrfController extends Controller
                 $menit = null;
 
                 if ($mulai) {
-                    $selisih = max(0, $serv->getTimestamp() - $mulai->getTimestamp());
+                    $selisih = max(0, $servWib->getTimestamp() - $mulai->getTimestamp());
                     $menit   = (int) round($selisih / 60);
                 }
 

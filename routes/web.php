@@ -24,6 +24,7 @@ use App\Http\Controllers\SopIkController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\RepairMtcController;
 use App\Http\Controllers\Mtc\MtcRrfController;
+use App\Http\Controllers\Mtc\MtcRrfExportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -720,6 +721,11 @@ Route::middleware(['auth', 'role:admin,pimpinan'])
         Route::get('/{rrf}', [MtcRrfController::class, 'show'])
             ->whereNumber('rrf')
             ->name('show');
+
+        Route::get('/{rrf}/export', [MtcRrfExportController::class, 'formulir'])
+            ->whereNumber('rrf')
+            ->name('export');
+
         Route::post('/{rrf}/callback-ulang', [MtcRrfController::class, 'callbackUlang'])
             ->whereNumber('rrf')
             ->name('callback-ulang');

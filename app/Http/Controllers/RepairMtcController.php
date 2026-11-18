@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Throwable;
+use App\Support\Waktu;
 
 class RepairMtcController extends Controller
 {
@@ -120,9 +121,11 @@ class RepairMtcController extends Controller
             ->through(function ($repair) {
                 $rrf = $repair->rrf;
 
-                $fmt = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y H:i') : null;
+                $fmt  = fn ($d) => Waktu::wib($d);
 
-                $serv = $fmt($rrf?->serv_schedule_at);
+                $serv = $rrf?->serv_schedule_at
+                    ? Carbon::parse($rrf->serv_schedule_at)->format('d/m/Y H:i')   // WIB apa adanya
+                    : null;
                 $part = $rrf?->parts->first();
 
                 $menit = ($rrf && $rrf->downtime_detik !== null)
@@ -147,7 +150,7 @@ class RepairMtcController extends Controller
                     'machine_class_description' => $repair->machine_class_description,
 
                     'repair_date' => $repair->repair_date?->format('d/m/Y'),
-                    'req_start_at' => $repair->req_start_at?->format('d/m/Y H:i'),
+                    'req_start_at'     => $fmt($repair->req_start_at),
 
                     'problem' => $repair->problem,
                     'request_activity' => $repair->request_activity,
@@ -157,15 +160,15 @@ class RepairMtcController extends Controller
 
                     'status' => $repair->status,
                     'rrf_status' => $repair->rrf_status,
-                    'rrf_submitted_at' => $repair->rrf_submitted_at?->format('d/m/Y H:i'),
-                    'synced_at' => $repair->synced_at?->format('d/m/Y H:i'),
+                    'rrf_submitted_at' => $fmt($repair->rrf_submitted_at),
+                    'synced_at'        => $fmt($repair->synced_at),
 
                     'has_rrf' => $rrf !== null,
                     'rrf_id' => $rrf?->id,
                     'rrf_local_status' => $rrf?->status,
                     'rrf_no' => $rrf?->rrf_no,
 
-                    'req_finish_at' => $repair->req_finish_at?->format('d/m/Y H:i') ?: $serv,
+                    'req_finish_at'    => $fmt($repair->req_finish_at) ?: $serv,
                     'req_duration_minutes' => $repair->req_duration_minutes ?? $menit,
                     'supervisor' => $repair->supervisor ?: $supervisor,
                     'mtc_name' => $repair->mtc_name ?: $rrf?->pic_nama,
@@ -174,7 +177,7 @@ class RepairMtcController extends Controller
                     'counter_measure' => $repair->counter_measure ?: $rrf?->remark,
                     'part_name' => $repair->part_name ?: $part?->part_name,
                     'part_model_type' => $repair->part_model_type ?: $part?->model_type,
-                    'repaired_at' => $repair->repaired_at?->format('d/m/Y H:i') ?: $serv,
+                    'repaired_at'      => $fmt($repair->repaired_at) ?: $serv,
 
                     'shift_kerja' => $rrf?->shift_kerja,
 
@@ -200,9 +203,9 @@ class RepairMtcController extends Controller
         ]);
     }
 
-    public function sync(MtcRepairSyncer $syncer)
+    public function sync(Request $request, MtcRepairSyncer $syncer)
     {
-        abort_unless(auth()->user()?->role === 'admin', 403);
+        abort_unless($request->user()?->role === 'admin', 403);
 
         try {
             $h = $syncer->jalankan();
