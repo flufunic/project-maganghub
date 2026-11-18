@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Rrf;
+use App\Support\Waktu;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -14,11 +15,13 @@ class MtcCallbackClient
     {
         $rrf->loadMissing(['mtcRepair', 'parts']);
 
-        $part  = $rrf->parts->first();
-        $serv  = $rrf->serv_schedule_at
-            ? \Carbon\Carbon::parse($rrf->serv_schedule_at)
-            : now();
-        $waktu = $serv->format('Y-m-d H:i:s');
+        $part = $rrf->parts->first();
+
+        // serv_schedule_at tersimpan sebagai jam WIB polos, sedangkan QMOS
+        // membaca waktu yang diterima sebagai UTC. Jadi dikonversi ke UTC dulu.
+        // Cadangan: now() sudah UTC (app.timezone = UTC).
+        $waktu = Waktu::utcDariWib($rrf->serv_schedule_at)
+            ?? now()->utc()->format('Y-m-d H:i:s');
 
         $menit = $rrf->downtime_detik !== null
             ? intdiv((int) $rrf->downtime_detik, 60)
@@ -34,7 +37,7 @@ class MtcCallbackClient
             'part_model_type' => $part?->model_type,
             'judge'           => $rrf->mtcRepair?->judge ?: 'OK',
 
-            // Serv. schedule = waktu selesai
+            // Serv. schedule = waktu selesai (UTC)
             'repaired_at'     => $waktu,
             'finish_at'       => $waktu,
             'req_finish_at'   => $waktu,

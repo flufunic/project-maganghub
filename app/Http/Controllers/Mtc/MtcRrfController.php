@@ -7,6 +7,8 @@ use App\Models\MtcRepair;
 use App\Models\Rrf;
 use App\Services\ImageCompressor;
 use App\Services\MtcCallbackClient;
+use App\Support\RrfNotifier;
+use App\Support\Waktu;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,8 +17,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use App\Support\RrfNotifier;
-use App\Support\Waktu;
 
 class MtcRrfController extends Controller
 {
@@ -104,14 +104,17 @@ class MtcRrfController extends Controller
 
         $repair = $rrf->mtcRepair;
 
+        // serv_schedule_at disimpan sebagai jam WIB apa adanya (diketik user),
+        // jadi JANGAN dikonversi zona waktu.
         $serv = $rrf->serv_schedule_at
-            ? Carbon::parse($rrf->serv_schedule_at)->timezone('Asia/Jakarta')
+            ? Carbon::parse($rrf->serv_schedule_at)
             : null;
-        
+
         $menit = $rrf->downtime_detik !== null
             ? intdiv((int) $rrf->downtime_detik, 60)
             : null;
 
+        // Kolom lain (created_at, req_start_at, acted_at, dll.) tersimpan UTC -> tampil WIB.
         $fmt = fn ($dt) => Waktu::wib($dt);
 
         // Supervisor = Pimpinan Maintenance yang memverifikasi
@@ -129,7 +132,7 @@ class MtcRrfController extends Controller
                 'rev'        => $rrf->rev ?? 0,
                 'status'     => $rrf->status,
                 'created_at' => $fmt($rrf->created_at),
-                'updated_at' => $rrf->updated_at ? $rrf->updated_at->format('Y-m-d H:i:s') : null, // key saja, boleh UTC
+                'updated_at' => $rrf->updated_at ? $rrf->updated_at->format('Y-m-d H:i:s') : null, // dipakai sebagai key saja
 
                 'serv_tanggal'    => $serv?->format('Y-m-d'),
                 'serv_jam'        => $serv?->format('H:i'),
@@ -140,6 +143,7 @@ class MtcRrfController extends Controller
                 'remark'          => $rrf->remark,
                 'downtime_menit'  => $menit,
 
+                // Dibandingkan di JS dengan jam yang diketik user (WIB), jadi harus WIB.
                 'req_start_raw' => Waktu::wib($repair?->req_start_at, 'Y-m-d H:i'),
 
                 'callback_status'  => $repair?->callback_status,
@@ -162,7 +166,8 @@ class MtcRrfController extends Controller
                 'submitted_by_frm'          => $repair->submitted_by_frm,
                 'supervisor'                => $supervisor,
                 'req_start_at'              => $fmt($repair->req_start_at),
-                'req_finish_at'             => $fmt($serv), // Selesai permintaan = Serv. schedule // Selesai permintaan = Serv. schedule
+                // Selesai permintaan = Serv. schedule (sudah WIB, jangan lewat $fmt)
+                'req_finish_at'             => $serv?->format('d/m/Y H:i'),
                 'problem'                   => $repair->problem,
                 'request_activity'          => $repair->request_activity,
                 'counter_measure'           => $repair->counter_measure,
@@ -195,7 +200,8 @@ class MtcRrfController extends Controller
                 'id'          => $l->id,
                 'status_baru' => $l->status_baru,
                 'catatan'     => $l->catatan,
-                'created_at'  => $fmt($l->created_at),
+                // Riwayat proses: jam tersimpan sudah WIB, jadi tampilkan apa adanya.
+                'created_at'  => $l->created_at?->format('d/m/Y H:i'),
                 'user'        => ['name' => $l->user?->name],
             ])->values(),
 
@@ -309,8 +315,15 @@ class MtcRrfController extends Controller
             'fotos_after.*.max'     => 'Ukuran tiap foto maksimal 5 MB.',
         ]);
 
-        $serv    = Carbon::parse($data['serv_tanggal'] . ' ' . $data['serv_jam']);              // disimpan apa adanya
-        $servWib = Carbon::parse($data['serv_tanggal'] . ' ' . $data['serv_jam'], 'Asia/Jakarta'); // untuk hitung
+        $waktuInput = $data['serv_tanggal'] . ' ' . $data['serv_jam'];
+
+        // Disimpan apa adanya (jam WIB sesuai yang diketik user).
+        $serv = Carbon::parse($waktuInput);
+
+        // Khusus untuk hitung downtime: input dianggap WIB, supaya sebanding
+        // dengan req_start_at dari QMOS yang tersimpan UTC.
+        $servWib = Carbon::parse($waktuInput, 'Asia/Jakarta');
+
         $parts     = $this->olahParts($data);
         $gantiPart = $request->has('parts');
         $hapusIds  = collect($data['hapus_foto_ids'] ?? [])->map(fn ($i) => (int) $i)->all();
@@ -532,7 +545,6 @@ class MtcRrfController extends Controller
         );
     }
 
-    
     public function kembalikan(Request $request, Rrf $rrf)
     {
         abort_unless($request->user()?->role === 'pimpinan', 403);
@@ -631,7 +643,6 @@ class MtcRrfController extends Controller
      | PEMBANTU
      ================================================================ */
 
-    
     private function ubahKeMenungguVerifikasi(
         Rrf $rrf,
         int $userId,
@@ -662,7 +673,6 @@ class MtcRrfController extends Controller
             "RRF {$rrf->rrf_no} telah dikirim oleh Admin dan menunggu verifikasi Anda."
         );
     }
-
 
     private function olahParts(array $data)
     {

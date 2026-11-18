@@ -18,6 +18,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
+use App\Support\Waktu;
 
 /**
  * Membuat file Excel untuk RRF yang sudah Completed (status "terverifikasi").
@@ -162,7 +163,7 @@ class RrfExcelExporter
         $set('I1:L1', 'RRF No. ' . ($d['rrf_no'] ?? '-'), [
             'bold' => true, 'size' => 13, 'warna' => 'FFFFFF', 'fill' => $navy, 'border' => false, 'h' => $kanan, 'indent' => 1,
         ]);
-        $set('A2:H2', 'JI SEAT INDONESIA   |   Maintenance Division   |   Form FM-101 / FJI-PD-01   |   Rev ' . $d['rev'], [
+        $set('A2:H2', 'JI SEAT INDONESIA   |   Maintenance Division   |   Rev ' . $d['rev'], [
             'size' => 9, 'warna' => 'C7D2FE', 'fill' => $biru, 'border' => false, 'indent' => 1,
         ]);
         $set('I2:L2', '✔ COMPLETED', [
@@ -327,7 +328,7 @@ class RrfExcelExporter
         /* ---------- footer ---------- */
         $f = $kr + 1;
         $s->getRowDimension($f)->setRowHeight(16);
-        $set("A{$f}:L{$f}", 'FORM NO: FM-101  FJI-PD-01     |     Diekspor ' . now()->format('d/m/Y H:i'), [
+        $set("A{$f}:L{$f}", 'Diekspor ' . now()->format('d/m/Y H:i'), [
             'size' => 7, 'warna' => $abu, 'h' => $kanan, 'border' => false,
         ]);
 
@@ -378,7 +379,7 @@ class RrfExcelExporter
     {
         $r = $rrf->mtcRepair;
 
-        $req  = $this->tgl($r?->req_start_at);
+        $req  = $this->tgl($r?->req_start_at)?->timezone('Asia/Jakarta');
         $serv = $this->tgl($rrf->serv_schedule_at);
 
         $menit = $rrf->downtime_detik !== null
