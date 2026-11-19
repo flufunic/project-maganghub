@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Link, router, usePage } from '@inertiajs/react';
 
@@ -6,7 +6,6 @@ import {
     X,
     ChevronRight,
     ChevronDown,
-    ChevronUp,
     LogOut,
     ClipboardList,
     ClipboardCheck,
@@ -16,7 +15,7 @@ import {
     Cog,
     SlidersHorizontal,
     FileText,
-    Factory, 
+    Factory,
 } from 'lucide-react';
 
 import SidebarPimpinan from './Pimpinan/Sidebar';
@@ -29,7 +28,6 @@ const ICONS = {
     close: X,
     chevron: ChevronRight,
     chevronDown: ChevronDown,
-    chevronUp: ChevronUp,
     logout: LogOut,
     laporan: ClipboardList,
     rrf: ClipboardCheck,
@@ -49,9 +47,7 @@ function Icon({ type, className = 'h-5 w-5' }) {
         return null;
     }
 
-    const strokeWidth = ['close', 'chevron', 'chevronDown', 'chevronUp'].includes(type)
-        ? 2
-        : 1.75;
+    const strokeWidth = ['close', 'chevron', 'chevronDown'].includes(type) ? 2 : 1.75;
 
     return <Comp className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
@@ -153,10 +149,68 @@ const GRUP = [
     },
 ];
 
+/* ------------------------------------------------------------------
+| STYLE (animasi sidebar + modal)
+------------------------------------------------------------------ */
+const STYLES = `
+    @keyframes sbItem { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes sbFade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes sbPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes sbIcon { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+    @keyframes sbShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+    @keyframes sbFloat { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(24px,-18px,0) scale(1.08); } }
+    @keyframes sbSpin { to { transform: rotate(360deg); } }
+
+    .sb-item { animation: sbItem .45s cubic-bezier(.22,1,.36,1) both; }
+    .sb-fade { animation: sbFade .25s ease-out both; }
+    .sb-pop { animation: sbPop .4s cubic-bezier(.22,1,.36,1) both; }
+    .sb-icon { animation: sbIcon .5s .1s cubic-bezier(.22,1,.36,1) both; }
+    .sb-shimmer { background-size: 200% 100%; animation: sbShimmer 6s linear infinite; }
+    .sb-float { animation: sbFloat 14s ease-in-out infinite; }
+    .sb-spin { animation: sbSpin .8s linear infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .sb-item, .sb-fade, .sb-pop, .sb-icon, .sb-shimmer, .sb-float, .sb-spin { animation: none !important; }
+    }
+`;
+
+/* ------------------------------------------------------------------
+| KOTAK IKON MENU
+------------------------------------------------------------------ */
+function IconBox({ type, active, small = false }) {
+    return (
+        <div
+            className={`flex shrink-0 items-center justify-center transition-all duration-200 ${
+                small ? 'h-8 w-8 rounded-lg' : 'h-10 w-10 rounded-xl'
+            } ${
+                active
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-950/40 ring-1 ring-white/25'
+                    : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:scale-105 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
+            }`}
+        >
+            <Icon type={type} className={small ? 'h-4 w-4' : 'h-5 w-5'} />
+        </div>
+    );
+}
+
+/* Garis penanda menu aktif */
+function ActiveBar() {
+    return (
+        <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
+    );
+}
+
+const rowBase =
+    'group relative flex min-h-[60px] w-full items-center gap-3 overflow-hidden rounded-xl text-left transition-all duration-200';
+const rowActive = 'bg-white/[0.13] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]';
+const rowIdle = 'hover:bg-white/[0.07]';
+
 function SidebarAdmin({ open, onClose }) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
 
-    const { url } = usePage();
+    const { url, props } = usePage();
+    const user = props.auth?.user;
 
     // Buang query string (?a=b)
     const path = url.split('?')[0];
@@ -174,32 +228,80 @@ function SidebarAdmin({ open, onClose }) {
             prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
         );
 
+    // ESC: tutup modal logout dulu, baru sidebar
+    useEffect(() => {
+        if (!open && !showLogoutModal) return;
+
+        const onKey = (e) => {
+            if (e.key !== 'Escape') return;
+
+            if (showLogoutModal) {
+                if (!loggingOut) setShowLogoutModal(false);
+            } else {
+                onClose?.();
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open, showLogoutModal, loggingOut, onClose]);
+
+    const logout = () => {
+        if (loggingOut) return;
+        setLoggingOut(true);
+
+        router.post(
+            '/logout',
+            {},
+            {
+                onFinish: () => {
+                    setLoggingOut(false);
+                    setShowLogoutModal(false);
+                },
+            }
+        );
+    };
+
+    // Urutan animasi masuk antar menu
+    let urutan = 0;
+    const delay = () => ({ animationDelay: `${120 + urutan++ * 45}ms` });
+    const anim = open ? 'sb-item' : '';
+
+    const inisial = (user?.name ?? 'A').trim().charAt(0).toUpperCase();
+
     return (
         <>
+            <style>{STYLES}</style>
+
             {/* BACKDROP */}
-            {open && (
-                <div
-                    className="fixed inset-0 z-[90] cursor-pointer bg-[#030a26]/60 backdrop-blur-sm transition-opacity"
-                    onClick={onClose}
-                />
-            )}
+            <div
+                onClick={onClose}
+                aria-hidden="true"
+                className={`fixed inset-0 z-[90] cursor-pointer bg-slate-950/50 backdrop-blur-sm transition-opacity duration-300 ${
+                    open ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+            />
 
             {/* SIDEBAR */}
             <aside
-                className={`fixed left-0 top-0 z-[100] flex h-screen w-[290px] flex-col overflow-hidden border-r border-white/15 bg-gradient-to-b from-[#050f3a]/95 via-[#0a2260]/95 to-[#0c2a78]/95 text-white shadow-[0_0_80px_rgba(2,6,23,0.6)] backdrop-blur-2xl transition-transform duration-300 ease-out ${
-                    open ? 'translate-x-0' : '-translate-x-full'
+                aria-label="Menu navigasi"
+                aria-hidden={!open}
+                className={`fixed left-0 top-0 z-[100] flex h-screen w-[300px] max-w-[88vw] flex-col overflow-hidden bg-gradient-to-b from-[#061033] via-[#0b1d57] to-[#12328a] text-white shadow-[0_0_80px_rgba(2,6,23,0.55)] transition-[transform,visibility] duration-300 ease-[cubic-bezier(.22,1,.36,1)] ${
+                    open ? 'visible translate-x-0' : 'invisible -translate-x-full'
                 }`}
             >
-                <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+                {/* garis aksen bergerak */}
+                <div className="sb-shimmer absolute left-0 right-0 top-0 h-[3px] bg-gradient-to-r from-blue-400 via-violet-400 via-cyan-300 to-blue-400" />
 
-                <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-blue-400/25 blur-[80px]" />
-                <div className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/25 blur-[80px]" />
+                {/* dekorasi */}
+                <div className="sb-float pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-blue-400/20 blur-[80px]" />
+                <div className="sb-float pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/25 blur-[80px] [animation-delay:-6s]" />
 
                 {/* HEADER */}
-                <div className="relative border-b border-white/10 px-5 pb-5 pt-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+                <div className="relative px-5 pb-4 pt-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 p-1.5 ring-1 ring-white/15">
                                 <img
                                     src="/images/logo-mms.png"
                                     alt="Logo MMS"
@@ -207,12 +309,12 @@ function SidebarAdmin({ open, onClose }) {
                                 />
                             </div>
 
-                            <div>
-                                <h2 className="text-sm font-bold tracking-tight text-white">
+                            <div className="min-w-0">
+                                <h2 className="truncate text-sm font-bold tracking-tight text-white">
                                     MMS (Admin)
                                 </h2>
 
-                                <p className="mt-0.5 text-[11px] font-medium text-blue-200/70">
+                                <p className="mt-0.5 truncate text-[11px] font-medium text-blue-200/70">
                                     Maintenance Management System
                                 </p>
                             </div>
@@ -221,8 +323,9 @@ function SidebarAdmin({ open, onClose }) {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-all duration-200 hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-95"
+                            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-all duration-200 hover:rotate-90 hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-95"
                             title="Tutup"
+                            aria-label="Tutup menu"
                         >
                             <Icon type="close" className="h-5 w-5" />
                         </button>
@@ -230,19 +333,16 @@ function SidebarAdmin({ open, onClose }) {
                 </div>
 
                 {/* MENU */}
-                <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
+                <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 pb-4 pt-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
                     {GRUP.map((grup) => (
                         <div key={grup.judul}>
                             {/* JUDUL GRUP */}
-                            <div className="mb-2.5 flex items-center gap-2 px-3">
-                                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-200/60">
-                                    {grup.judul}
-                                </span>
-
-                                <div className="h-px flex-1 bg-white/10" />
+                            <div className="mb-2 flex items-center gap-3 px-3">
+                                <span className="text-xs font-semibold text-blue-200/60">{grup.judul}</span>
+                                <div className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div className="space-y-1">
                                 {grup.menus.map((item) => {
                                     const active = item.match(path);
                                     const hasChildren = item.children?.length > 0;
@@ -256,34 +356,22 @@ function SidebarAdmin({ open, onClose }) {
                                         const submenuOpen = terbuka.includes(item.key);
 
                                         return (
-                                            <div key={item.key}>
+                                            <div key={item.key} style={delay()} className={anim}>
                                                 {/* PARENT */}
                                                 <div
-                                                    className={`group relative flex h-[68px] items-center gap-3 overflow-hidden rounded-2xl border transition-all duration-200 ${
-                                                        parentActive
-                                                            ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30'
-                                                            : 'border-transparent hover:border-white/10 hover:bg-white/10'
+                                                    className={`${rowBase} pr-2 ${
+                                                        parentActive ? rowActive : rowIdle
                                                     }`}
                                                 >
-                                                    {parentActive && (
-                                                        <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
-                                                    )}
+                                                    {parentActive && <ActiveBar />}
 
                                                     <Link
                                                         href={item.href}
                                                         onClick={onClose}
                                                         aria-current={active ? 'page' : undefined}
-                                                        className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1"
+                                                        className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                                                     >
-                                                        <div
-                                                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
-                                                                parentActive
-                                                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-white/25'
-                                                                    : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
-                                                            }`}
-                                                        >
-                                                            <Icon type={item.icon} className="h-5 w-5" />
-                                                        </div>
+                                                        <IconBox type={item.icon} active={parentActive} />
 
                                                         <div className="min-w-0 flex-1">
                                                             <p
@@ -315,81 +403,88 @@ function SidebarAdmin({ open, onClose }) {
                                                         onClick={() => toggle(item.key)}
                                                         aria-label={submenuOpen ? 'Tutup submenu' : 'Buka submenu'}
                                                         aria-expanded={submenuOpen}
-                                                        className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-blue-100 transition hover:bg-white/20"
+                                                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-white/10 text-blue-100 transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:scale-90"
                                                     >
                                                         <Icon
-                                                            type={submenuOpen ? 'chevronUp' : 'chevronDown'}
-                                                            className="h-4 w-4"
+                                                            type="chevronDown"
+                                                            className={`h-4 w-4 transition-transform duration-300 ${
+                                                                submenuOpen ? 'rotate-180' : ''
+                                                            }`}
                                                         />
                                                     </button>
                                                 </div>
 
-                                                {/* SUBMENU */}
-                                                {submenuOpen && (
-                                                    <div className="ml-5 mt-1.5 space-y-1 border-l border-white/15 pl-3">
-                                                        {item.children.map((child) => {
-                                                            const childIsActive = child.match(path);
+                                                {/* SUBMENU (buka/tutup halus) */}
+                                                <div
+                                                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+                                                        submenuOpen
+                                                            ? 'grid-rows-[1fr] opacity-100'
+                                                            : 'grid-rows-[0fr] opacity-0'
+                                                    }`}
+                                                >
+                                                    <div className="overflow-hidden">
+                                                        <div className="ml-6 mt-1 space-y-1 border-l border-white/15 py-0.5 pl-3">
+                                                            {item.children.map((child) => {
+                                                                const childIsActive = child.match(path);
 
-                                                            return (
-                                                                <Link
-                                                                    key={child.key}
-                                                                    href={child.href}
-                                                                    onClick={onClose}
-                                                                    aria-current={childIsActive ? 'page' : undefined}
-                                                                    className={`group relative flex min-h-[50px] w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200 ${
-                                                                        childIsActive
-                                                                            ? 'bg-white/15 text-white shadow-sm'
-                                                                            : 'text-blue-100/70 hover:bg-white/10 hover:text-white'
-                                                                    }`}
-                                                                >
-                                                                    {childIsActive && (
-                                                                        <span className="absolute -left-[4px] bottom-2 top-2 w-1 rounded-full bg-gradient-to-b from-sky-300 to-indigo-400" />
-                                                                    )}
-
-                                                                    <div
-                                                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                                                                return (
+                                                                    <Link
+                                                                        key={child.key}
+                                                                        href={child.href}
+                                                                        onClick={onClose}
+                                                                        tabIndex={submenuOpen ? 0 : -1}
+                                                                        aria-current={childIsActive ? 'page' : undefined}
+                                                                        className={`group relative flex min-h-[50px] w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
                                                                             childIsActive
-                                                                                ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
-                                                                                : 'bg-white/10 text-blue-200/70 group-hover:bg-white/15 group-hover:text-white'
+                                                                                ? 'bg-white/[0.13] text-white'
+                                                                                : 'text-blue-100/70 hover:bg-white/[0.07] hover:text-white'
                                                                         }`}
                                                                     >
-                                                                        <Icon type={child.icon} className="h-4 w-4" />
-                                                                    </div>
+                                                                        {childIsActive && (
+                                                                            <span className="absolute -left-[13px] bottom-2.5 top-2.5 w-1 rounded-full bg-gradient-to-b from-sky-300 to-indigo-400" />
+                                                                        )}
 
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <p
-                                                                            className={`text-[12px] font-semibold ${
-                                                                                childIsActive
-                                                                                    ? 'text-white'
-                                                                                    : 'text-blue-100/80 group-hover:text-white'
-                                                                            }`}
-                                                                        >
-                                                                            {child.title}
-                                                                        </p>
+                                                                        <IconBox
+                                                                            type={child.icon}
+                                                                            active={childIsActive}
+                                                                            small
+                                                                        />
 
-                                                                        <p
-                                                                            className={`mt-0.5 truncate text-[10px] ${
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p
+                                                                                className={`text-xs font-semibold ${
+                                                                                    childIsActive
+                                                                                        ? 'text-white'
+                                                                                        : 'text-blue-100/80 group-hover:text-white'
+                                                                                }`}
+                                                                            >
+                                                                                {child.title}
+                                                                            </p>
+
+                                                                            <p
+                                                                                className={`mt-0.5 truncate text-[10px] ${
+                                                                                    childIsActive
+                                                                                        ? 'text-blue-200'
+                                                                                        : 'text-blue-200/40 group-hover:text-blue-200/70'
+                                                                                }`}
+                                                                            >
+                                                                                {child.desc}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        <ChevronRight
+                                                                            className={`h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 ${
                                                                                 childIsActive
                                                                                     ? 'text-blue-200'
-                                                                                    : 'text-blue-200/40 group-hover:text-blue-200/70'
+                                                                                    : 'text-blue-200/30 group-hover:text-blue-200/70'
                                                                             }`}
-                                                                        >
-                                                                            {child.desc}
-                                                                        </p>
-                                                                    </div>
-
-                                                                    <ChevronRight
-                                                                        className={`h-3.5 w-3.5 ${
-                                                                            childIsActive
-                                                                                ? 'text-blue-200'
-                                                                                : 'text-blue-200/30 group-hover:text-blue-200/70'
-                                                                        }`}
-                                                                    />
-                                                                </Link>
-                                                            );
-                                                        })}
+                                                                        />
+                                                                    </Link>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         );
                                     }
@@ -398,58 +493,52 @@ function SidebarAdmin({ open, onClose }) {
                                     | MENU BIASA
                                     ------------------------------------------------ */
                                     return (
-                                        <Link
-                                            key={item.key}
-                                            href={item.href}
-                                            onClick={onClose}
-                                            aria-current={active ? 'page' : undefined}
-                                            className={`group relative flex h-[68px] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border px-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
-                                                active
-                                                    ? 'border-white/20 bg-white/15 shadow-lg shadow-blue-950/30 hover:bg-white/20'
-                                                    : 'border-transparent hover:border-white/10 hover:bg-white/10'
-                                            }`}
-                                        >
-                                            {active && (
-                                                <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-gradient-to-b from-sky-300 to-indigo-400" />
-                                            )}
-
-                                            <div
-                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105 ${
-                                                    active
-                                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-white/25'
-                                                        : 'bg-white/10 text-blue-100/80 ring-1 ring-white/5 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:ring-white/20'
+                                        <div key={item.key} style={delay()} className={anim}>
+                                            <Link
+                                                href={item.href}
+                                                onClick={onClose}
+                                                aria-current={active ? 'page' : undefined}
+                                                className={`${rowBase} cursor-pointer px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${
+                                                    active ? rowActive : rowIdle
                                                 }`}
                                             >
-                                                <Icon type={item.icon} className="h-5 w-5" />
-                                            </div>
+                                                {active && <ActiveBar />}
 
-                                            <div className="min-w-0 flex-1">
-                                                <p
-                                                    title={item.title}
-                                                    className={`line-clamp-2 text-[13px] font-semibold leading-tight ${
-                                                        active
-                                                            ? 'text-white'
-                                                            : 'text-blue-50/90 group-hover:text-white'
-                                                    }`}
-                                                >
-                                                    {item.title}
-                                                </p>
+                                                <IconBox type={item.icon} active={active} />
 
-                                                <p
-                                                    className={`mt-0.5 truncate text-[11px] font-medium ${
+                                                <div className="min-w-0 flex-1">
+                                                    <p
+                                                        title={item.title}
+                                                        className={`line-clamp-2 text-[13px] font-semibold leading-tight ${
+                                                            active
+                                                                ? 'text-white'
+                                                                : 'text-blue-50/90 group-hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {item.title}
+                                                    </p>
+
+                                                    <p
+                                                        className={`mt-0.5 truncate text-[11px] font-medium ${
+                                                            active
+                                                                ? 'text-blue-200'
+                                                                : 'text-blue-200/50 group-hover:text-blue-200/80'
+                                                        }`}
+                                                    >
+                                                        {item.desc}
+                                                    </p>
+                                                </div>
+
+                                                <Icon
+                                                    type="chevron"
+                                                    className={`h-4 w-4 shrink-0 transition-all duration-200 ${
                                                         active
                                                             ? 'text-blue-200'
-                                                            : 'text-blue-200/50 group-hover:text-blue-200/80'
+                                                            : '-translate-x-1 text-blue-100 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
                                                     }`}
-                                                >
-                                                    {item.desc}
-                                                </p>
-                                            </div>
-
-                                            <div className="absolute right-2 top-1/2 flex h-7 w-7 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-lg bg-white/10 text-blue-100 opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100">
-                                                <Icon type="chevron" className="h-3.5 w-3.5" />
-                                            </div>
-                                        </Link>
+                                                />
+                                            </Link>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -457,84 +546,102 @@ function SidebarAdmin({ open, onClose }) {
                     ))}
                 </nav>
 
-                {/* LOGOUT */}
-                <div className="relative border-t border-white/10 p-4">
-                    <button
-                        type="button"
-                        onClick={() => setShowLogoutModal(true)}
-                        className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-all duration-200 hover:border-red-300/20 hover:bg-red-500/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-                    >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-950/40 ring-1 ring-white/20 transition-all duration-200 group-hover:scale-105">
+                {/* FOOTER: user + logout */}
+                <div className="relative border-t border-white/10 p-3">
+                    <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-2.5 ring-1 ring-white/10">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-sm font-bold text-white shadow-md shadow-blue-950/40">
+                            {inisial}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] font-semibold text-white">
+                                {user?.name ?? 'Admin'}
+                            </p>
+                            <p className="truncate text-[11px] capitalize text-blue-200/60">
+                                {user?.role ?? 'admin'}
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowLogoutModal(true)}
+                            title="Logout"
+                            aria-label="Logout"
+                            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-red-500/15 text-red-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-950/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 active:translate-y-0"
+                        >
                             <Icon type="logout" className="h-5 w-5" />
-                        </div>
-
-                        <div className="flex-1">
-                            <p className="text-[13px] font-semibold text-red-200 group-hover:text-white">
-                                Logout
-                            </p>
-
-                            <p className="mt-0.5 text-[11px] text-red-200/50 transition group-hover:text-red-100/80">
-                                Keluar dari sistem
-                            </p>
-                        </div>
-
-                        <Icon
-                            type="chevron"
-                            className="h-4 w-4 text-red-200 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-                        />
-                    </button>
+                        </button>
+                    </div>
                 </div>
             </aside>
 
             {/* MODAL KONFIRMASI LOGOUT */}
             {showLogoutModal && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
+                <div
+                    className="sb-fade fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-slate-950/50 px-4 py-6 backdrop-blur-sm"
+                    onMouseDown={(e) => {
+                        if (e.target === e.currentTarget && !loggingOut) setShowLogoutModal(false);
+                    }}
+                >
                     <div
-                        role="dialog"
+                        role="alertdialog"
                         aria-modal="true"
-                        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40"
+                        aria-labelledby="logout-title"
+                        aria-describedby="logout-message"
+                        className="sb-pop w-full max-w-md overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/30"
                     >
-                        <div className="absolute left-0 right-0 top-0 h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-orange-400" />
-
-                        <div className="relative overflow-hidden bg-gradient-to-br from-red-50 via-white to-white px-6 pb-5 pt-8">
-                            <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-red-100/60" />
-
-                            <div className="relative flex justify-center">
-                                <div className="relative">
-                                    <div className="absolute inset-0 rounded-2xl bg-red-200 blur-xl" />
-
-                                    <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-300/50">
-                                        <Icon type="logout" className="h-7 w-7" />
-                                    </div>
+                        {/* HEADER */}
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                            <div className="flex items-center gap-3">
+                                <div className="sb-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-50 to-rose-100 text-red-600">
+                                    <Icon type="logout" className="h-5 w-5" />
                                 </div>
-                            </div>
 
-                            <div className="relative mt-4 text-center">
-                                <h3 className="text-lg font-bold tracking-tight text-slate-900">
-                                    Konfirmasi Logout
+                                <h3 id="logout-title" className="text-base font-bold text-slate-900">
+                                    Konfirmasi logout
                                 </h3>
-
-                                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
-                                    Apakah kamu yakin ingin keluar dari sistem?
-                                </p>
                             </div>
-                        </div>
 
-                        <div className="flex gap-3 border-t border-slate-100 bg-white px-6 py-5">
                             <button
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
-                                className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 active:scale-[0.98]"
+                                disabled={loggingOut}
+                                aria-label="Tutup"
+                                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Icon type="close" className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* ISI */}
+                        <div className="px-6 py-5">
+                            <p id="logout-message" className="text-sm leading-relaxed text-slate-600">
+                                Apakah kamu yakin ingin keluar dari sistem? Kamu perlu login lagi untuk mengakses data.
+                            </p>
+                        </div>
+
+                        {/* FOOTER */}
+                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowLogoutModal(false)}
+                                disabled={loggingOut}
+                                autoFocus
+                                className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Batal
                             </button>
 
                             <button
                                 type="button"
-                                onClick={() => router.post('/logout')}
-                                className="flex-1 cursor-pointer rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600"
+                                onClick={logout}
+                                disabled={loggingOut}
+                                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
                             >
-                                Logout
+                                {loggingOut && (
+                                    <span className="sb-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-white" />
+                                )}
+                                {loggingOut ? 'Keluar...' : 'Ya, Logout'}
                             </button>
                         </div>
                     </div>

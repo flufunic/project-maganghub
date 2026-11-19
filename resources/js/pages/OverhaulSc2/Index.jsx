@@ -1,14 +1,12 @@
 import Sidebar from '@/Components/Sidebar';
 import ConfirmModal from '@/Components/ConfirmModal';
 import MesinFormModal from '@/Components/MesinFormModal';
-import React, { useEffect, useState } from 'react';
-import { Head, router } from '@inertiajs/react';
 import DokumenModal from '@/Components/DokumenModal';
-
-
+import React, { useEffect, useMemo, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 
 /* ------------------------------------------------------------------
-| ICON
+| ICON  (UI saja, tidak ada logic)
 ------------------------------------------------------------------ */
 const ICONS = {
     plus: { sw: 2, paths: ['M12 5v14M5 12h14'] },
@@ -24,16 +22,47 @@ const ICONS = {
             'M10 11v5.5M14 11v5.5',
         ],
     },
-    menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
+    file: {
+        paths: [
+            'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z',
+            'M14 3v5h5',
+        ],
+    },
+    calendar: {
+        rect: { x: 3.75, y: 4.5, width: 16.5, height: 16, rx: 2 },
+        paths: ['M8 2.75v3.5M16 2.75v3.5M3.75 9h16.5'],
+    },
     clipboard: {
         rect: { x: 5, y: 4, width: 14, height: 17, rx: 2 },
         paths: ['M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4'],
+    },
+    list: { paths: ['M6 4.5h12M6 8.5h12M6 12.5h8M6 16.5h10'] },
+    chart: { sw: 2, paths: ['M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6'] },
+    menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
+    close: { sw: 2, paths: ['M6 6l12 12M18 6L6 18'] },
+    download: { sw: 2, paths: ['M12 3v12m0 0 4-4m-4 4-4-4', 'M5 21h14'] },
+    check: { sw: 2.6, paths: ['M5 12.5l4.5 4.5L19 7.5'] },
+    alert: {
+        paths: [
+            'M12 9v4',
+            'M12 17h.01',
+            'M10.3 4.5L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.5a2 2 0 00-3.4 0z',
+        ],
+    },
+    note: {
+        paths: [
+            'M7 3.75h10a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5H7a1.5 1.5 0 01-1.5-1.5V5.25A1.5 1.5 0 017 3.75z',
+            'M9 8.5h6M9 12h6M9 15.5h3',
+        ],
     },
 };
 
 function Icon({ type, className = 'h-4 w-4' }) {
     const icon = ICONS[type];
-    if (!icon) return null;
+
+    if (!icon) {
+        return null;
+    }
 
     return (
         <svg
@@ -57,31 +86,87 @@ function Icon({ type, className = 'h-4 w-4' }) {
 /* ------------------------------------------------------------------
 | STYLE TOKENS
 ------------------------------------------------------------------ */
-const glassCard =
-    'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
+const card =
+    'rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.12)]';
 
 const selectClass =
-    'h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
 
 const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50';
+    'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:bg-white';
 
+/* Label kecil + kontrol */
 function Field({ label, children }) {
     return (
         <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {label}
-            </span>
+            <span className="text-[11px] font-medium text-slate-400">{label}</span>
             {children}
         </label>
     );
 }
 
+/* Cangkang modal: backdrop blur + animasi pop */
+function ModalShell({ z = 'z-[90]', maxW = 'max-w-lg', onBackdrop, children }) {
+    return (
+        <div
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget) onBackdrop?.();
+            }}
+            className={`idx-fade fixed inset-0 ${z} flex items-center justify-center overflow-y-auto bg-slate-950/50 px-4 py-6 backdrop-blur-sm`}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                className={`idx-pop w-full ${maxW} overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/30`}
+            >
+                {children}
+            </div>
+        </div>
+    );
+}
+
+/* Toast */
+function Toast({ tone = 'emerald', title, message, onClose, icon }) {
+    const tones = {
+        emerald: { bar: 'from-emerald-400 to-green-600', ico: 'bg-emerald-50 text-emerald-600' },
+        amber: { bar: 'from-amber-400 to-orange-500', ico: 'bg-amber-50 text-amber-600' },
+    };
+    const t = tones[tone];
+
+    return (
+        <div
+            role="status"
+            aria-live="polite"
+            className="idx-slide fixed right-5 top-5 z-[100] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/25"
+        >
+            <div className={`absolute left-0 top-0 h-full w-1 bg-gradient-to-b ${t.bar}`} />
+
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${t.ico}`}>
+                <Icon type={icon} className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-800">{title}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-slate-500">{message}</p>
+            </div>
+
+            <button
+                type="button"
+                onClick={onClose}
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                aria-label="Tutup"
+            >
+                <Icon type="close" className="h-4 w-4" />
+            </button>
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------
 | PENANDA JADWAL
-| Plan  : dicentang -> lingkaran (cincin biru)
-| Act   : dicentang -> lingkaran penuh dengan tanda centang (hijau)
-| Kosong: titik kecil abu-abu
+| Plan  : dicentang -> kotak biru dengan lingkaran
+| Act   : dicentang -> kotak hijau dengan centang
+| Kosong: kotak kosong
 ------------------------------------------------------------------ */
 function ScheduleMark({ type, checked, onToggle, title }) {
     const isPlan = type === 'plan';
@@ -93,30 +178,18 @@ function ScheduleMark({ type, checked, onToggle, title }) {
             aria-checked={checked}
             title={title}
             onClick={onToggle}
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-400"
+            className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-400 active:scale-90 ${
+                checked
+                    ? isPlan
+                        ? 'border-blue-300 bg-blue-50 text-blue-500'
+                        : 'border-emerald-500 bg-gradient-to-br from-emerald-400 to-green-600 text-white shadow-sm shadow-emerald-500/30'
+                    : isPlan
+                    ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50'
+            }`}
         >
-            {!checked && <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />}
-
-            {checked && isPlan && (
-                <span className="h-[18px] w-[18px] rounded-full border-[2.5px] border-blue-600" />
-            )}
-
-            {checked && !isPlan && (
-                <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-emerald-600 text-white">
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={3.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-2.5 w-2.5"
-                        aria-hidden="true"
-                    >
-                        <path d="M5 13l4 4L19 7" />
-                    </svg>
-                </span>
-            )}
+            {checked && isPlan && <span className="idx-check text-lg font-bold leading-none">○</span>}
+            {checked && !isPlan && <Icon type="check" className="idx-check h-4 w-4" />}
         </button>
     );
 }
@@ -138,7 +211,6 @@ const WEEKS = [1, 2, 3, 4];
 const WEEK_LABEL = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 const ITEMS = ['plan', 'act'];
 
-
 // Contoh: 1200000 + shot -> "1.200.000 shot"
 const formatStandar = (mesin) => {
     if (mesin.standar === null || mesin.standar === undefined || mesin.standar === '') {
@@ -150,6 +222,8 @@ const formatStandar = (mesin) => {
 
     return mesin.satuan ? `${angka} ${mesin.satuan}` : angka;
 };
+
+const delay = (ms) => ({ animationDelay: `${ms}ms` });
 
 export default function Index({ mesins = [], satuans = [], tahun, flash }) {
     // =========================
@@ -164,6 +238,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
     // Modal catatan
     const [catatanModal, setCatatanModal] = useState(null);
     const [catatan, setCatatan] = useState('');
+    const [savingCatatan, setSavingCatatan] = useState(false);
 
     // Modal form mesin (tambah / edit)
     const [showForm, setShowForm] = useState(false);
@@ -192,6 +267,18 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
         return () => clearTimeout(timer);
     }, [showSuccess]);
 
+    // ESC menutup modal catatan
+    useEffect(() => {
+        if (!catatanModal) return;
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') closeCatatan();
+        };
+
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [catatanModal]);
+
     // =========================
     // HELPER DATA JADWAL
     // =========================
@@ -218,12 +305,34 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
         return count * 2;
     };
 
-    // Nomor urut otomatis per mesin (1, 2, 3, ...) mengikuti urutan tampil,
-    // jadi kalau ada mesin dihapus nomor di bawahnya langsung naik.
+    // Nomor urut otomatis per mesin mengikuti urutan tampil
     const nomorMesin = new Map();
     mesins.forEach((m) => {
         if (!nomorMesin.has(m.mesin)) nomorMesin.set(m.mesin, nomorMesin.size + 1);
     });
+
+    // Ringkasan Plan vs Act (hanya tampilan)
+    const totals = useMemo(() => {
+        let plan = 0;
+        let act = 0;
+
+        mesins.forEach((m) =>
+            m.schedules?.forEach((s) => {
+                if (!s.checked) return;
+                if (s.item === 'plan') plan++;
+                if (s.item === 'act') act++;
+            })
+        );
+
+        const percent = plan > 0 ? Math.min(100, Math.round((act / plan) * 100)) : 0;
+
+        return { plan, act, percent };
+    }, [mesins]);
+
+    const jumlahMesin = nomorMesin.size;
+
+    // Bulan berjalan (disorot kalau tahun yang dilihat = tahun ini)
+    const currentMonth = new Date().getFullYear() === selectedYear ? new Date().getMonth() : -1;
 
     // =========================
     // PERIODE
@@ -237,7 +346,6 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
             { preserveState: true, preserveScroll: true, replace: true }
         );
     };
-
 
     // =========================
     // CHECKBOX
@@ -271,17 +379,23 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
     const closeCatatan = () => {
         setCatatanModal(null);
         setCatatan('');
+        setSavingCatatan(false);
     };
 
     const saveCatatan = () => {
-        if (!catatanModal) return;
+        if (!catatanModal || savingCatatan) return;
 
         const { mesin, item, bulan, minggu } = catatanModal;
+        setSavingCatatan(true);
 
         router.post(
             `/overhaul-sc2/${mesin.id}/schedule`,
             { item, tahun: selectedYear, bulan, minggu, catatan },
-            { preserveScroll: true, onSuccess: () => closeCatatan() }
+            {
+                preserveScroll: true,
+                onSuccess: () => closeCatatan(),
+                onFinish: () => setSavingCatatan(false),
+            }
         );
     };
 
@@ -376,105 +490,210 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
         });
     };
 
+    const dokumenMesin = dokumenMesinId ? mesins.find((m) => m.id === dokumenMesinId) : null;
+
+    // Kartu ringkasan
+    const stats = [
+        {
+            label: 'Total data',
+            value: mesins.length,
+            hint: `${jumlahMesin} mesin · ${selectedYear}`,
+            icon: 'list',
+            tone: 'from-blue-500 to-indigo-600',
+            soft: 'bg-blue-50 text-blue-600',
+        },
+        {
+            label: 'Plan terjadwal',
+            value: totals.plan,
+            hint: 'Jumlah minggu direncanakan',
+            icon: 'calendar',
+            tone: 'from-violet-500 to-purple-600',
+            soft: 'bg-violet-50 text-violet-600',
+        },
+        {
+            label: 'ACT terlaksana',
+            value: totals.act,
+            hint: 'Jumlah minggu dikerjakan',
+            icon: 'check',
+            tone: 'from-emerald-500 to-green-600',
+            soft: 'bg-emerald-50 text-emerald-600',
+        },
+        {
+            label: 'Realisasi',
+            value: `${totals.percent}%`,
+            hint: `${totals.act} dari ${totals.plan} plan`,
+            icon: 'chart',
+            tone: 'from-cyan-500 to-sky-600',
+            soft: 'bg-cyan-50 text-cyan-600',
+            progress: totals.percent,
+        },
+    ];
+
     return (
         <>
             <Sidebar open={showSidebar} onClose={() => setShowSidebar(false)} />
             <Head title="Schedule Overhaul Mesin SC2" />
 
             <style>{`
-                @keyframes idxGradient {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                @keyframes idxFloat {
-                    0%, 100% { transform: translate3d(0,0,0) scale(1); }
-                    50% { transform: translate3d(30px,-30px,0) scale(1.08); }
-                }
-                @keyframes idxFloatReverse {
-                    0%, 100% { transform: translate3d(0,0,0) scale(1); }
-                    50% { transform: translate3d(-35px,25px,0) scale(1.1); }
-                }
-                @keyframes idxRise {
-                    from { opacity: 0; transform: translateY(18px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .idx-gradient { background-size: 250% 250%; animation: idxGradient 20s ease infinite; }
+                @keyframes idxRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes idxFade { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes idxPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+                @keyframes idxSlide { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+                @keyframes idxFloat { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(30px,-24px,0) scale(1.08); } }
+                @keyframes idxFloatReverse { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-34px,22px,0) scale(1.1); } }
+                @keyframes idxShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+                @keyframes idxCheck { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+                @keyframes idxGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+                .idx-rise { animation: idxRise .7s cubic-bezier(.22,1,.36,1) both; }
+                .idx-fade { animation: idxFade .25s ease-out both; }
+                .idx-pop { animation: idxPop .4s cubic-bezier(.22,1,.36,1) both; }
+                .idx-slide { animation: idxSlide .45s cubic-bezier(.22,1,.36,1) both; }
                 .idx-float { animation: idxFloat 14s ease-in-out infinite; }
                 .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
-                .idx-rise { animation: idxRise 0.7s ease-out both; }
+                .idx-shimmer { background-size: 200% 100%; animation: idxShimmer 6s linear infinite; }
+                .idx-check { animation: idxCheck .35s cubic-bezier(.22,1,.36,1) both; }
+                .idx-grow { transform-origin: left; animation: idxGrow .9s .3s cubic-bezier(.22,1,.36,1) both; }
 
                 .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
                 .idx-scroll::-webkit-scrollbar-track { background: transparent; }
-                .idx-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(100,116,139,0.4);
-                    border-radius: 999px;
-                }
+                .idx-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 999px; }
+                .idx-scroll::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,.55); }
+
                 @media (prefers-reduced-motion: reduce) {
-                    .idx-gradient, .idx-float, .idx-float-reverse, .idx-rise { animation: none !important; }
+                    .idx-rise, .idx-fade, .idx-pop, .idx-slide, .idx-float,
+                    .idx-float-reverse, .idx-shimmer, .idx-check, .idx-grow { animation: none !important; }
                 }
             `}</style>
 
-            <div className="relative flex min-h-screen flex-col overflow-x-hidden">
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-slate-50 text-slate-800">
                 {/* BACKGROUND */}
-                <div className="fixed inset-0 -z-20 overflow-hidden">
-                    <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
-                    <div className="idx-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
-                    <div className="idx-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
-                    <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
+                <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+                    <div className="idx-float absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-blue-300/30 blur-[100px]" />
+                    <div className="idx-float-reverse absolute right-[-100px] top-[8%] h-[440px] w-[440px] rounded-full bg-indigo-300/25 blur-[110px]" />
+                    <div
+                        className="absolute inset-0 opacity-[0.35]"
+                        style={{
+                            backgroundImage: 'radial-gradient(rgba(100,116,139,.22) 1px, transparent 1px)',
+                            backgroundSize: '22px 22px',
+                            maskImage: 'linear-gradient(to bottom, black, transparent 60%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, black, transparent 60%)',
+                        }}
+                    />
                 </div>
 
-                {/* HEADER */}
-                <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
-                    <div className="mx-auto w-full max-w-[1800px] px-4 py-2.5 sm:px-6">
+                {/* =====================================================
+                    HEADER
+                ====================================================== */}
+                <header className="sticky top-0 z-40 bg-gradient-to-r from-[#061033] via-[#0b1d57] to-[#12328a] shadow-lg shadow-slate-950/20">
+                    <div className="w-full px-3 py-3 sm:px-5 2xl:px-8">
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
                                 onClick={() => setShowSidebar(true)}
-                                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
+                                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
                                 title="Menu"
+                                aria-label="Buka menu"
                             >
                                 <Icon type="menu" className="h-5 w-5" />
                             </button>
 
-                            <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
-                                Schedule Overhaul Mesin SC2
-                            </h1>
+                            <div className="min-w-0">
+                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
+                                    Schedule Overhaul Mesin SC2
+                                </h1>
+                                <p className="truncate text-xs text-blue-200/80">Tahun {selectedYear}</p>
+                            </div>
                         </div>
                     </div>
+
+                    {/* garis aksen bergerak */}
+                    <div className="idx-shimmer h-[3px] bg-gradient-to-r from-blue-400 via-violet-400 via-cyan-300 to-blue-400" />
                 </header>
 
-                {/* MAIN */}
-                <main className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-4 sm:px-6">
+                {/* =====================================================
+                    MAIN
+                ====================================================== */}
+                <main className="w-full flex-1 px-3 py-4 sm:px-5 2xl:px-8">
+                    {/* STAT CARDS */}
+                    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {stats.map((item, i) => (
+                            <div
+                                key={item.label}
+                                style={delay(i * 70)}
+                                className={`idx-rise group relative overflow-hidden p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl ${card}`}
+                            >
+                                <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${item.tone}`} />
+
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                                        <p className="mt-1.5 truncate text-2xl font-bold tracking-tight text-slate-900">
+                                            {item.value}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-[11px] text-slate-400">{item.hint}</p>
+                                    </div>
+
+                                    <span
+                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110 ${item.soft}`}
+                                    >
+                                        <Icon type={item.icon} className="h-5 w-5" />
+                                    </span>
+                                </div>
+
+                                {item.progress !== undefined && (
+                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                        <div
+                                            key={`${selectedYear}-${item.progress}`}
+                                            style={{ width: `${item.progress}%` }}
+                                            className="idx-grow h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-500"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
                     {/* TOOLBAR */}
-                    <div className={`idx-rise mb-3 overflow-hidden rounded-2xl ${glassCard}`}>
-                        <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div style={delay(280)} className={`idx-rise mb-4 ${card}`}>
+                        <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+                            {/* LEFT - INFO */}
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <h2 className="text-base font-bold tracking-tight text-slate-900">
+                                    <h2 className="text-lg font-bold tracking-tight text-slate-900">
                                         Schedule Overhaul {selectedYear}
                                     </h2>
 
-                                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-600">
+                                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
                                         {mesins.length} data
                                     </span>
                                 </div>
 
-                                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                {/* LEGENDA */}
+                                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] text-slate-500">
                                     <span className="inline-flex items-center gap-1.5">
-                                        <span className="h-3.5 w-3.5 rounded-full border-[2.5px] border-blue-600" />
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-md border border-blue-300 bg-blue-50 text-[11px] font-bold leading-none text-blue-500">
+                                            ○
+                                        </span>
                                         Plan
                                     </span>
+
                                     <span className="inline-flex items-center gap-1.5">
-                                        <span className="h-3.5 w-3.5 rounded-full bg-emerald-600" />
-                                        Act
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-green-600 text-white">
+                                            <Icon type="check" className="h-3 w-3" />
+                                        </span>
+                                        ACT (sudah dikerjakan)
                                     </span>
+
                                     <span className="inline-flex items-center gap-1.5">
-                                        <span>📝</span> Catatan
+                                        <Icon type="note" className="h-4 w-4 text-slate-400" />
+                                        Catatan
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap items-end gap-2">
+                            {/* RIGHT - FILTER */}
+                            <div className="flex flex-wrap items-end gap-2.5">
                                 <Field label="Tahun">
                                     <select
                                         value={selectedYear}
@@ -491,55 +710,42 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
 
                                 <a
                                     href={`/overhaul-sc2/export?tahun=${selectedYear}`}
-                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
                                     title={`Export Schedule Overhaul tahun ${selectedYear} ke Excel`}
+                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-xs font-semibold text-emerald-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0"
                                 >
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
-                                        <path d="M5 17v3h14v-3" />
-                                    </svg>
-                                    Export Excel
+                                    <Icon type="download" className="h-4 w-4" />
+                                    Excel
                                 </a>
 
                                 <button
                                     type="button"
                                     onClick={openCreate}
-                                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white shadow-md shadow-blue-300/50 transition hover:from-blue-700 hover:to-indigo-800"
+                                    className="group relative inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 text-xs font-semibold text-white shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/40 active:translate-y-0"
                                 >
-                                    <Icon type="plus" className="h-4 w-4" />
-                                    Tambah
+                                    <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-700 group-hover:left-[150%]" />
+                                    <Icon
+                                        type="plus"
+                                        className="relative h-4 w-4 transition-transform duration-300 group-hover:rotate-90"
+                                    />
+                                    <span className="relative">Tambah</span>
                                 </button>
                             </div>
                         </div>
-
-                        <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </div>
 
                     {/* TABLE */}
-                    <div
-                        style={{ animationDelay: '100ms' }}
-                        className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
-                    >
+                    <div style={delay(360)} className={`idx-rise overflow-hidden ${card}`}>
                         <div className="idx-scroll overflow-x-auto">
                             <table className="w-full border-separate border-spacing-0 text-sm">
                                 <thead className="text-white">
-                                    {/* BARIS 1: kolom tetap + TAHUN */}
-                                    <tr className="bg-[#0a1a4d]">
-                                        {['No', 'Mesin', 'Nama', 'Total Mesin', 'Standar','Dokumen', 'Item'].map(
+                                    {/* HEADER UTAMA */}
+                                    <tr className="bg-[#0b1a4d]">
+                                        {['No', 'Mesin', 'Nama', 'Total Mesin', 'Standar', 'Dokumen', 'Item'].map(
                                             (header) => (
                                                 <th
                                                     key={header}
                                                     rowSpan="3"
-                                                    className={`border-b border-r border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap first:border-l ${
+                                                    className={`border-b border-r border-white/10 bg-gradient-to-b from-[#0b1a4d] to-[#10266b] px-4 py-3 text-xs font-semibold whitespace-nowrap ${
                                                         header === 'Nama'
                                                             ? 'min-w-[220px] text-left'
                                                             : 'text-center'
@@ -552,42 +758,46 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
 
                                         <th
                                             colSpan={48}
-                                            className="border-b border-white/10 bg-[#0a1a4d] px-4 py-2 text-center"
+                                            className="border-b border-white/10 bg-[#0b1a4d] px-4 py-2 text-center"
                                         >
-                                            <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-white">
-                                                {selectedYear}
+                                            <span className="text-xs font-semibold tracking-wide text-white">
+                                                Jadwal Overhaul · {selectedYear}
                                             </span>
                                         </th>
 
                                         <th
                                             rowSpan="3"
-                                            className="border-b border-white/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                            className="w-[96px] min-w-[96px] border-b border-white/10 bg-gradient-to-b from-[#0b1a4d] to-[#10266b] px-3 py-3 text-center text-xs font-semibold whitespace-nowrap"
                                         >
                                             Aksi
                                         </th>
                                     </tr>
 
-                                    {/* BARIS 2: BULAN */}
-                                    <tr className="bg-[#0a1a4d]">
+                                    {/* HEADER BULAN */}
+                                    <tr className="bg-[#13285f]">
                                         {MONTHS.map((month, index) => (
                                             <th
                                                 key={month}
                                                 colSpan={4}
                                                 title={MONTHS_FULL[index]}
-                                                className="border-b border-r border-white/10 px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wider"
+                                                className={`border-b border-r border-white/10 px-2 py-1.5 text-center text-[11px] font-semibold ${
+                                                    index === currentMonth
+                                                        ? 'bg-blue-500 text-white'
+                                                        : 'bg-[#16307a] text-blue-100'
+                                                }`}
                                             >
                                                 {month}-{String(selectedYear).slice(2)}
                                             </th>
                                         ))}
                                     </tr>
 
-                                    {/* BARIS 3: MINGGU I - IV */}
-                                    <tr className="bg-[#0a1a4d]">
+                                    {/* HEADER MINGGU */}
+                                    <tr className="bg-[#0b1a4d]">
                                         {MONTHS.map((month) =>
                                             WEEKS.map((week) => (
                                                 <th
                                                     key={`${month}-${week}`}
-                                                    className="min-w-[44px] border-b border-r border-white/10 px-1 py-1.5 text-center text-[10px] font-semibold text-blue-100"
+                                                    className="min-w-[44px] border-b border-r border-white/10 bg-[#0b1a4d] px-1 py-2 text-center text-[11px] font-semibold text-white/90"
                                                 >
                                                     {WEEK_LABEL[week]}
                                                 </th>
@@ -600,80 +810,86 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                     {mesins.length > 0 ? (
                                         mesins.map((mesin, index) => {
                                             const groupSpan = getGroupRowSpan(mesins, index);
+                                            const docCount = mesin.dokumens?.length ?? 0;
 
                                             return (
                                                 <React.Fragment key={mesin.id}>
                                                     {ITEMS.map((item, itemIndex) => {
                                                         const isPlan = item === 'plan';
+                                                        const rowLine = isPlan ? 'border-slate-100' : 'border-slate-200';
 
                                                         return (
                                                             <tr
                                                                 key={item}
-                                                                className="group transition-colors hover:bg-blue-50/40"
+                                                                className={`transition-colors duration-300 ${
+                                                                    isPlan
+                                                                        ? 'hover:bg-blue-50/40'
+                                                                        : 'hover:bg-emerald-50/30'
+                                                                }`}
                                                             >
                                                                 {/* NO + MESIN: digabung per mesin */}
                                                                 {itemIndex === 0 && groupSpan > 0 && (
                                                                     <>
                                                                         <td
                                                                             rowSpan={groupSpan}
-                                                                            className="border border-slate-200 bg-slate-50 px-4 py-3 text-center align-middle font-bold text-slate-700"
+                                                                            className="border-b border-r border-slate-100 bg-slate-50/80 px-4 py-3 text-center align-middle font-medium text-slate-500"
                                                                         >
                                                                             {nomorMesin.get(mesin.mesin)}
                                                                         </td>
                                                                         <td
                                                                             rowSpan={groupSpan}
-                                                                            className="border border-slate-200 bg-slate-50 px-4 py-3 text-center align-middle font-bold uppercase text-slate-700"
+                                                                            className="border-b border-r border-slate-100 bg-slate-50/80 px-4 py-3 text-center align-middle font-semibold uppercase text-slate-700"
                                                                         >
                                                                             {mesin.mesin}
                                                                         </td>
                                                                     </>
                                                                 )}
 
-                                                                {/* NAMA, TOTAL, STANDAR (per data, gabung Plan+Act) */}
-                                                                {/* NAMA, TOTAL, STANDAR, DOKUMEN (per data, gabung Plan+Act) */}
+                                                                {/* NAMA, TOTAL, STANDAR, DOKUMEN (gabung Plan+Act) */}
                                                                 {itemIndex === 0 && (
                                                                     <>
                                                                         <td
                                                                             rowSpan={2}
-                                                                            className="border border-slate-200 px-4 py-3 text-center font-medium text-slate-700"
+                                                                            className="border-b border-r border-slate-100 px-4 py-3 text-left align-middle font-medium text-slate-800"
                                                                         >
                                                                             {mesin.nama}
                                                                         </td>
                                                                         <td
                                                                             rowSpan={2}
-                                                                            className="border border-slate-200 px-4 py-3 text-center text-slate-600"
+                                                                            className="border-b border-r border-slate-100 px-4 py-3 text-center align-middle text-slate-600"
                                                                         >
                                                                             {mesin.total_mesin}
                                                                         </td>
                                                                         <td
                                                                             rowSpan={2}
-                                                                            className="border border-slate-200 px-4 py-3 text-center whitespace-nowrap text-slate-600"
+                                                                            className="border-b border-r border-slate-100 px-4 py-3 text-center align-middle whitespace-nowrap text-slate-600"
                                                                         >
                                                                             {formatStandar(mesin)}
                                                                         </td>
                                                                         <td
                                                                             rowSpan={2}
-                                                                            className="border border-slate-200 px-3 py-3 text-center"
+                                                                            className="border-b border-r border-slate-100 px-3 py-3 text-center align-middle"
                                                                         >
                                                                             <button
                                                                                 type="button"
                                                                                 title="Lihat / unggah dokumen"
                                                                                 onClick={() => setDokumenMesinId(mesin.id)}
-                                                                                className={`inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
-                                                                                    (mesin.dokumens?.length ?? 0) > 0
+                                                                                className={`inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border py-1 pl-3 pr-1.5 text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
+                                                                                    docCount > 0
                                                                                         ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
                                                                                         : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                                                                                 }`}
                                                                             >
-                                                                                <span>Lihat Dokumen</span>
+                                                                                <Icon type="file" className="h-3.5 w-3.5" />
+                                                                                <span>Dokumen</span>
                                                                                 <span
-                                                                                    className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold leading-none ${
-                                                                                        (mesin.dokumens?.length ?? 0) > 0
+                                                                                    className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none ${
+                                                                                        docCount > 0
                                                                                             ? 'bg-blue-600 text-white'
                                                                                             : 'bg-slate-200 text-slate-500'
                                                                                     }`}
                                                                                 >
-                                                                                    {mesin.dokumens?.length ?? 0}
+                                                                                    {docCount}
                                                                                 </span>
                                                                             </button>
                                                                         </td>
@@ -681,15 +897,17 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                 )}
 
                                                                 {/* ITEM */}
-                                                                <td className="border border-slate-200 px-3 py-2 text-center">
+                                                                <td
+                                                                    className={`border-b border-r ${rowLine} px-3 py-2 text-center align-middle`}
+                                                                >
                                                                     <span
-                                                                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                                                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide ${
                                                                             isPlan
-                                                                                ? 'bg-blue-50 text-blue-700'
-                                                                                : 'bg-emerald-50 text-emerald-700'
+                                                                                ? 'bg-blue-50 text-blue-600'
+                                                                                : 'bg-emerald-50 text-emerald-600'
                                                                         }`}
                                                                     >
-                                                                        {isPlan ? 'Plan' : 'Act'}
+                                                                        {isPlan ? 'PLAN' : 'ACT'}
                                                                     </span>
                                                                 </td>
 
@@ -712,25 +930,22 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                         return (
                                                                             <td
                                                                                 key={`${bulan}-${week}`}
-                                                                                className={`border border-slate-200 px-1 py-1.5 text-center transition-colors ${
+                                                                                className={`border-b border-r ${rowLine} px-1.5 py-1.5 text-center transition-colors ${
                                                                                     checked
                                                                                         ? isPlan
-                                                                                            ? 'bg-blue-50'
-                                                                                            : 'bg-emerald-50'
-                                                                                        : 'bg-white'
+                                                                                            ? 'bg-blue-50/60'
+                                                                                            : 'bg-emerald-50/70'
+                                                                                        : monthIndex === currentMonth
+                                                                                        ? 'bg-blue-50/30'
+                                                                                        : ''
                                                                                 }`}
                                                                             >
-                                                                                <div className="flex flex-col items-center gap-1">
+                                                                                <div className="flex flex-col items-center gap-0.5">
                                                                                     <ScheduleMark
                                                                                         type={item}
                                                                                         checked={checked}
                                                                                         onToggle={() =>
-                                                                                            toggleCheck(
-                                                                                                mesin,
-                                                                                                item,
-                                                                                                bulan,
-                                                                                                week
-                                                                                            )
+                                                                                            toggleCheck(mesin, item, bulan, week)
                                                                                         }
                                                                                         title={`${
                                                                                             isPlan ? 'Plan' : 'Act'
@@ -740,27 +955,22 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() =>
-                                                                                            openCatatan(
-                                                                                                mesin,
-                                                                                                item,
-                                                                                                bulan,
-                                                                                                week
-                                                                                            )
+                                                                                            openCatatan(mesin, item, bulan, week)
                                                                                         }
+                                                                                        className={`relative cursor-pointer rounded p-0.5 transition hover:scale-110 ${
+                                                                                            hasCatatan
+                                                                                                ? 'text-blue-600'
+                                                                                                : 'text-slate-300 hover:text-slate-500'
+                                                                                        }`}
                                                                                         title={
                                                                                             hasCatatan
                                                                                                 ? 'Lihat catatan'
                                                                                                 : 'Tambah catatan'
                                                                                         }
-                                                                                        className={`relative cursor-pointer text-xs transition hover:scale-110 ${
-                                                                                            hasCatatan
-                                                                                                ? 'text-blue-600'
-                                                                                                : 'text-slate-300 hover:text-slate-500'
-                                                                                        }`}
                                                                                     >
-                                                                                        📝
+                                                                                        <Icon type="note" className="h-3.5 w-3.5" />
                                                                                         {hasCatatan && (
-                                                                                            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-red-500" />
+                                                                                            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-red-500" />
                                                                                         )}
                                                                                     </button>
                                                                                 </div>
@@ -769,19 +979,18 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                     })
                                                                 )}
 
-                                        
                                                                 {/* AKSI */}
                                                                 {itemIndex === 0 && (
                                                                     <td
                                                                         rowSpan={2}
-                                                                        className="border border-slate-200 px-3 py-3"
+                                                                        className="w-[96px] min-w-[96px] border-b border-slate-100 px-3 py-3 align-middle"
                                                                     >
-                                                                        <div className="flex items-center justify-center gap-1.5">
+                                                                        <div className="flex items-center justify-center gap-2">
                                                                             <button
                                                                                 type="button"
                                                                                 title="Edit data"
                                                                                 onClick={() => openEdit(mesin)}
-                                                                                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md"
+                                                                                className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-600 hover:text-white hover:shadow-md hover:shadow-blue-500/30 active:translate-y-0"
                                                                             >
                                                                                 <Icon type="edit" className="h-4 w-4" />
                                                                             </button>
@@ -790,7 +999,7 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                                                                                 type="button"
                                                                                 title="Hapus data"
                                                                                 onClick={() => confirmDelete(mesin)}
-                                                                                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md"
+                                                                                className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-red-50 text-red-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-red-600 hover:text-white hover:shadow-md hover:shadow-red-500/30 active:translate-y-0"
                                                                             >
                                                                                 <Icon type="trash" className="h-4 w-4" />
                                                                             </button>
@@ -825,9 +1034,9 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                 </main>
 
                 {/* FOOTER */}
-                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
-                    <div className="mx-auto flex max-w-[1800px] items-center justify-center px-6 py-3 text-center">
-                        <p className="text-xs font-medium text-white/70">
+                <footer className="mt-auto border-t border-slate-200/70 bg-white/60 backdrop-blur-xl">
+                    <div className="flex w-full items-center justify-center px-6 py-3 text-center">
+                        <p className="text-xs font-medium text-slate-400">
                             © {new Date().getFullYear()} Schedule Overhaul Mesin SC2
                         </p>
                     </div>
@@ -836,94 +1045,93 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
 
             {/* SUCCESS TOAST */}
             {showSuccess && (
-                <div className="fixed right-5 top-5 z-[110] flex w-[360px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl shadow-slate-950/40">
-                    <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-emerald-400 to-green-600" />
-
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-green-100">
-                        <span className="font-bold text-emerald-600">✓</span>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800">Berhasil</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-slate-500">{successMessage}</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setShowSuccess(false)}
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-lg leading-none text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
-                    >
-                        ×
-                    </button>
-                </div>
+                <Toast
+                    tone="emerald"
+                    icon="check"
+                    title="Berhasil"
+                    message={successMessage}
+                    onClose={() => setShowSuccess(false)}
+                />
             )}
 
             {/* MODAL CATATAN */}
             {catatanModal && (
-                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
-                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-                        <div className="border-b border-slate-100 px-6 py-5">
-                            <div className="flex items-start justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 shadow-sm">
-                                        📝
-                                    </div>
-
-                                    <div>
-                                        <h2 className="text-base font-bold text-slate-900">Catatan Overhaul</h2>
-                                        <p className="mt-0.5 text-xs text-slate-500">
-                                            {MONTHS_FULL[catatanModal.bulan - 1]} {selectedYear} · Minggu{' '}
-                                            {catatanModal.minggu} ·{' '}
-                                            <span className="font-semibold uppercase">{catatanModal.item}</span>
-                                        </p>
-                                    </div>
+                <ModalShell onBackdrop={closeCatatan}>
+                    <div className="border-b border-slate-100 px-6 py-5">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600">
+                                    <Icon type="note" className="h-5 w-5" />
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={closeCatatan}
-                                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                >
-                                    ×
-                                </button>
+                                <div>
+                                    <h2 className="text-base font-bold text-slate-900">Catatan Overhaul</h2>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        {MONTHS_FULL[catatanModal.bulan - 1]} {selectedYear} · Minggu{' '}
+                                        {WEEK_LABEL[catatanModal.minggu]} ·{' '}
+                                        <span
+                                            className={`font-semibold ${
+                                                catatanModal.item === 'plan' ? 'text-blue-600' : 'text-emerald-600'
+                                            }`}
+                                        >
+                                            {catatanModal.item === 'plan' ? 'Plan' : 'ACT'}
+                                        </span>
+                                    </p>
+                                </div>
                             </div>
 
-                            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                                {catatanModal.mesin.nama}
-                            </p>
-                        </div>
-
-                        <div className="px-6 py-5">
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">Catatan</label>
-
-                            <textarea
-                                value={catatan}
-                                onChange={(e) => setCatatan(e.target.value)}
-                                rows="5"
-                                placeholder="Tulis catatan untuk minggu ini..."
-                                className={`${inputClass} resize-none`}
-                            />
-                        </div>
-
-                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
                             <button
                                 type="button"
                                 onClick={closeCatatan}
-                                className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                                aria-label="Tutup"
+                                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                             >
-                                Batal
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={saveCatatan}
-                                className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
-                            >
-                                Simpan Catatan
+                                <Icon type="close" className="h-4 w-4" />
                             </button>
                         </div>
+
+                        <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                            {catatanModal.mesin.nama}
+                        </p>
                     </div>
-                </div>
+
+                    <div className="px-6 py-5">
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Catatan</label>
+
+                        <textarea
+                            autoFocus
+                            value={catatan}
+                            onChange={(e) => setCatatan(e.target.value)}
+                            onKeyDown={(e) => {
+                                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveCatatan();
+                            }}
+                            rows="5"
+                            placeholder="Tulis catatan untuk minggu ini..."
+                            className={`${inputClass} resize-none py-3 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10`}
+                        />
+
+                        <p className="mt-1.5 text-[11px] text-slate-400">Ctrl + Enter untuk menyimpan</p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                        <button
+                            type="button"
+                            onClick={closeCatatan}
+                            className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                        >
+                            Batal
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={saveCatatan}
+                            disabled={savingCatatan}
+                            className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                        >
+                            {savingCatatan ? 'Menyimpan...' : 'Simpan Catatan'}
+                        </button>
+                    </div>
+                </ModalShell>
             )}
 
             {/* MODAL FORM MESIN (TAMBAH / EDIT) */}
@@ -942,13 +1150,14 @@ export default function Index({ mesins = [], satuans = [], tahun, flash }) {
                 />
             )}
 
-            {dokumenMesinId && mesins.find((m) => m.id === dokumenMesinId) && (
+            {dokumenMesin && (
                 <DokumenModal
-                    mesin={mesins.find((m) => m.id === dokumenMesinId)}
+                    mesin={dokumenMesin}
                     tahun={selectedYear}
                     onClose={() => setDokumenMesinId(null)}
                 />
             )}
+
             {/* DIALOG KONFIRMASI HAPUS */}
             <ConfirmModal
                 open={Boolean(confirmDialog)}

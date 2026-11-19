@@ -118,7 +118,7 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'S
 // 48 kolom: [bulan, minggu]
 const WEEKS = MONTHS_SHORT.flatMap((_, m) => [1, 2, 3, 4].map((w) => [m + 1, w]));
 
-// kolom kiri yang menempel: [Baris] [Plan/Act]
+// kolom kiri yang menempel saat scroll ke samping: [Nama Line] [Plan/Act]
 const COL_BARIS = { left: 0, width: 170 };
 const COL_JENIS = { left: 170, width: 64 };
 const COL_TOTAL = { left: 0, width: 234 };
@@ -401,7 +401,11 @@ function Capai({ p, a }) {
             ? 'bg-amber-400/20 text-amber-300'
             : 'bg-rose-400/20 text-rose-300';
 
-    return <span className={`inline-block rounded-md px-1.5 py-0.5 text-[11px] font-bold ${warna}`}>{nilai}%</span>;
+    return (
+        <span className={`inline-block rounded-md px-1.5 py-0.5 text-[11px] font-bold ${warna}`}>
+            {nilai}%
+        </span>
+    );
 }
 
 /* ------------------------------------------------------------------
@@ -1226,7 +1230,7 @@ export default function Index({
     };
 
     /* ---------------- EXPORT EXCEL ---------------- */
-    
+
     const exportExcel = () => {
         try {
             const html = buatExcelHtml({
@@ -1573,22 +1577,23 @@ export default function Index({
                                     </details>
                                 </div>
 
-                                {/* TABEL: layar normal = scroll ke samping, zoom out = 48 week muat & melebar */}
+                                {/* TABEL: ukuran sel nyaman dibaca. Layar sempit = scroll ke samping (kolom kiri tetap menempel),
+                                    layar lebar / zoom out = tabel melebar memenuhi card */}
                                 <div style={delay(360)} className={`idx-rise overflow-hidden ${card}`}>
-                                    <div className="idx-scroll max-h-[72vh] overflow-auto">
+                                    <div className="idx-scroll overflow-x-auto">
                                         <table className="w-full border-separate border-spacing-0 whitespace-nowrap text-xs">
                                             <thead>
                                                 <tr>
-                                                    <th rowSpan={2} style={{ ...stickyCol(COL_BARIS), top: 0, zIndex: 30 }} className={`${thNavy} text-center`}>
+                                                    <th rowSpan={2} style={{ ...stickyCol(COL_BARIS), zIndex: 30 }} className={`${thNavy} text-center`}>
                                                         Nama Line
                                                     </th>
-                                                    <th rowSpan={2} style={{ ...stickyCol(COL_JENIS), top: 0, zIndex: 30 }} className={`${thNavy} border-r-2 border-r-white/25 !px-2`} />
+                                                    <th rowSpan={2} style={{ ...stickyCol(COL_JENIS), zIndex: 30 }} className={`${thNavy} border-r-2 border-r-white/25 !px-2`} />
 
                                                     {MONTHS_SHORT.map((m, idx) => (
                                                         <th
                                                             key={m}
                                                             colSpan={4}
-                                                            style={{ position: 'sticky', top: 0, height: 32, zIndex: 20 }}
+                                                            style={{ height: 32 }}
                                                             className={`border-b border-l border-r border-white/10 border-l-white/25 px-2 text-center text-xs font-semibold tracking-wide text-white ${
                                                                 idx % 2 === 0 ? 'bg-[#0b1a4d]' : 'bg-[#10266b]'
                                                             }`}
@@ -1602,7 +1607,6 @@ export default function Index({
                                                     {WEEKS.map(([m, w]) => (
                                                         <th
                                                             key={`${m}-${w}`}
-                                                            style={{ position: 'sticky', top: 32, zIndex: 20 }}
                                                             className={`min-w-[48px] border-b border-r border-white/10 ${awalBulanGelap(w)} bg-[#16307a] px-2 py-1.5 text-center text-[11px] font-semibold text-blue-100`}
                                                         >
                                                             W{w}

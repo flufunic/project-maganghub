@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
+    ArrowUpRight,
     CalendarDays,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     ClipboardList,
     Clock3,
     Eye,
@@ -31,34 +34,50 @@ const STATUS = {
         label: 'Menunggu Diisi',
         className: 'border-sky-200 bg-sky-50 text-sky-700',
         icon: FileText,
-        kartu: 'from-sky-500 to-blue-600',
+        bar: 'from-sky-400 to-cyan-600',
+        soft: 'bg-sky-50 text-sky-600',
+        ring: 'ring-sky-300/70',
     },
     menunggu_verifikasi: {
         label: 'Menunggu Konfirmasi Pimpinan',
         className: 'border-amber-200 bg-amber-50 text-amber-700',
         icon: Clock3,
-        kartu: 'from-amber-400 to-orange-500',
+        bar: 'from-amber-400 to-orange-500',
+        soft: 'bg-amber-50 text-amber-600',
+        ring: 'ring-amber-300/70',
     },
     revisi: {
         label: 'Perlu Revisi',
-        className: 'border-red-200 bg-red-50 text-red-700',
+        className: 'border-rose-200 bg-rose-50 text-rose-700',
         icon: RotateCcw,
-        kartu: 'from-red-500 to-rose-600',
+        bar: 'from-rose-400 to-pink-600',
+        soft: 'bg-rose-50 text-rose-600',
+        ring: 'ring-rose-300/70',
     },
     terverifikasi: {
         label: 'Completed',
-        className: 'border-green-200 bg-green-50 text-green-700',
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
         icon: CheckCircle2,
-        kartu: 'from-green-500 to-green-600',
+        bar: 'from-emerald-400 to-green-600',
+        soft: 'bg-emerald-50 text-emerald-600',
+        ring: 'ring-emerald-300/70',
     },
 };
 
+const SEMUA = {
+    bar: 'from-blue-500 to-indigo-600',
+    soft: 'bg-blue-50 text-blue-600',
+    ring: 'ring-blue-300/70',
+};
+
+const card =
+    'rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.12)]';
+
+const delay = (ms) => ({ animationDelay: `${ms}ms` });
+
 // Bagi Pimpinan, "menunggu konfirmasi pimpinan" = menunggu dirinya sendiri.
 const labelStatus = (kode, isPimpinan) => {
-    if (isPimpinan && kode === 'menunggu_verifikasi') {
-        return 'Menunggu Verifikasi';
-    }
-
+    if (isPimpinan && kode === 'menunggu_verifikasi') return 'Menunggu Verifikasi';
     return STATUS[kode]?.label ?? kode;
 };
 
@@ -67,7 +86,7 @@ const formatTanggal = (tanggal) => {
     const date = new Date(tanggal);
     if (Number.isNaN(date.getTime())) return tanggal;
 
-   return new Intl.DateTimeFormat('id-ID', {
+    return new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta',
         day: '2-digit',
         month: 'short',
@@ -80,7 +99,7 @@ const formatTanggalWaktu = (tanggal) => {
     const date = new Date(tanggal);
     if (Number.isNaN(date.getTime())) return tanggal;
 
-     return new Intl.DateTimeFormat('id-ID', {
+    return new Intl.DateTimeFormat('id-ID', {
         timeZone: 'UTC',
         day: '2-digit',
         month: 'short',
@@ -95,12 +114,11 @@ const StatusBadge = ({ status, isPimpinan }) => {
         className: 'border-slate-200 bg-slate-100 text-slate-600',
         icon: AlertCircle,
     };
-
     const Icon = config.icon;
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[10px] font-bold ${config.className}`}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold ${config.className}`}
         >
             <Icon className="h-3.5 w-3.5" />
             {labelStatus(status, isPimpinan) ?? 'Tidak diketahui'}
@@ -121,18 +139,14 @@ export default function Index({
     const { flash = {} } = usePage().props;
 
     const [search, setSearch] = useState(filters.search ?? '');
-
     const statusAktif = filters.status ?? '';
 
-    /* ---------- EXPORT EXCEL ---------- */
-
-    // Repair Request Form 1 RRF
+    /* ---------- EXPORT EXCEL (1 RRF) ---------- */
     const urlExportRrf = (id) => `/mtc/rrf/${id}/export`;
 
     // Kirim filter ke server (parameter kosong tidak ikut dikirim)
     const kirim = (s, st) => {
         const params = {};
-
         if (s) params.search = s;
         if (st) params.status = st;
 
@@ -143,7 +157,7 @@ export default function Index({
         });
     };
 
-    // Pencarian otomatis 0,4 detik setelah selesai mengetik (tanpa tombol)
+    // Pencarian otomatis 0,4 detik setelah selesai mengetik
     const pertama = useRef(true);
 
     useEffect(() => {
@@ -153,7 +167,6 @@ export default function Index({
         }
 
         const timer = setTimeout(() => kirim(search.trim(), statusAktif), 400);
-
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
@@ -178,102 +191,115 @@ export default function Index({
         : ['menunggu_verifikasi', 'terverifikasi'];
 
     const kartu = [
-        ['', 'Semua RRF', totalSemua, Layers, 'from-blue-500 to-indigo-600'],
-        ...daftarStatus.map((k) => [
-            k,
-            labelStatus(k, isPimpinan),
-            Number(ringkasan[k] ?? 0),
-            STATUS[k]?.icon ?? ClipboardList,
-            STATUS[k]?.kartu ?? 'from-slate-500 to-slate-700',
-        ]),
+        { kode: '', label: 'Semua RRF', jumlah: totalSemua, Ikon: Layers, tone: SEMUA },
+        ...daftarStatus.map((k) => ({
+            kode: k,
+            label: labelStatus(k, isPimpinan),
+            jumlah: Number(ringkasan[k] ?? 0),
+            Ikon: STATUS[k]?.icon ?? ClipboardList,
+            tone: STATUS[k] ?? SEMUA,
+        })),
     ];
 
     const judul = isPimpinan ? 'Verifikasi RRF Maintenance' : 'Daftar RRF Maintenance';
-
     const deskripsi = isPimpinan
-        ? 'Periksa hasil penanganan Maintenance lalu verifikasi atau kembalikan untuk revisi.'
+        ? 'Periksa hasil penanganan Maintenance, lalu verifikasi atau kembalikan untuk revisi.'
         : 'Daftar permintaan perbaikan yang dikelola oleh Maintenance.';
 
     const gridKartu = isPimpinan ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 lg:grid-cols-5';
+
+    const kolom = ['No.', 'Nomor RRF', 'Data QMOS', 'Mesin', 'Permasalahan', 'Jadwal Service', 'Tanggal Dibuat', 'Status', 'Aksi'];
 
     return (
         <ProduksiLayout>
             <Head title={judul} />
 
-            <div className="space-y-5">
-                {/* HEADER */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/10 px-5 py-4 shadow-xl backdrop-blur-xl">
-                    <div className="flex items-center gap-3">
-                        <div
-                            className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ${
-                                isPimpinan ? 'from-amber-400 to-orange-500' : 'from-blue-500 to-indigo-700'
-                            }`}
-                        >
-                            {isPimpinan ? <ShieldCheck className="h-5 w-5" /> : <ClipboardList className="h-5 w-5" />}
-                        </div>
+            <div className="space-y-4 pb-2">
+                {/* HEADER HALAMAN */}
+                <section className={`rrf-enter relative overflow-hidden px-4 py-4 sm:px-5 ${card}`}>
+                    <div className="rrf-shimmer absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-blue-500 via-indigo-500 via-cyan-400 to-blue-500" />
 
-                        <div>
-                            <h1 className="text-lg font-extrabold text-white">{judul}</h1>
-                            <p className="text-xs text-blue-100/70">{deskripsi}</p>
-                        </div>
-                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex min-w-0 items-center gap-3.5">
+                            <div
+                                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg ${
+                                    isPimpinan
+                                        ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30'
+                                        : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/30'
+                                }`}
+                            >
+                                {isPimpinan ? <ShieldCheck className="h-5 w-5" /> : <ClipboardList className="h-5 w-5" />}
+                            </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                            <div className="min-w-0">
+                                <h1 className="text-lg font-bold tracking-tight text-slate-900">{judul}</h1>
+                                <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">{deskripsi}</p>
+                            </div>
+                        </div>
 
                         {isAdmin && (
                             <Link
                                 href="/mtc/rrf/repair-mtc"
-                                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700"
+                                className="group relative inline-flex h-10 items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-semibold text-white shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/40 active:translate-y-0"
                             >
-                                <Wrench className="h-4 w-4" />
-                                Data Repair QMOS
+                                <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-700 group-hover:left-[150%]" />
+                                <Wrench className="relative h-4 w-4" />
+                                <span className="relative">Data Repair QMOS</span>
                             </Link>
                         )}
                     </div>
-                </div>
+                </section>
 
                 {/* FLASH */}
                 {flash.success && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                        {flash.success}
+                    <div className="rrf-slide-down relative flex items-start gap-3 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-4 pl-5 text-emerald-800 shadow-sm">
+                        <span className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                        <p className="text-sm font-semibold leading-relaxed">{flash.success}</p>
                     </div>
                 )}
 
                 {flash.error && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                        {flash.error}
+                    <div className="rrf-slide-down relative flex items-start gap-3 overflow-hidden rounded-2xl border border-rose-200 bg-rose-50 p-4 pl-5 text-rose-800 shadow-sm">
+                        <span className="absolute inset-y-0 left-0 w-1 bg-rose-500" />
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                        <p className="text-sm font-semibold leading-relaxed">{flash.error}</p>
                     </div>
                 )}
 
                 {/* BANNER PIMPINAN */}
                 {isPimpinan && menunggu > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 px-4 py-3 shadow-lg">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                    <div className="rrf-slide-down relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5 shadow-sm">
+                        <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+
+                        <div className="flex items-center gap-3 pl-1">
+                            <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
                                 <ShieldCheck className="h-5 w-5" />
+                                <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                                    <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-white bg-amber-500" />
+                                </span>
                             </span>
 
                             <div>
                                 <p className="text-sm font-bold text-amber-900">Ada RRF menunggu verifikasi Anda</p>
-                                <p className="mt-0.5 text-xs text-amber-800/80">
-                                    {menunggu} RRF sudah dikirim Maintenance.
-                                </p>
+                                <p className="mt-0.5 text-xs text-amber-800/80">{menunggu} RRF sudah dikirim Maintenance.</p>
                             </div>
                         </div>
 
                         <button
                             type="button"
                             onClick={() => pilihKartu('menunggu_verifikasi')}
-                            className="cursor-pointer rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700"
+                            className="cursor-pointer rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-amber-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
                         >
                             Lihat antrean
                         </button>
                     </div>
                 )}
 
-                {/* KARTU RINGKASAN = FILTER (klik kartu untuk memfilter) */}
+                {/* KARTU RINGKASAN = FILTER */}
                 <div className={`grid gap-3 ${gridKartu}`}>
-                    {kartu.map(([kode, label, jumlah, Ikon, warna]) => {
+                    {kartu.map(({ kode, label, jumlah, Ikon, tone }, index) => {
                         const aktif = statusAktif === kode;
 
                         return (
@@ -282,21 +308,36 @@ export default function Index({
                                 type="button"
                                 onClick={() => pilihKartu(kode)}
                                 title={`Tampilkan: ${label}`}
-                                className={`relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-white/40 bg-white/[0.95] px-3 pb-2.5 pt-3 text-left shadow-md transition hover:-translate-y-0.5 hover:shadow-lg ${
-                                    aktif ? 'ring-2 ring-blue-400' : ''
+                                style={delay(index * 70)}
+                                className={`rrf-enter group relative cursor-pointer overflow-hidden p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl ${card} ${
+                                    aktif ? `ring-2 ${tone.ring}` : ''
                                 }`}
                             >
-                                <span className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${warna}`} />
+                                <span className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${tone.bar}`} />
 
-                                <span
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow ${warna}`}
-                                >
-                                    <Ikon className="h-4 w-4" />
-                                </span>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-medium leading-tight text-slate-500">{label}</p>
+                                        <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">
+                                            {Number(jumlah).toLocaleString('id-ID')}
+                                        </p>
+                                    </div>
 
-                                <div className="min-w-0">
-                                    <p className="text-xl font-black leading-none text-slate-800">{jumlah}</p>
-                                    <p className="mt-1 text-[11px] font-bold leading-tight text-slate-600">{label}</p>
+                                    <span
+                                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110 ${tone.soft}`}
+                                    >
+                                        <Ikon className="h-5 w-5" />
+                                    </span>
+                                </div>
+
+                                <div className="mt-3 flex h-4 items-center">
+                                    {aktif ? (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                                            Filter aktif
+                                        </span>
+                                    ) : (
+                                        <ArrowUpRight className="h-4 w-4 text-slate-300 transition duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-slate-500" />
+                                    )}
                                 </div>
                             </button>
                         );
@@ -304,13 +345,17 @@ export default function Index({
                 </div>
 
                 {/* TABEL */}
-                <div className="overflow-hidden rounded-2xl border border-white/40 bg-white/[0.95] shadow-xl">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/70 px-5 py-4">
-                        <div>
-                            <h2 className="text-sm font-extrabold text-slate-900">
-                                {isPimpinan ? 'Verifikasi & Riwayat RRF' : 'Data RRF'}
-                            </h2>
-
+                <section style={delay(280)} className={`rrf-enter overflow-hidden ${card}`}>
+                    <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                                    {isPimpinan ? 'Verifikasi & riwayat RRF' : 'Data RRF'}
+                                </h2>
+                                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600">
+                                    {Number(rrfs.total ?? 0).toLocaleString('id-ID')} data
+                                </span>
+                            </div>
                             <p className="mt-1 text-xs text-slate-500">
                                 {isPimpinan
                                     ? 'RRF yang menunggu verifikasi tampil paling atas.'
@@ -318,8 +363,8 @@ export default function Index({
                             </p>
                         </div>
 
-                        <form onSubmit={cariSekarang} className="w-full lg:w-auto">
-                            <div className="relative min-w-[240px]">
+                        <form onSubmit={cariSekarang} className="w-full sm:w-auto">
+                            <div className="relative sm:min-w-[300px]">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                                 <input
@@ -327,7 +372,7 @@ export default function Index({
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Cari nomor RRF, mesin..."
-                                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-xs text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                                 />
 
                                 {search && (
@@ -335,7 +380,8 @@ export default function Index({
                                         type="button"
                                         onClick={() => setSearch('')}
                                         title="Hapus pencarian"
-                                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                        aria-label="Hapus pencarian"
+                                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
                                     >
                                         <X className="h-3.5 w-3.5" />
                                     </button>
@@ -344,24 +390,16 @@ export default function Index({
                         </form>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="rrf-scroll overflow-x-auto">
                         <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
                             <thead>
-                                <tr className="bg-[#0a1a4d] text-white">
-                                    {[
-                                        'No.',
-                                        'Nomor RRF',
-                                        'Data QMOS',
-                                        'Mesin',
-                                        'Permasalahan',
-                                        'Jadwal Service',
-                                        'Tanggal Dibuat',
-                                        'Status',
-                                        'Aksi',
-                                    ].map((k) => (
+                                <tr className="bg-[#0b1a4d]">
+                                    {kolom.map((k) => (
                                         <th
                                             key={k}
-                                            className="whitespace-nowrap border-r border-white/10 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider last:border-r-0"
+                                            className={`whitespace-nowrap border-b border-r border-white/10 bg-gradient-to-b from-[#0b1a4d] to-[#10266b] px-4 py-3.5 text-xs font-semibold text-white/90 first:pl-5 last:border-r-0 last:pr-5 ${
+                                                k === 'Aksi' ? 'text-center' : 'text-left'
+                                            }`}
                                         >
                                             {k}
                                         </th>
@@ -373,13 +411,17 @@ export default function Index({
                                 {!rrfs.data?.length ? (
                                     <tr>
                                         <td colSpan={9} className="px-4 py-16 text-center">
-                                            <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
-                                            <p className="mt-3 text-sm font-bold text-slate-600">Belum ada data RRF</p>
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                {isPimpinan
-                                                    ? 'Belum ada RRF yang dikirim Maintenance untuk diverifikasi.'
-                                                    : 'RRF yang dibuat dari data Repair QMOS akan tampil di sini.'}
-                                            </p>
+                                            <div className="flex flex-col items-center">
+                                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                                    <ClipboardList className="h-7 w-7" />
+                                                </div>
+                                                <p className="font-semibold text-slate-700">Belum ada data RRF</p>
+                                                <p className="mt-1 max-w-sm text-sm leading-6 text-slate-400">
+                                                    {isPimpinan
+                                                        ? 'Belum ada RRF yang dikirim Maintenance untuk diverifikasi.'
+                                                        : 'RRF yang dibuat dari data Repair QMOS akan tampil di sini.'}
+                                                </p>
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : (
@@ -391,82 +433,81 @@ export default function Index({
                                         return (
                                             <tr
                                                 key={rrf.id}
-                                                className={`transition hover:bg-blue-50/70 ${
+                                                className={`transition-colors duration-200 hover:bg-blue-50/50 ${
                                                     index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
                                                 }`}
                                             >
-                                                <td className="border-b border-r border-slate-100 px-4 py-3 text-xs text-slate-500">
+                                                <td className="border-b border-slate-100 px-4 py-3.5 pl-5 text-xs text-slate-400">
                                                     {(rrfs.from ?? 1) + index}
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3">
-                                                    <p className="whitespace-nowrap text-xs font-extrabold text-blue-700">
+                                                <td className="border-b border-slate-100 px-4 py-3.5">
+                                                    <span className="whitespace-nowrap rounded-md bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">
                                                         {rrf.rrf_no ?? `RRF-${rrf.id}`}
-                                                    </p>
-                                                    <p className="mt-1 text-[10px] text-slate-400">Rev. {rrf.rev ?? '0'}</p>
+                                                    </span>
+                                                    <p className="mt-1.5 text-[11px] text-slate-400">Rev. {rrf.rev ?? '0'}</p>
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3">
-                                                    <p className="whitespace-nowrap text-xs font-bold text-slate-700">
+                                                <td className="border-b border-slate-100 px-4 py-3.5">
+                                                    <p className="whitespace-nowrap text-xs font-semibold text-slate-700">
                                                         QMOS-{repair.qmos_repair_id ?? '-'}
                                                     </p>
-                                                    <p className="mt-1 text-[10px] text-slate-400">{repair.location ?? '-'}</p>
+                                                    <p className="mt-1 text-[11px] text-slate-400">{repair.location ?? '-'}</p>
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3">
-                                                    <p className="text-xs font-bold text-slate-800">{repair.machine ?? '-'}</p>
-                                                    <p className="mt-1 text-[10px] text-slate-400">
+                                                <td className="border-b border-slate-100 px-4 py-3.5">
+                                                    <p className="text-xs font-semibold text-slate-800">{repair.machine ?? '-'}</p>
+                                                    <p className="mt-1 text-[11px] text-slate-400">
                                                         {repair.machine_no ?? repair.asset_no ?? '-'}
                                                     </p>
                                                 </td>
 
-                                                <td className="max-w-[220px] border-b border-r border-slate-100 px-4 py-3 text-xs text-slate-600">
+                                                <td className="max-w-[220px] border-b border-slate-100 px-4 py-3.5 text-xs leading-4 text-slate-600">
                                                     <p className="line-clamp-2">{rrf.problem ?? repair.problem ?? '-'}</p>
                                                 </td>
 
-                                                <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3">
-                                                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                                                <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5">
+                                                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
                                                         <CalendarDays className="h-3.5 w-3.5 text-blue-500" />
                                                         {formatTanggalWaktu(rrf.serv_schedule_at)}
-                                                    </div>
+                                                    </span>
                                                 </td>
 
-                                                <td className="whitespace-nowrap border-b border-r border-slate-100 px-4 py-3 text-xs text-slate-600">
+                                                <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 text-xs text-slate-600">
                                                     {formatTanggal(rrf.created_at)}
                                                 </td>
 
-                                                <td className="border-b border-r border-slate-100 px-4 py-3">
+                                                <td className="border-b border-slate-100 px-4 py-3.5">
                                                     <StatusBadge status={rrf.status} isPimpinan={isPimpinan} />
                                                 </td>
 
-                                                <td className="border-b border-slate-100 px-4 py-3">
+                                                <td className="border-b border-slate-100 px-4 py-3.5 pr-5">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <Link
-                                                                href={`/mtc/rrf/${rrf.id}`}
-                                                                title={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
-                                                                aria-label={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
-                                                                className={
-                                                                    perluVerifikasi
-                                                                        ? 'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-3 text-[11px] font-bold text-white transition hover:from-amber-600 hover:to-orange-700'
-                                                                        : 'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition bg-blue-600 text-white hover:bg-blue-700'
-                                                                }
-                                                            >
-                                                                {perluVerifikasi ? (
-                                                                    <>
-                                                                        <ShieldCheck className="h-3.5 w-3.5" />
-                                                                        Verifikasi
-                                                                    </>
-                                                                ) : (
-                                                                    <Eye className="h-4 w-4" />
-                                                                )}
-                                                            </Link>
+                                                            href={`/mtc/rrf/${rrf.id}`}
+                                                            title={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
+                                                            aria-label={perluVerifikasi ? 'Verifikasi RRF' : 'Detail RRF'}
+                                                            className={
+                                                                perluVerifikasi
+                                                                    ? 'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-amber-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+                                                                    : 'inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-600 hover:text-white hover:shadow-md hover:shadow-blue-500/30 active:translate-y-0'
+                                                            }
+                                                        >
+                                                            {perluVerifikasi ? (
+                                                                <>
+                                                                    <ShieldCheck className="h-3.5 w-3.5" /> Verifikasi
+                                                                </>
+                                                            ) : (
+                                                                <Eye className="h-4 w-4" />
+                                                            )}
+                                                        </Link>
 
                                                         {bisaExport && (
                                                             <a
                                                                 href={urlExportRrf(rrf.id)}
                                                                 title="Export Excel"
                                                                 aria-label="Export Excel"
-                                                                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-100"
                                                             >
                                                                 <FileSpreadsheet className="h-4 w-4" />
                                                             </a>
@@ -482,29 +523,46 @@ export default function Index({
                     </div>
 
                     {/* PAGINATION */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">
+                    <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                         <p className="text-xs text-slate-500">
-                            Menampilkan {rrfs.from ?? 0} - {rrfs.to ?? 0} dari {rrfs.total ?? 0} data
+                            Menampilkan{' '}
+                            <span className="font-semibold text-slate-700">
+                                {rrfs.from ?? 0}–{rrfs.to ?? 0}
+                            </span>{' '}
+                            dari <span className="font-semibold text-slate-700">{Number(rrfs.total ?? 0).toLocaleString('id-ID')}</span> data
                         </p>
 
-                        <div className="flex flex-wrap gap-1">
-                            {rrfs.links?.map((link, index) => (
-                                <button
-                                    key={index}
-                                    type="button"
-                                    disabled={!link.url}
-                                    onClick={() => bukaHalaman(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                    className={`min-w-9 rounded-lg border px-3 py-2 text-xs font-semibold ${
-                                        link.active
-                                            ? 'border-blue-600 bg-blue-600 text-white'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:bg-blue-50'
-                                    } disabled:cursor-not-allowed disabled:opacity-40`}
-                                />
-                            ))}
+                        <div className="flex flex-wrap items-center gap-1">
+                            {rrfs.links?.map((link, index) => {
+                                const isPrev = index === 0;
+                                const isNext = index === rrfs.links.length - 1;
+
+                                return (
+                                    <button
+                                        key={index}
+                                        type="button"
+                                        disabled={!link.url}
+                                        onClick={() => bukaHalaman(link.url)}
+                                        aria-label={isPrev ? 'Halaman sebelumnya' : isNext ? 'Halaman selanjutnya' : `Halaman ${link.label}`}
+                                        className={`inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-lg border px-2.5 text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-35 ${
+                                            link.active
+                                                ? 'border-blue-600 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/30'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
+                                        }`}
+                                    >
+                                        {isPrev ? (
+                                            <ChevronLeft className="h-4 w-4" />
+                                        ) : isNext ? (
+                                            <ChevronRight className="h-4 w-4" />
+                                        ) : (
+                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </ProduksiLayout>
     );
