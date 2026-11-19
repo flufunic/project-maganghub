@@ -577,8 +577,9 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
 
     Route::prefix('machines')->name('machines.')->group(function () {
 
-        // Lihat & print: admin dan pimpinan
+        // Lihat, export & print: semua role yang login
         Route::get('/', [MachineController::class, 'index'])->name('index');
+        Route::get('/export', [MachineController::class, 'export'])->name('export');
         Route::get('/print-barcodes', [MachineController::class, 'printBarcodes'])->name('print');
         Route::get('/print-all', [MachineController::class, 'printAll'])->name('print-all');
         Route::get('/type/{type}/units', [MachineController::class, 'units'])
