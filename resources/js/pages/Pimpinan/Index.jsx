@@ -14,6 +14,8 @@ import {
     Pencil,
     Inbox,
     X,
+    Bell,
+    BellOff,
 } from 'lucide-react';
 import Sidebar from '@/Components/Sidebar';
 
@@ -169,6 +171,149 @@ function StatCard({ card, aktif, onClick, index }) {
     );
 }
 
+function BellNotifikasi({ items = [], onLihatSemua }) {
+    const [buka, setBuka] = useState(false);
+    const jumlah = items.length;
+    const ada = jumlah > 0;
+
+    // Esc menutup panel
+    useEffect(() => {
+        if (!buka) return undefined;
+
+        const onKey = (e) => e.key === 'Escape' && setBuka(false);
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [buka]);
+
+    return (
+        <div className="relative shrink-0">
+            <button
+                type="button"
+                onClick={() => setBuka((prev) => !prev)}
+                aria-label={`Notifikasi, ${jumlah} report menunggu`}
+                aria-expanded={buka}
+                title="Notifikasi"
+                className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-white/10 text-white transition-all duration-300 hover:bg-white/20 active:scale-95 ${
+                    ada ? 'border-blue-300/50 shadow-[0_0_18px_rgba(59,130,246,0.4)]' : 'border-white/15'
+                }`}
+            >
+                {ada && (
+                    <span className="pmp-notif-pulse pointer-events-none absolute inset-1 rounded-xl border border-blue-300/80 bg-blue-400/20" />
+                )}
+
+                <span className={`relative z-10 flex items-center justify-center ${ada ? 'pmp-bell-shake' : ''}`}>
+                    <Bell className={`h-5 w-5 ${ada ? 'text-blue-200' : 'text-white'}`} strokeWidth={1.8} />
+                </span>
+
+                {ada && (
+                    <span
+                        key={jumlah}
+                        className="pmp-badge-pop absolute -right-1 -top-1 z-20 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b1d57] bg-red-500 px-1 text-[10px] font-extrabold text-white shadow-lg shadow-red-500/40"
+                    >
+                        {jumlah > 99 ? '99+' : jumlah}
+                    </span>
+                )}
+            </button>
+
+            {buka && (
+                <>
+                    <button
+                        type="button"
+                        aria-label="Tutup notifikasi"
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setBuka(false)}
+                    />
+
+                    <div className="pmp-drop absolute right-0 z-50 mt-3 w-[min(380px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+                        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/60 px-4 py-3.5">
+                            <div>
+                                <p className="text-sm font-bold text-slate-900">Notifikasi</p>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {ada ? `${jumlah} report menunggu pemeriksaan` : 'Tidak ada report baru'}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setBuka(false)}
+                                aria-label="Tutup"
+                                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="pmp-scroll max-h-[380px] overflow-y-auto">
+                            {!ada ? (
+                                <div className="px-4 py-12 text-center">
+                                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                        <BellOff className="h-6 w-6" strokeWidth={1.7} />
+                                    </div>
+                                    <p className="text-sm font-semibold text-slate-600">Belum ada notifikasi</p>
+                                    <p className="mt-1 text-xs text-slate-400">
+                                        Report baru dari Admin akan muncul di sini.
+                                    </p>
+                                </div>
+                            ) : (
+                                items.map((item) => (
+                                    <Link
+                                        key={item.id}
+                                        href={`/pimpinan/laporan/${item.id}`}
+                                        className="relative flex w-full cursor-pointer gap-3 border-b border-slate-100 bg-blue-50/60 px-4 py-3.5 text-left transition-colors hover:bg-blue-50"
+                                    >
+                                        <span className="absolute inset-y-0 left-0 w-[3px] bg-blue-500" />
+
+                                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                                            <FileText className="h-4 w-4" strokeWidth={1.8} />
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="text-xs font-bold text-slate-800">
+                                                    Report mingguan baru masuk
+                                                </p>
+                                                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                                            </div>
+
+                                            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                {item.dikirim_oleh || 'Admin'} mengirim report Week {item.week} (
+                                                {item.periode}) untuk diperiksa.
+                                            </p>
+
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                                <span className="rounded-md bg-blue-100/70 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                                                    W{item.week}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400">
+                                                    {item.dikirim_pada || '-'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))
+                            )}
+                        </div>
+
+                        {ada && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setBuka(false);
+                                    onLihatSemua?.();
+                                }}
+                                className="w-full cursor-pointer bg-slate-50 px-4 py-2.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
+                            >
+                                Lihat semua di tabel
+                            </button>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------
 | HALAMAN
 ------------------------------------------------------------------ */
@@ -188,6 +333,7 @@ export default function Index({ user, laporans = [], flash }) {
     const totalMenunggu = laporans.filter((i) => cocokFilter(i, 'menunggu')).length;
     const totalDisetujui = laporans.filter((i) => i.status === 'disetujui').length;
     const totalDitolak = laporans.filter((i) => i.status === 'ditolak').length;
+    const laporanBaru = laporans.filter((i) => i.status === 'menunggu');
 
     const daftar = laporans.filter((item) => cocokFilter(item, filter));
 
@@ -231,6 +377,22 @@ export default function Index({ user, laporans = [], flash }) {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [itemBatal, memproses]);
+
+    // Cek report baru tiap 30 detik (hanya saat tab terlihat)
+    useEffect(() => {
+        const muat = () => {
+            if (document.visibilityState !== 'visible' || memproses) return;
+            router.reload({ only: ['laporans'], preserveScroll: true });
+        };
+
+        const id = setInterval(muat, 30000);
+        document.addEventListener('visibilitychange', muat);
+
+        return () => {
+            clearInterval(id);
+            document.removeEventListener('visibilitychange', muat);
+        };
+    }, [memproses]);
 
     const judulTabel =
         filter === 'menunggu'
@@ -321,6 +483,21 @@ export default function Index({ user, laporans = [], flash }) {
                 @keyframes pmpLine { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
                 @keyframes pmpPing { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.4); opacity: 0; } }
                 @keyframes pmpBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+                @keyframes pmpDrop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
+                @keyframes pmpBellShake {
+                    0%, 100% { transform: rotate(0deg); }
+                    10%, 30%, 50%, 70% { transform: rotate(12deg); }
+                    20%, 40%, 60%, 80% { transform: rotate(-12deg); }
+                    90% { transform: rotate(0deg); }
+                }
+                @keyframes pmpNotifPulse { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(1.65); opacity: 0; } }
+                @keyframes pmpBadgePop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+                @keyframes pmpBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+                .pmp-drop { animation: pmpDrop .22s cubic-bezier(.22,1,.36,1) both; transform-origin: top right; }
+                .pmp-bell-shake { animation: pmpBellShake 1.1s ease-in-out infinite; transform-origin: 50% 15%; }
+                .pmp-notif-pulse { animation: pmpNotifPulse 1.8s ease-out infinite; }
+                .pmp-badge-pop { animation: pmpBadgePop .45s ease-out both, pmpBadgePulse 1.5s ease-in-out .5s infinite; }
 
                 /* fill-mode "backwards": tidak ada transform tersisa setelah selesai */
                 .pmp-rise { animation: pmpRise .6s cubic-bezier(.22,1,.36,1) backwards; }
@@ -338,7 +515,8 @@ export default function Index({ user, laporans = [], flash }) {
 
                 @media (prefers-reduced-motion: reduce) {
                     .pmp-rise, .pmp-fade, .pmp-pop, .pmp-float, .pmp-float-reverse,
-                    .pmp-line, .pmp-ping, .pmp-bar { animation: none !important; }
+                    .pmp-line, .pmp-ping, .pmp-bar, .pmp-drop, .pmp-bell-shake,
+                    .pmp-notif-pulse, .pmp-badge-pop { animation: none !important; }
                 }
             `}</style>
 
@@ -382,6 +560,13 @@ export default function Index({ user, laporans = [], flash }) {
                                     Approval Report Mingguan Preventif
                                 </p>
                             </div>
+                        </div>
+                        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                            <div className="flex min-w-0 items-center gap-3">
+                                {/* tombol menu + judul (tetap) */}
+                            </div>
+
+                            <BellNotifikasi items={laporanBaru} onLihatSemua={() => setFilter('menunggu')} />
                         </div>
                     </div>
 

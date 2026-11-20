@@ -29,8 +29,8 @@ class CheckSheetController extends Controller
     ];
 
     // =====================================================
-    // DASHBOARD CHECK SHEET (tahunan, Januari - Desember)
-    // Route publik: GET /check-sheet-dashboard
+    // DATA DASHBOARD CHECK SHEET (tahunan, Januari - Desember)
+    // Dipakai oleh PreventifMesinController@welcome (route '/').
     //
     // 3 grafik per divisi (Headrest, Saidan, Utility):
     //   1. Jumlah centang   = checklist yang sudah diisi (status = 1)
@@ -38,9 +38,8 @@ class CheckSheetController extends Controller
     //   3. Jumlah abnormality yang tercatat
     // =====================================================
 
-    public function dashboard(Request $request): Response
+    public function dashboardData(int $tahun): array
     {
-        $tahun = (int) ($request->tahun ?: now()->year);
         $tahun = max(2020, min(2040, $tahun));
 
         $awal  = "{$tahun}-01-01";
@@ -174,12 +173,12 @@ class CheckSheetController extends Controller
             }
         }
 
-        return Inertia::render('CheckSheet/Dashboard', [
+        return [
             'tahun'   => $tahun,
             'divisi'  => $divisiList,
             'laporan' => array_values($laporan),
             'total'   => $total,
-        ]);
+        ];
     }
 
     // =====================================================

@@ -25,6 +25,7 @@ use App\Http\Controllers\MachineController;
 use App\Http\Controllers\RepairMtcController;
 use App\Http\Controllers\Mtc\MtcRrfController;
 use App\Http\Controllers\Mtc\MtcRrfExportController;
+use App\Http\Controllers\CheckSheetNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,17 +61,19 @@ Route::post('/logout', function (Request $request) {
     return Inertia::location('/');
 })->name('logout');
 
-// Dashboard Overhaul SC2
-Route::get('/overhaul-dashboard', [
-    OverhaulSc2Controller::class,
-    'dashboard',
-])->name('overhaul-sc2.dashboard');
+// Dashboard Overhaul SC2 -> sekarang jadi bagian halaman utama
+Route::get('/overhaul-dashboard', function (Request $request) {
+    return redirect()->route('welcome', array_filter([
+        'tahun_overhaul' => $request->query('tahun'),
+    ]));
+})->name('overhaul-sc2.dashboard');
 
 // Dashboard Check Sheet (publik)
-Route::get('/check-sheet-dashboard', [
-    CheckSheetController::class,
-    'dashboard',
-])->name('check-sheet.dashboard');
+Route::get('/check-sheet-dashboard', function (Request $request) {
+    return redirect()->route('welcome', array_filter([
+        'tahun_checksheet' => $request->query('tahun'),
+    ]));
+})->name('check-sheet.dashboard');
 
 
 /*
@@ -676,6 +679,11 @@ Route::middleware(['auth', 'role:pimpinan'])->group(function () {
         CheckSheetPimpinanController::class,
         'destroy',
     ])->name('pimpinan.check-sheet.destroy');
+    
+    Route::post(
+        '/pimpinan/check-sheet/notifikasi/{notification}/baca',
+        [CheckSheetNotificationController::class, 'baca']
+    )->name('pimpinan.check-sheet.notifikasi.baca');
 });
 
 

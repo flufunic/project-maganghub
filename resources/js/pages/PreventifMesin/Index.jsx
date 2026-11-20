@@ -41,7 +41,10 @@ const ICONS = {
         paths: ['M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4'],
     },
     bell: {
-        paths: ['M15 17h5l-1.5-2v-4a6.5 6.5 0 00-13 0v4L4 17h5', 'M10 20h4'],
+        paths: [
+            'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9',
+            'M10.3 21a1.94 1.94 0 0 0 3.4 0',
+        ],
     },
     menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
     close: { sw: 2, paths: ['M6 6l12 12M18 6L6 18'] },
@@ -368,6 +371,16 @@ export default function Index({
 
         return () => clearTimeout(timer);
     }, [warningMessage]);
+
+    // Esc menutup dropdown notifikasi
+    useEffect(() => {
+        if (!showNotifications) return undefined;
+
+        const onKey = (e) => e.key === 'Escape' && setShowNotifications(false);
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [showNotifications]);
 
     // =========================
     // CEK CHECKLIST
@@ -1192,7 +1205,6 @@ export default function Index({
                 @keyframes idxFloatReverse { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-34px,22px,0) scale(1.1); } }
                 @keyframes idxShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
                 @keyframes idxCheck { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
-                @keyframes idxWiggle { 0%,100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } 75% { transform: rotate(0); } }
                 @keyframes idxPing { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(2.2); opacity: 0; } }
                 @keyframes idxPulse {
                     0%,100% { box-shadow: inset 0 0 0 2px rgba(245,158,11,.95), 0 0 0 0 rgba(245,158,11,.55); }
@@ -1213,7 +1225,18 @@ export default function Index({
                 .idx-ping { animation: idxPing 1.8s ease-out infinite; }
                 .idx-pulse { animation: idxPulse 1.2s ease-in-out infinite; }
                 .idx-spin { animation: idxSpin .8s linear infinite; }
-
+                @keyframes idxBellShake {
+                    0%, 100% { transform: rotate(0deg); }
+                    10%, 30%, 50%, 70% { transform: rotate(12deg); }
+                    20%, 40%, 60%, 80% { transform: rotate(-12deg); }
+                    90% { transform: rotate(0deg); }
+                }
+                @keyframes idxNotifPulse { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(1.65); opacity: 0; } }
+                @keyframes idxBadgePop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+                @keyframes idxBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+                .idx-bell-shake { animation: idxBellShake 1.1s ease-in-out infinite; transform-origin: 50% 15%; }
+                .idx-notif-pulse { animation: idxNotifPulse 1.8s ease-out infinite; }
+                .idx-badge-pop { animation: idxBadgePop .45s ease-out both, idxBadgePulse 1.5s ease-in-out .5s infinite; }
                 .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
                 .idx-scroll::-webkit-scrollbar-track { background: transparent; }
                 .idx-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 999px; }
@@ -1222,7 +1245,8 @@ export default function Index({
                 @media (prefers-reduced-motion: reduce) {
                     .idx-rise, .idx-fade, .idx-pop, .idx-slide, .idx-drop,
                     .idx-float, .idx-float-reverse, .idx-shimmer, .idx-check,
-                    .idx-wiggle, .idx-ping, .idx-pulse { animation: none !important; }
+                    .idx-bell-shake, .idx-notif-pulse, .idx-badge-pop,
+                    .idx-ping, .idx-pulse { animation: none !important; }
                 }
             `}</style>
 
@@ -1276,32 +1300,37 @@ export default function Index({
                                 <div className="relative">
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            setShowNotifications(!showNotifications)
-                                        }
-                                        className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/15 text-white transition-all duration-200 active:scale-95 ${
-                                            totalNotif > 0
-                                                ? 'bg-white/20 hover:bg-white/30'
-                                                : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
-                                        }`}
+                                        onClick={() => setShowNotifications((prev) => !prev)}
+                                        aria-label={`Notifikasi, ${totalNotif} perlu perhatian`}
+                                        aria-expanded={showNotifications}
                                         title="Notifikasi"
-                                        aria-label="Notifikasi"
+                                        className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-white/10 text-white transition-all duration-300 hover:bg-white/20 active:scale-95 ${
+                                            totalNotif > 0
+                                                ? 'border-blue-300/50 shadow-[0_0_18px_rgba(59,130,246,0.4)]'
+                                                : 'border-white/15'
+                                        }`}
                                     >
-                                        <Icon
-                                            type="bell"
-                                            className={`h-5 w-5 ${
-                                                totalNotif > 0
-                                                    ? 'idx-wiggle drop-shadow-[0_0_6px_rgba(147,197,253,0.8)]'
-                                                    : ''
+                                        {totalNotif > 0 && (
+                                            <span className="idx-notif-pulse pointer-events-none absolute inset-1 rounded-xl border border-blue-300/80 bg-blue-400/20" />
+                                        )}
+
+                                        <span
+                                            className={`relative z-10 flex items-center justify-center ${
+                                                totalNotif > 0 && !showNotifications ? 'idx-bell-shake' : ''
                                             }`}
-                                        />
+                                        >
+                                            <Icon
+                                                type="bell"
+                                                className={`h-5 w-5 ${totalNotif > 0 ? 'text-blue-200' : 'text-white'}`}
+                                            />
+                                        </span>
 
                                         {totalNotif > 0 && (
-                                            <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center">
-                                                <span className="idx-ping absolute inset-0 rounded-full bg-red-500/70" />
-                                                <span className="relative flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0b1d57] bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-extrabold text-white shadow-md">
-                                                    {totalNotif > 99 ? '99+' : totalNotif}
-                                                </span>
+                                            <span
+                                                key={totalNotif}
+                                                className="idx-badge-pop absolute -right-1 -top-1 z-20 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b1d57] bg-red-500 px-1 text-[10px] font-extrabold text-white shadow-lg shadow-red-500/40"
+                                            >
+                                                {totalNotif > 99 ? '99+' : totalNotif}
                                             </span>
                                         )}
                                     </button>
@@ -1310,42 +1339,35 @@ export default function Index({
                                         DROPDOWN NOTIFIKASI
                                     ================================================== */}
                                     {showNotifications && (
-                                        <div className="idx-drop absolute right-0 top-12 z-[80] w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30">
-                                            {/* HEADER */}
-                                            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                                                <div className="flex items-center gap-2.5">
-                                                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                                                        <Icon type="bell" className="h-4 w-4" />
-                                                    </span>
+                                        <>
+                                            {/* BACKDROP: klik di luar untuk menutup */}
+                                            <button
+                                                type="button"
+                                                aria-label="Tutup notifikasi"
+                                                className="fixed inset-0 z-[70] cursor-default"
+                                                onClick={() => setShowNotifications(false)}
+                                            />
 
-                                                    <div>
-                                                        <h3 className="text-sm font-bold leading-tight text-slate-800">
-                                                            Notifikasi
-                                                        </h3>
-
-                                                        <p className="text-[11px] leading-tight text-slate-400">
-                                                            Jadwal & aktivitas preventif
+                                            <div className="idx-drop absolute right-0 top-full z-[80] mt-3 w-[min(380px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+                                                {/* HEADER */}
+                                                <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/60 px-4 py-3.5">
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-900">Notifikasi</p>
+                                                        <p className="mt-0.5 text-xs text-slate-500">
+                                                            {totalNotif > 0
+                                                                ? `${jumlahAbnormality} abnormality · ${jumlahJadwal} jadwal`
+                                                                : 'Jadwal & aktivitas preventif'}
                                                         </p>
                                                     </div>
-                                                </div>
 
-                                                {totalNotif > 0 && (
-                                                    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-[11px] font-semibold">
-                                                        {jumlahAbnormality > 0 && (
-                                                            <span className="inline-flex items-center gap-1 text-red-500">
-                                                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                                                {jumlahAbnormality} abnormality
-                                                            </span>
-                                                        )}
-
-                                                        {jumlahJadwal > 0 && (
-                                                            <span className="inline-flex items-center gap-1 text-amber-600">
-                                                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                                                {jumlahJadwal} jadwal
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowNotifications(false)}
+                                                        aria-label="Tutup"
+                                                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                                    >
+                                                        <Icon type="close" className="h-4 w-4" />
+                                                    </button>
                                             </div>
 
                                             {/* ISI */}
@@ -1479,7 +1501,8 @@ export default function Index({
                                                 </div>
                                             )}
                                         </div>
-                                    )}
+                                    </>
+                                )}
                                 </div>
                             </div>
                         </div>

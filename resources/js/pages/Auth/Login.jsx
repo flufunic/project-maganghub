@@ -345,15 +345,6 @@ export default function Login() {
                                         </button>
                                     </div>
                                 </form>
-
-                                {/* STATUS */}
-                                <div className="lg-rise mt-7 flex items-center justify-center gap-2 border-t border-white/5 pt-5 text-xs text-slate-500" style={rise(4)}>
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                                    </span>
-                                    Koneksi aman
-                                </div>
                             </div>
                         </div>
                     </div>

@@ -13,6 +13,8 @@ import {
     X,
     AlertTriangle,
     AlertCircle,
+    Bell,
+    BellOff,
 } from 'lucide-react';
 import Sidebar from '@/Components/Sidebar';
 
@@ -43,10 +45,11 @@ const STATUS = {
     },
 };
 
-const thClass = 'px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500';
+const thClass =
+    'px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500';
 
 /* ------------------------------------------------------------------
-| HOOK: angka naik pelan-pelan
+| HOOK: ANGKA NAIK PELAN-PELAN
 ------------------------------------------------------------------ */
 function useCountUp(target, duration = 800) {
     const [value, setValue] = useState(0);
@@ -96,8 +99,14 @@ function useCountUp(target, duration = 800) {
 function Dot({ cls, ping, pulse }) {
     return (
         <span className="relative flex h-2 w-2">
-            {pulse && <span className={`csi-ping absolute inline-flex h-full w-full rounded-full ${ping}`} />}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${cls}`} />
+            {pulse && (
+                <span
+                    className={`csi-ping absolute inline-flex h-full w-full rounded-full ${ping}`}
+                />
+            )}
+            <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${cls}`}
+            />
         </span>
     );
 }
@@ -120,7 +129,9 @@ function StatCard({ card, aktif, onClick, index }) {
             aria-pressed={aktif}
             style={{ animationDelay: `${index * 70}ms` }}
             className={`csi-rise group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-900/5 focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                aktif ? `border-transparent ring-2 ${card.tone.ring}` : 'border-slate-200/80'
+                aktif
+                    ? `border-transparent ring-2 ${card.tone.ring}`
+                    : 'border-slate-200/80'
             }`}
         >
             <div className="flex items-start justify-between">
@@ -137,9 +148,17 @@ function StatCard({ card, aktif, onClick, index }) {
                 )}
             </div>
 
-            <p className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${card.tone.value}`}>{angka}</p>
-            <p className="mt-0.5 text-xs font-semibold text-slate-600">{card.label}</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-400">{card.hint}</p>
+            <p
+                className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${card.tone.value}`}
+            >
+                {angka}
+            </p>
+            <p className="mt-0.5 text-xs font-semibold text-slate-600">
+                {card.label}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                {card.hint}
+            </p>
 
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
                 <div
@@ -154,7 +173,11 @@ function StatCard({ card, aktif, onClick, index }) {
 /* ------------------------------------------------------------------
 | HALAMAN
 ------------------------------------------------------------------ */
-export default function Index({ pengirimans = [] }) {
+export default function Index({
+    pengirimans = [],
+    notifications = [],
+    unreadCount = 0,
+}) {
     const { flash, errors } = usePage().props;
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -162,16 +185,57 @@ export default function Index({ pengirimans = [] }) {
     const [hapusItem, setHapusItem] = useState(null);
     const [menghapus, setMenghapus] = useState(false);
     const [toast, setToast] = useState(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+
+    const adaNotifikasi = unreadCount > 0;
+
+    const handleNotificationClick = (notification) => {
+        if (!notification.read_url) return;
+
+        router.post(notification.read_url, {}, {
+            preserveScroll: true,
+            onFinish: () => setShowNotifications(false),
+        });
+    };
+
+    /* Refresh notifikasi setiap 30 detik */
+    useEffect(() => {
+        const interval = setInterval(() => {
+            router.reload({
+                only: ['notifications', 'unreadCount'],
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    /* Esc menutup dropdown notifikasi */
+    useEffect(() => {
+        if (!showNotifications) return undefined;
+
+        const onKey = (e) => e.key === 'Escape' && setShowNotifications(false);
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [showNotifications]);
 
     useEffect(() => {
         if (flash?.success) {
-            setToast({ type: 'success', message: flash.success });
+            setToast({
+                type: 'success',
+                message: flash.success,
+            });
         }
     }, [flash]);
 
     useEffect(() => {
         if (errors?.pengiriman) {
-            setToast({ type: 'error', message: errors.pengiriman });
+            setToast({
+                type: 'error',
+                message: errors.pengiriman,
+            });
         }
     }, [errors]);
 
@@ -183,26 +247,41 @@ export default function Index({ pengirimans = [] }) {
         return () => clearTimeout(timer);
     }, [toast]);
 
-    // Esc menutup modal hapus
+    /* Esc menutup modal hapus */
     useEffect(() => {
         if (!hapusItem) return undefined;
 
         const onKey = (e) => {
-            if (e.key === 'Escape' && !menghapus) setHapusItem(null);
+            if (e.key === 'Escape' && !menghapus) {
+                setHapusItem(null);
+            }
         };
 
         window.addEventListener('keydown', onKey);
+
         return () => window.removeEventListener('keydown', onKey);
     }, [hapusItem, menghapus]);
 
-    const daftar = filter === 'semua' ? pengirimans : pengirimans.filter((p) => p.status === filter);
+    const daftar =
+        filter === 'semua'
+            ? pengirimans
+            : pengirimans.filter((p) => p.status === filter);
 
     const totalPengiriman = pengirimans.length;
-    const totalMenunggu = pengirimans.filter((p) => p.status === 'menunggu').length;
-    const totalDiperiksa = pengirimans.filter((p) => p.status === 'diperiksa').length;
-    const totalDitolak = pengirimans.filter((p) => p.status === 'ditolak').length;
+    const totalMenunggu = pengirimans.filter(
+        (p) => p.status === 'menunggu'
+    ).length;
+    const totalDiperiksa = pengirimans.filter(
+        (p) => p.status === 'diperiksa'
+    ).length;
+    const totalDitolak = pengirimans.filter(
+        (p) => p.status === 'ditolak'
+    ).length;
 
-    const persen = (n) => (totalPengiriman > 0 ? `${(n / totalPengiriman) * 100}%` : '0%');
+    const persen = (n) =>
+        totalPengiriman > 0
+            ? `${(n / totalPengiriman) * 100}%`
+            : '0%';
 
     const statCards = [
         {
@@ -263,9 +342,13 @@ export default function Index({ pengirimans = [] }) {
         },
     ];
 
-    // Klik kartu yang sedang aktif -> kembali ke semua
+    /* Klik kartu aktif -> kembali ke semua */
     const pilihFilter = (nilai) => {
-        setFilter((sekarang) => (sekarang === nilai || nilai === 'semua' ? 'semua' : nilai));
+        setFilter((sekarang) =>
+            sekarang === nilai || nilai === 'semua'
+                ? 'semua'
+                : nilai
+        );
     };
 
     const konfirmasiHapus = () => {
@@ -286,38 +369,200 @@ export default function Index({ pengirimans = [] }) {
         <>
             <Head title="Check Sheet Mingguan" />
 
-            {/* SIDEBAR (di luar pembungkus agar posisi fixed tidak terkurung) */}
-            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+            <Sidebar
+                open={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+            />
 
             <style>{`
-                @keyframes csiRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-                @keyframes csiFade { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes csiPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
-                @keyframes csiToast { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
-                @keyframes csiFloat { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(28px,-22px,0) scale(1.08); } }
-                @keyframes csiFloatReverse { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-28px,22px,0) scale(1.1); } }
-                @keyframes csiLine { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
-                @keyframes csiPing { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.4); opacity: 0; } }
-                @keyframes csiShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+                @keyframes csiRise {
+                    from { opacity: 0; transform: translateY(14px); }
+                    to { opacity: 1; transform: none; }
+                }
 
-                /* fill-mode "backwards": tidak ada transform tersisa setelah selesai */
-                .csi-rise { animation: csiRise .6s cubic-bezier(.22,1,.36,1) backwards; }
-                .csi-fade { animation: csiFade .25s ease-out both; }
-                .csi-pop { animation: csiPop .35s cubic-bezier(.22,1,.36,1) both; }
-                .csi-toast { animation: csiToast .4s cubic-bezier(.22,1,.36,1) both; }
-                .csi-float { animation: csiFloat 14s ease-in-out infinite; }
-                .csi-float-reverse { animation: csiFloatReverse 17s ease-in-out infinite; }
-                .csi-line { background-size: 200% 100%; animation: csiLine 7s linear infinite; }
-                .csi-ping { animation: csiPing 1.8s cubic-bezier(0,0,.2,1) infinite; }
-                .csi-shrink { transform-origin: left; animation: csiShrink 5s linear forwards; }
+                @keyframes csiFade {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
 
-                .csi-scroll::-webkit-scrollbar { height: 8px; }
-                .csi-scroll::-webkit-scrollbar-track { background: transparent; }
-                .csi-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 999px; }
+                @keyframes csiPop {
+                    from {
+                        opacity: 0;
+                        transform: translateY(14px) scale(.96);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: none;
+                    }
+                }
+
+                @keyframes csiToast {
+                    from {
+                        opacity: 0;
+                        transform: translateX(24px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: none;
+                    }
+                }
+
+                @keyframes csiFloat {
+                    0%, 100% {
+                        transform: translate3d(0,0,0) scale(1);
+                    }
+                    50% {
+                        transform: translate3d(28px,-22px,0) scale(1.08);
+                    }
+                }
+
+                @keyframes csiFloatReverse {
+                    0%, 100% {
+                        transform: translate3d(0,0,0) scale(1);
+                    }
+                    50% {
+                        transform: translate3d(-28px,22px,0) scale(1.1);
+                    }
+                }
+
+                @keyframes csiLine {
+                    0% { background-position: 0% 50%; }
+                    100% { background-position: 200% 50%; }
+                }
+
+                @keyframes csiPing {
+                    0% {
+                        transform: scale(1);
+                        opacity: .6;
+                    }
+                    80%, 100% {
+                        transform: scale(2.4);
+                        opacity: 0;
+                    }
+                }
+
+                @keyframes csiShrink {
+                    from { transform: scaleX(1); }
+                    to { transform: scaleX(0); }
+                }
+
+                /* LONCENG NOTIFIKASI */
+                @keyframes csiDrop {
+                    from { opacity: 0; transform: translateY(-8px) scale(.97); }
+                    to { opacity: 1; transform: none; }
+                }
+
+                @keyframes csiBellShake {
+                    0%, 100% { transform: rotate(0deg); }
+                    10%, 30%, 50%, 70% { transform: rotate(12deg); }
+                    20%, 40%, 60%, 80% { transform: rotate(-12deg); }
+                    90% { transform: rotate(0deg); }
+                }
+
+                @keyframes csiNotifPulse {
+                    0% { transform: scale(.8); opacity: .7; }
+                    100% { transform: scale(1.65); opacity: 0; }
+                }
+
+                @keyframes csiBadgePop {
+                    0% { transform: scale(0); }
+                    60% { transform: scale(1.25); }
+                    100% { transform: scale(1); }
+                }
+
+                @keyframes csiBadgePulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.12); }
+                }
+
+                .csi-rise {
+                    animation: csiRise .6s cubic-bezier(.22,1,.36,1) backwards;
+                }
+
+                .csi-fade {
+                    animation: csiFade .25s ease-out both;
+                }
+
+                .csi-pop {
+                    animation: csiPop .35s cubic-bezier(.22,1,.36,1) both;
+                }
+
+                .csi-toast {
+                    animation: csiToast .4s cubic-bezier(.22,1,.36,1) both;
+                }
+
+                .csi-float {
+                    animation: csiFloat 14s ease-in-out infinite;
+                }
+
+                .csi-float-reverse {
+                    animation: csiFloatReverse 17s ease-in-out infinite;
+                }
+
+                .csi-line {
+                    background-size: 200% 100%;
+                    animation: csiLine 7s linear infinite;
+                }
+
+                .csi-ping {
+                    animation: csiPing 1.8s cubic-bezier(0,0,.2,1) infinite;
+                }
+
+                .csi-shrink {
+                    transform-origin: left;
+                    animation: csiShrink 5s linear forwards;
+                }
+
+                .csi-drop {
+                    animation: csiDrop .22s cubic-bezier(.22,1,.36,1) both;
+                    transform-origin: top right;
+                }
+
+                /* LONCENG BERGOYANG SELAMA ADA NOTIFIKASI BELUM DIBACA */
+                .csi-bell-shake {
+                    animation: csiBellShake 1.1s ease-in-out infinite;
+                    transform-origin: 50% 15%;
+                }
+
+                .csi-notif-pulse {
+                    animation: csiNotifPulse 1.8s ease-out infinite;
+                }
+
+                .csi-badge-pop {
+                    animation: csiBadgePop .45s ease-out both,
+                               csiBadgePulse 1.5s ease-in-out .5s infinite;
+                }
+
+                .csi-scroll::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+
+                .csi-scroll::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+
+                .csi-scroll::-webkit-scrollbar-thumb {
+                    background: rgba(100,116,139,.35);
+                    border-radius: 999px;
+                }
 
                 @media (prefers-reduced-motion: reduce) {
-                    .csi-rise, .csi-fade, .csi-pop, .csi-toast, .csi-float, .csi-float-reverse,
-                    .csi-line, .csi-ping, .csi-shrink { animation: none !important; }
+                    .csi-rise,
+                    .csi-fade,
+                    .csi-pop,
+                    .csi-toast,
+                    .csi-float,
+                    .csi-float-reverse,
+                    .csi-line,
+                    .csi-ping,
+                    .csi-shrink,
+                    .csi-drop,
+                    .csi-bell-shake,
+                    .csi-notif-pulse,
+                    .csi-badge-pop {
+                        animation: none !important;
+                    }
                 }
             `}</style>
 
@@ -325,43 +570,220 @@ export default function Index({ pengirimans = [] }) {
                 {/* BACKGROUND */}
                 <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
                     <div className="absolute inset-0 bg-slate-50" />
+
                     <div className="csi-float absolute -left-32 -top-24 h-[420px] w-[420px] rounded-full bg-blue-300/25 blur-[110px]" />
+
                     <div className="csi-float-reverse absolute -right-32 top-[15%] h-[460px] w-[460px] rounded-full bg-indigo-300/20 blur-[120px]" />
+
                     <div className="csi-float absolute bottom-[-180px] left-[30%] h-[440px] w-[440px] rounded-full bg-sky-300/20 blur-[110px]" />
+
                     <div
                         className="absolute inset-0 opacity-30"
                         style={{
-                            backgroundImage: 'radial-gradient(rgba(100,116,139,.22) 1px, transparent 1px)',
+                            backgroundImage:
+                                'radial-gradient(rgba(100,116,139,.22) 1px, transparent 1px)',
                             backgroundSize: '22px 22px',
-                            maskImage: 'linear-gradient(to bottom, black, transparent 65%)',
-                            WebkitMaskImage: 'linear-gradient(to bottom, black, transparent 65%)',
+                            maskImage:
+                                'linear-gradient(to bottom, black, transparent 65%)',
+                            WebkitMaskImage:
+                                'linear-gradient(to bottom, black, transparent 65%)',
                         }}
                     />
                 </div>
 
                 {/* HEADER */}
                 <header className="sticky top-0 z-40 bg-gradient-to-r from-[#061033] via-[#0b1d57] to-[#12328a] shadow-lg shadow-slate-950/20">
-                    <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
-                        <button
-                            type="button"
-                            onClick={() => setSidebarOpen(true)}
-                            aria-label="Buka menu"
-                            title="Buka menu"
-                            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all duration-200 hover:bg-white/20 active:scale-95"
-                        >
-                            <Menu className="h-5 w-5" strokeWidth={2} />
-                        </button>
+                    <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                        {/* BAGIAN KIRI */}
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSidebarOpen(true)}
+                                aria-label="Buka menu"
+                                title="Buka menu"
+                                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all duration-200 hover:bg-white/20 active:scale-95"
+                            >
+                                <Menu className="h-5 w-5" strokeWidth={2} />
+                            </button>
 
-                        <div className="min-w-0">
-                            <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
-                                Check Sheet Mingguan
-                            </h1>
-                            <p className="hidden truncate text-xs text-blue-100/60 sm:block">
-                                Approval dan Monitoring Check Sheet
-                            </p>
+                            <div className="min-w-0">
+                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
+                                    Check Sheet Mingguan
+                                </h1>
+                                <p className="hidden truncate text-xs text-blue-100/60 sm:block">
+                                    Approval dan Monitoring Check Sheet
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* BAGIAN KANAN: NOTIFIKASI */}
+                        <div className="relative shrink-0">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowNotifications((prev) => !prev)
+                                }
+                                aria-label={`Notifikasi Check Sheet, ${unreadCount} belum dibaca`}
+                                aria-expanded={showNotifications}
+                                title="Notifikasi Check Sheet"
+                                className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-white/10 text-white transition-all duration-300 hover:bg-white/20 active:scale-95 ${
+                                    adaNotifikasi
+                                        ? 'border-blue-300/50 shadow-[0_0_18px_rgba(59,130,246,0.4)]'
+                                        : 'border-white/15'
+                                }`}
+                            >
+                                {adaNotifikasi && (
+                                    <span className="csi-notif-pulse pointer-events-none absolute inset-1 rounded-xl border border-blue-300/80 bg-blue-400/20" />
+                                )}
+
+                                <span
+                                    className={`relative z-10 flex items-center justify-center ${
+                                        adaNotifikasi ? 'csi-bell-shake' : ''
+                                    }`}
+                                >
+                                    <Bell
+                                        className={`h-5 w-5 ${
+                                            adaNotifikasi
+                                                ? 'text-blue-200'
+                                                : 'text-white'
+                                        }`}
+                                        strokeWidth={1.8}
+                                    />
+                                </span>
+
+                                {adaNotifikasi && (
+                                    <span
+                                        key={unreadCount}
+                                        className="csi-badge-pop absolute -right-1 -top-1 z-20 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b1d57] bg-red-500 px-1 text-[10px] font-extrabold text-white shadow-lg shadow-red-500/40"
+                                    >
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {showNotifications && (
+                                <>
+                                    {/* BACKDROP */}
+                                    <button
+                                        type="button"
+                                        aria-label="Tutup notifikasi"
+                                        className="fixed inset-0 z-40 cursor-default"
+                                        onClick={() =>
+                                            setShowNotifications(false)
+                                        }
+                                    />
+
+                                    {/* DROPDOWN */}
+                                    <div className="csi-drop absolute right-0 z-50 mt-3 w-[min(380px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+                                        {/* HEADER DROPDOWN */}
+                                        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/60 px-4 py-3.5">
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-900">
+                                                    Notifikasi Check Sheet
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-slate-500">
+                                                    {adaNotifikasi
+                                                        ? `${unreadCount} belum dibaca`
+                                                        : 'Semua sudah dibaca'}
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowNotifications(false)
+                                                }
+                                                aria-label="Tutup"
+                                                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* DAFTAR NOTIFIKASI */}
+                                        <div className="csi-scroll max-h-[380px] overflow-y-auto">
+                                            {notifications.length === 0 ? (
+                                                <div className="px-4 py-12 text-center">
+                                                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                                        <BellOff
+                                                            className="h-6 w-6"
+                                                            strokeWidth={1.7}
+                                                        />
+                                                    </div>
+
+                                                    <p className="text-sm font-semibold text-slate-600">
+                                                        Belum ada notifikasi
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        Notifikasi pengiriman Check Sheet akan muncul di sini.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                notifications.map(
+                                                    (notification) => (
+                                                        <button
+                                                            key={notification.id}
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleNotificationClick(
+                                                                    notification
+                                                                )
+                                                            }
+                                                            className={`relative flex w-full cursor-pointer gap-3 border-b border-slate-100 px-4 py-3.5 text-left transition-colors hover:bg-blue-50 ${
+                                                                !notification.dibaca
+                                                                    ? 'bg-blue-50/60'
+                                                                    : 'bg-white'
+                                                            }`}
+                                                        >
+                                                            {!notification.dibaca && (
+                                                                <span className="absolute inset-y-0 left-0 w-[3px] bg-blue-500" />
+                                                            )}
+
+                                                            <div
+                                                                className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                                                                    !notification.dibaca
+                                                                        ? 'bg-blue-100 text-blue-700'
+                                                                        : 'bg-slate-100 text-slate-500'
+                                                                }`}
+                                                            >
+                                                                <FileText
+                                                                    className="h-4 w-4"
+                                                                    strokeWidth={1.8}
+                                                                />
+                                                            </div>
+
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <p className="text-xs font-bold text-slate-800">
+                                                                        {notification.judul}
+                                                                    </p>
+
+                                                                    {!notification.dibaca && (
+                                                                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                                                                    )}
+                                                                </div>
+
+                                                                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                    {notification.pesan}
+                                                                </p>
+
+                                                                <p className="mt-1.5 text-[11px] text-slate-400">
+                                                                    {notification.waktu}
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    )
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 
+                    {/* GARIS AKSEN */}
                     <div className="csi-line h-[3px] bg-gradient-to-r from-blue-400 via-violet-400 via-cyan-300 to-blue-400" />
                 </header>
 
@@ -370,7 +792,9 @@ export default function Index({ pengirimans = [] }) {
                     {/* JUDUL */}
                     <div className="csi-rise mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Data Check Sheet</h2>
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                                Data Check Sheet
+                            </h2>
                             <p className="mt-1 text-sm text-slate-500">
                                 Data yang telah dikirim oleh Admin untuk diperiksa.
                             </p>
@@ -382,13 +806,17 @@ export default function Index({ pengirimans = [] }) {
                                 onClick={() => setFilter('menunggu')}
                                 className="inline-flex w-fit cursor-pointer items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 py-1.5 pl-3 pr-4 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
                             >
-                                <Dot cls="bg-amber-500" ping="bg-amber-400" pulse />
+                                <Dot
+                                    cls="bg-amber-500"
+                                    ping="bg-amber-400"
+                                    pulse
+                                />
                                 {totalMenunggu} data menunggu pemeriksaan
                             </button>
                         )}
                     </div>
 
-                    {/* KARTU STATISTIK (klik untuk filter) */}
+                    {/* KARTU STATISTIK */}
                     <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                         {statCards.map((card, i) => (
                             <StatCard
@@ -409,12 +837,17 @@ export default function Index({ pengirimans = [] }) {
                         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                                    <CalendarDays className="h-5 w-5" strokeWidth={1.9} />
+                                    <CalendarDays
+                                        className="h-5 w-5"
+                                        strokeWidth={1.9}
+                                    />
                                 </div>
 
                                 <div>
                                     <h3 className="font-bold text-slate-900">
-                                        {filter === 'semua' ? 'Riwayat Pengiriman' : STATUS[filter]?.label}
+                                        {filter === 'semua'
+                                            ? 'Riwayat Pengiriman'
+                                            : STATUS[filter]?.label}
                                     </h3>
                                     <p className="mt-0.5 text-sm text-slate-500">
                                         Daftar check sheet mingguan yang dikirim oleh Admin.
@@ -445,13 +878,21 @@ export default function Index({ pengirimans = [] }) {
                             <div className="px-6 py-16 text-center">
                                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                                     {totalPengiriman === 0 ? (
-                                        <FileText className="h-8 w-8" strokeWidth={1.5} />
+                                        <FileText
+                                            className="h-8 w-8"
+                                            strokeWidth={1.5}
+                                        />
                                     ) : (
-                                        <Inbox className="h-8 w-8" strokeWidth={1.5} />
+                                        <Inbox
+                                            className="h-8 w-8"
+                                            strokeWidth={1.5}
+                                        />
                                     )}
                                 </div>
 
-                                <h3 className="font-semibold text-slate-700">Belum ada data</h3>
+                                <h3 className="font-semibold text-slate-700">
+                                    Belum ada data
+                                </h3>
 
                                 <p className="mt-1 text-sm text-slate-500">
                                     {filter === 'semua'
@@ -469,19 +910,27 @@ export default function Index({ pengirimans = [] }) {
                                             <th className={thClass}>Dikirim Oleh</th>
                                             <th className={thClass}>Waktu Pengiriman</th>
                                             <th className={thClass}>Status</th>
-                                            <th className={`${thClass} text-center`}>Aksi</th>
+                                            <th className={`${thClass} text-center`}>
+                                                Aksi
+                                            </th>
                                         </tr>
                                     </thead>
 
-                                    {/* key={filter}: animasi baris diulang tiap ganti filter */}
-                                    <tbody key={filter} className="divide-y divide-slate-100">
+                                    <tbody
+                                        key={filter}
+                                        className="divide-y divide-slate-100"
+                                    >
                                         {daftar.map((item, index) => {
-                                            const s = STATUS[item.status] ?? STATUS.menunggu;
+                                            const s =
+                                                STATUS[item.status] ??
+                                                STATUS.menunggu;
 
                                             return (
                                                 <tr
                                                     key={item.id}
-                                                    style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}
+                                                    style={{
+                                                        animationDelay: `${Math.min(index, 10) * 45}ms`,
+                                                    }}
                                                     className="csi-rise group transition-colors duration-200 hover:bg-indigo-50/40"
                                                 >
                                                     <td className="px-5 py-4 font-semibold text-slate-900">
@@ -494,14 +943,18 @@ export default function Index({ pengirimans = [] }) {
                                                                 {item.divisi}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-slate-300">-</span>
+                                                            <span className="text-slate-300">
+                                                                -
+                                                            </span>
                                                         )}
                                                     </td>
 
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-2.5">
                                                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 text-xs font-bold text-indigo-600">
-                                                                {(item.dikirim_oleh || 'A').charAt(0).toUpperCase()}
+                                                                {(item.dikirim_oleh || 'A')
+                                                                    .charAt(0)
+                                                                    .toUpperCase()}
                                                             </div>
                                                             <span className="text-slate-600">
                                                                 {item.dikirim_oleh || '-'}
@@ -517,7 +970,11 @@ export default function Index({ pengirimans = [] }) {
                                                         <span
                                                             className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${s.cls}`}
                                                         >
-                                                            <Dot cls={s.dot} ping={s.ping} pulse={s.pulse} />
+                                                            <Dot
+                                                                cls={s.dot}
+                                                                ping={s.ping}
+                                                                pulse={s.pulse}
+                                                            />
                                                             {s.label}
                                                         </span>
                                                     </td>
@@ -570,13 +1027,17 @@ export default function Index({ pengirimans = [] }) {
                     key={toast.message}
                     role="status"
                     className={`csi-toast fixed right-5 top-5 z-[300] w-[340px] max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border bg-white shadow-2xl shadow-slate-950/15 ${
-                        toast.type === 'error' ? 'border-rose-200' : 'border-emerald-200'
+                        toast.type === 'error'
+                            ? 'border-rose-200'
+                            : 'border-emerald-200'
                     }`}
                 >
                     <div className="flex items-start gap-3 p-4">
                         <span
                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                                toast.type === 'error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+                                toast.type === 'error'
+                                    ? 'bg-rose-50 text-rose-600'
+                                    : 'bg-emerald-50 text-emerald-600'
                             }`}
                         >
                             {toast.type === 'error' ? (
@@ -590,7 +1051,9 @@ export default function Index({ pengirimans = [] }) {
                             <p className="text-sm font-bold text-slate-900">
                                 {toast.type === 'error' ? 'Gagal' : 'Berhasil'}
                             </p>
-                            <p className="mt-0.5 text-sm text-slate-500">{toast.message}</p>
+                            <p className="mt-0.5 text-sm text-slate-500">
+                                {toast.message}
+                            </p>
                         </div>
 
                         <button
@@ -605,7 +1068,11 @@ export default function Index({ pengirimans = [] }) {
 
                     <div className="h-[3px] bg-slate-100">
                         <div
-                            className={`csi-shrink h-full ${toast.type === 'error' ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                            className={`csi-shrink h-full ${
+                                toast.type === 'error'
+                                    ? 'bg-rose-400'
+                                    : 'bg-emerald-400'
+                            }`}
                         />
                     </div>
                 </div>
@@ -627,7 +1094,10 @@ export default function Index({ pengirimans = [] }) {
                             <div className="relative mx-auto h-14 w-14">
                                 <span className="csi-ping absolute inset-0 rounded-2xl bg-rose-300/60" />
                                 <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-lg shadow-rose-300/50">
-                                    <AlertTriangle className="h-7 w-7" strokeWidth={2} />
+                                    <AlertTriangle
+                                        className="h-7 w-7"
+                                        strokeWidth={2}
+                                    />
                                 </span>
                             </div>
 
@@ -636,9 +1106,12 @@ export default function Index({ pengirimans = [] }) {
                             </h3>
 
                             <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
-                                {hapusItem.divisi ? `${hapusItem.divisi} · ` : ''}
-                                {hapusItem.label} akan dihapus dari daftar. Data check sheet aslinya tidak ikut
-                                terhapus, dan Admin bisa mengirim ulang.
+                                {hapusItem.divisi
+                                    ? `${hapusItem.divisi} · `
+                                    : ''}
+                                {hapusItem.label} akan dihapus dari daftar.
+                                Data check sheet aslinya tidak ikut terhapus,
+                                dan Admin bisa mengirim ulang.
                             </p>
                         </div>
 

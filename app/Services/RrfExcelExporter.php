@@ -328,7 +328,7 @@ class RrfExcelExporter
         /* ---------- footer ---------- */
         $f = $kr + 1;
         $s->getRowDimension($f)->setRowHeight(16);
-        $set("A{$f}:L{$f}", 'Diekspor ' . now()->format('d/m/Y H:i'), [
+        $set("A{$f}:L{$f}", 'Diekspor ' . now()->format('d/m/Y'), [
             'size' => 7, 'warna' => $abu, 'h' => $kanan, 'border' => false,
         ]);
 

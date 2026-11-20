@@ -6,6 +6,7 @@ use App\Models\RrfNotification;
 use App\Support\Waktu;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Models\CheckSheetNotification;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -44,32 +45,45 @@ class HandleInertiaRequests extends Middleware
                 'perusahaan' => config('rrf.perusahaan'),
             ],
 
+            
             'rrfNotifications' => fn () => $user
-                ? [
-                    'jumlah_belum_dibaca' => RrfNotification::where('user_id', $user->id)
-                        ->whereNull('dibaca_pada')
-                        ->count(),
-
-                    'daftar' => RrfNotification::where('user_id', $user->id)
+                ? (function () use ($user) {
+                    // Hanya notifikasi RRF.
+                    // Notifikasi Check Sheet punya lonceng sendiri di halaman Check Sheet.
+                    $daftar = RrfNotification::where('user_id', $user->id)
                         ->with('rrf:id,rrf_no')
                         ->latest()
-                        ->limit(10)
+                        ->take(10)
                         ->get()
                         ->map(fn ($notification) => [
-                            'id'       => $notification->id,
-                            'judul'    => $notification->judul,
-                            'pesan'    => $notification->pesan,
-                            'dibaca'   => !is_null($notification->dibaca_pada),
-                            'waktu'    => Waktu::wib($notification->created_at),
-                            'rrf_no'   => $notification->rrf?->rrf_no,
-                            'read_url' => route('rrf.notifikasi.baca', $notification->id),
+                            'id' => 'rrf-' . $notification->id,
+                            'judul' => $notification->judul,
+                            'pesan' => $notification->pesan,
+                            'dibaca' => !is_null($notification->dibaca_pada),
+                            'waktu' => Waktu::wib($notification->created_at),
+                            'rrf_no' => $notification->rrf?->rrf_no,
+                            'read_url' => route(
+                                'rrf.notifikasi.baca',
+                                $notification->id
+                            ),
                         ])
-                        ->values(),
-                ]
+                        ->values();
+
+                    // Hitung semua yang belum dibaca, bukan hanya 10 yang tampil.
+                    $jumlahBelumDibaca = RrfNotification::where('user_id', $user->id)
+                        ->whereNull('dibaca_pada')
+                        ->count();
+
+                    return [
+                        'jumlah_belum_dibaca' => $jumlahBelumDibaca,
+                        'daftar' => $daftar,
+                    ];
+                })()
                 : [
                     'jumlah_belum_dibaca' => 0,
-                    'daftar'              => [],
+                    'daftar' => [],
                 ],
+
         ];
     }
 }

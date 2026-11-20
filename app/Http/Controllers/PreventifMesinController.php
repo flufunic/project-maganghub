@@ -316,6 +316,12 @@ class PreventifMesinController extends Controller
             'tahunSelesai' => $tahunSelesai,
 
             'namaBulan' => $namaBulan,
+
+            'checkSheet' => app(\App\Http\Controllers\CheckSheetController::class)
+            ->dashboardData($request->integer('tahun_checksheet', now()->year)),
+
+            'overhaul' => app(\App\Http\Controllers\OverhaulSc2Controller::class)
+            ->dashboardData($request->integer('tahun_overhaul', now()->year)),
         ]);
     }
 

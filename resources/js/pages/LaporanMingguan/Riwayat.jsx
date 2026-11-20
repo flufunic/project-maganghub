@@ -33,10 +33,10 @@ const selectClass =
     'h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
 
 const thClass =
-    'border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap';
+    'border-b border-r border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap last:border-r-0';
 
 const tdClass =
-    'border-b border-slate-100 px-4 py-3 align-middle text-sm text-slate-700';
+    'border-b border-r border-slate-200 px-4 py-3 align-middle text-sm text-slate-700 last:border-r-0';
 
 const delay = (ms) => ({ animationDelay: `${ms}ms` });
 

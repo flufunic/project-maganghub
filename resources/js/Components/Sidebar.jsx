@@ -407,7 +407,7 @@ export default function Sidebar({ open, onClose }) {
 
                         <div className="min-w-0">
                             <h2 className="truncate text-sm font-bold tracking-tight">
-                                MMS <span className="font-medium text-sky-300/80">· {config.label}</span>
+                                MMS
                             </h2>
                             <p className="mt-0.5 truncate text-[11px] font-medium text-slate-400">
                                 Maintenance Management System

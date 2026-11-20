@@ -4,12 +4,20 @@ import { Link } from '@inertiajs/react';
 const SEEN_KEY = 'cs_notif_seen';
 const POLL_MS = 60000;
 
-function Icon({ name, className = 'h-5 w-5' }) {
+function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 }) {
     const paths = {
         bell: (
             <>
                 <path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9" />
                 <path d="M10.3 21a1.94 1.94 0 003.4 0" />
+            </>
+        ),
+        bellOff: (
+            <>
+                <path d="M8.7 3A6 6 0 0118 8c0 2.6.4 4.6.9 6" />
+                <path d="M17 17H3s3-2 3-9c0-.9.2-1.7.5-2.4" />
+                <path d="M10.3 21a1.94 1.94 0 003.4 0" />
+                <path d="M2 2l20 20" />
             </>
         ),
         check: <path d="M5 12l4 4L19 6" />,
@@ -20,6 +28,7 @@ function Icon({ name, className = 'h-5 w-5' }) {
             </>
         ),
         arrow: <path d="M9 6l6 6-6 6" />,
+        close: <path d="M18 6 6 18M6 6l12 12" />,
     };
 
     return (
@@ -27,7 +36,7 @@ function Icon({ name, className = 'h-5 w-5' }) {
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth={1.8}
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             className={className}
@@ -89,7 +98,7 @@ export default function NotifPengiriman() {
 
     // Tutup dropdown saat klik di luar atau menekan Escape.
     useEffect(() => {
-        if (!open) return;
+        if (!open) return undefined;
 
         const onClick = (e) => {
             if (wrapRef.current && !wrapRef.current.contains(e.target)) {
@@ -116,6 +125,7 @@ export default function NotifPengiriman() {
         it.status === 'ditolak' || Number(it.ts) > seen;
 
     const jumlah = items.filter(perluPerhatian).length;
+    const adaNotifikasi = jumlah > 0;
     const adaDitolak = items.some((it) => it.status === 'ditolak');
 
     const toggle = () => {
@@ -136,48 +146,76 @@ export default function NotifPengiriman() {
     return (
         <>
             <style>{`
-                @keyframes bell-shake {
-                    0%, 100% { transform: rotate(0deg); }
-                    15%, 45%, 75% { transform: rotate(10deg); }
-                    30%, 60%, 90% { transform: rotate(-10deg); }
+                @keyframes npDrop {
+                    from { opacity: 0; transform: translateY(-8px) scale(.97); }
+                    to { opacity: 1; transform: none; }
                 }
 
-                @keyframes notif-ping {
-                    0% { transform: scale(1); opacity: .6; }
-                    80%, 100% { transform: scale(1.9); opacity: 0; }
-                }
-
-                @keyframes dropdown-enter {
-                    from { opacity: 0; transform: translateY(-6px) scale(.97); }
-                    to { opacity: 1; transform: translateY(0) scale(1); }
-                }
-
-                @keyframes item-enter {
+                @keyframes npItem {
                     from { opacity: 0; transform: translateY(4px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    to { opacity: 1; transform: none; }
                 }
 
-                .bell-shaking {
-                    transform-origin: top center;
-                    animation: bell-shake 1s ease-in-out 3;
+                @keyframes npBellShake {
+                    0%, 100% { transform: rotate(0deg); }
+                    10%, 30%, 50%, 70% { transform: rotate(12deg); }
+                    20%, 40%, 60%, 80% { transform: rotate(-12deg); }
+                    90% { transform: rotate(0deg); }
                 }
 
-                .notif-ping { animation: notif-ping 1.8s ease-out infinite; }
+                @keyframes npPulse {
+                    0% { transform: scale(.8); opacity: .7; }
+                    100% { transform: scale(1.65); opacity: 0; }
+                }
 
-                .notif-dropdown {
-                    animation: dropdown-enter .22s cubic-bezier(.22,1,.36,1) both;
+                @keyframes npBadgePop {
+                    0% { transform: scale(0); }
+                    60% { transform: scale(1.25); }
+                    100% { transform: scale(1); }
+                }
+
+                @keyframes npBadgePulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.12); }
+                }
+
+                .np-drop {
+                    animation: npDrop .22s cubic-bezier(.22,1,.36,1) both;
                     transform-origin: top right;
                 }
 
-                .notif-item {
-                    animation: item-enter .3s cubic-bezier(.22,1,.36,1) both;
+                .np-item {
+                    animation: npItem .3s cubic-bezier(.22,1,.36,1) both;
+                }
+
+                /* Bergoyang selama ada notifikasi yang perlu perhatian */
+                .np-bell-shake {
+                    animation: npBellShake 1.1s ease-in-out infinite;
+                    transform-origin: 50% 15%;
+                }
+
+                .np-pulse {
+                    animation: npPulse 1.8s ease-out infinite;
+                }
+
+                .np-badge-pop {
+                    animation: npBadgePop .45s ease-out both,
+                               npBadgePulse 1.5s ease-in-out .5s infinite;
+                }
+
+                .np-scroll::-webkit-scrollbar { width: 8px; }
+                .np-scroll::-webkit-scrollbar-track { background: transparent; }
+                .np-scroll::-webkit-scrollbar-thumb {
+                    background: rgba(100,116,139,.35);
+                    border-radius: 999px;
                 }
 
                 @media (prefers-reduced-motion: reduce) {
-                    .bell-shaking,
-                    .notif-ping,
-                    .notif-dropdown,
-                    .notif-item {
+                    .np-drop,
+                    .np-item,
+                    .np-bell-shake,
+                    .np-pulse,
+                    .np-badge-pop {
                         animation: none !important;
                     }
                 }
@@ -189,72 +227,83 @@ export default function NotifPengiriman() {
                     type="button"
                     onClick={toggle}
                     title="Status pengiriman ke pimpinan"
-                    aria-label="Notifikasi status pengiriman"
+                    aria-label={`Notifikasi status pengiriman, ${jumlah} perlu perhatian`}
                     aria-expanded={open}
-                    className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-white outline-none transition-all duration-200 hover:bg-white/20 active:scale-95 focus-visible:ring-4 focus-visible:ring-white/30 ${
-                        open ? 'bg-white/20' : 'bg-white/10'
+                    className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-white/10 text-white outline-none transition-all duration-300 hover:bg-white/20 active:scale-95 focus-visible:ring-4 focus-visible:ring-white/30 ${
+                        adaNotifikasi
+                            ? 'border-blue-300/50 shadow-[0_0_18px_rgba(59,130,246,0.4)]'
+                            : 'border-white/15'
                     }`}
                 >
-                    <Icon
-                        name="bell"
-                        className={`h-5 w-5 ${
-                            jumlah > 0 && !open ? 'bell-shaking' : ''
-                        }`}
-                    />
+                    {adaNotifikasi && (
+                        <span className="np-pulse pointer-events-none absolute inset-1 rounded-xl border border-blue-300/80 bg-blue-400/20" />
+                    )}
 
-                    {jumlah > 0 && (
-                        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px]">
-                            <span
-                                className={`notif-ping absolute inset-0 rounded-full ${
-                                    adaDitolak ? 'bg-red-400' : 'bg-emerald-400'
-                                }`}
-                            />
-                            <span
-                                className={`relative flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-[#071735] ${
-                                    adaDitolak ? 'bg-red-500' : 'bg-emerald-500'
-                                }`}
-                            >
-                                {jumlah > 9 ? '9+' : jumlah}
-                            </span>
+                    <span
+                        className={`relative z-10 flex items-center justify-center ${
+                            adaNotifikasi && !open ? 'np-bell-shake' : ''
+                        }`}
+                    >
+                        <Icon
+                            name="bell"
+                            className={`h-5 w-5 ${
+                                adaNotifikasi ? 'text-blue-200' : 'text-white'
+                            }`}
+                        />
+                    </span>
+
+                    {adaNotifikasi && (
+                        <span
+                            key={jumlah}
+                            className={`np-badge-pop absolute -right-1 -top-1 z-20 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#071735] px-1 text-[10px] font-extrabold text-white shadow-lg ${
+                                adaDitolak
+                                    ? 'bg-red-500 shadow-red-500/40'
+                                    : 'bg-emerald-500 shadow-emerald-500/40'
+                            }`}
+                        >
+                            {jumlah > 9 ? '9+' : jumlah}
                         </span>
                     )}
                 </button>
 
                 {/* Dropdown notifikasi */}
                 {open && (
-                    <div className="notif-dropdown absolute right-0 top-full z-50 mt-2.5 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20 ring-1 ring-slate-200">
-                        {/* Header (polos, tanpa blok warna) */}
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                    <div className="np-drop absolute right-0 top-full z-50 mt-3 w-[min(380px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+                        {/* Header */}
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/60 px-4 py-3.5">
                             <div className="min-w-0">
                                 <p className="text-sm font-bold text-slate-900">
                                     Status pengiriman
                                 </p>
-                                <p className="mt-0.5 text-[11px] text-slate-400">
-                                    Hasil pemeriksaan pimpinan, 7 hari terakhir
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {adaNotifikasi
+                                        ? `${jumlah} perlu perhatian`
+                                        : 'Hasil pemeriksaan pimpinan, 7 hari terakhir'}
                                 </p>
                             </div>
 
-                            {jumlah > 0 && (
-                                <span
-                                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                        adaDitolak
-                                            ? 'bg-red-50 text-red-600'
-                                            : 'bg-emerald-50 text-emerald-600'
-                                    }`}
-                                >
-                                    {jumlah} baru
-                                </span>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => setOpen(false)}
+                                aria-label="Tutup"
+                                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                                <Icon name="close" className="h-4 w-4" />
+                            </button>
                         </div>
 
                         {/* Isi */}
                         {items.length === 0 ? (
-                            <div className="px-5 py-10 text-center">
-                                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                                    <Icon name="bell" className="h-5 w-5" />
+                            <div className="px-4 py-12 text-center">
+                                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                    <Icon
+                                        name="bellOff"
+                                        className="h-6 w-6"
+                                        strokeWidth={1.7}
+                                    />
                                 </div>
 
-                                <p className="mt-3 text-sm font-semibold text-slate-700">
+                                <p className="text-sm font-semibold text-slate-600">
                                     Belum ada hasil pemeriksaan
                                 </p>
 
@@ -263,7 +312,7 @@ export default function NotifPengiriman() {
                                 </p>
                             </div>
                         ) : (
-                            <ul className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
+                            <ul className="np-scroll max-h-[380px] overflow-y-auto">
                                 {items.map((it, i) => {
                                     const ditolak = it.status === 'ditolak';
                                     const baru = Number(it.ts) > seen;
@@ -271,7 +320,7 @@ export default function NotifPengiriman() {
                                     return (
                                         <li
                                             key={it.id}
-                                            className="notif-item"
+                                            className="np-item"
                                             style={{
                                                 animationDelay: `${Math.min(i, 6) * 35}ms`,
                                             }}
@@ -279,10 +328,16 @@ export default function NotifPengiriman() {
                                             <Link
                                                 href={`/check-sheet-pengiriman?bulan=${it.bulan}&tahun=${it.tahun}`}
                                                 onClick={() => setOpen(false)}
-                                                className="group flex gap-3 px-4 py-3 transition-colors duration-150 hover:bg-slate-50"
+                                                className={`group relative flex gap-3 border-b border-slate-100 px-4 py-3.5 transition-colors duration-150 hover:bg-blue-50 ${
+                                                    baru ? 'bg-blue-50/60' : 'bg-white'
+                                                }`}
                                             >
+                                                {baru && (
+                                                    <span className="absolute inset-y-0 left-0 w-[3px] bg-blue-500" />
+                                                )}
+
                                                 <span
-                                                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                                                         ditolak
                                                             ? 'bg-red-50 text-red-600'
                                                             : 'bg-emerald-50 text-emerald-600'
@@ -296,15 +351,15 @@ export default function NotifPengiriman() {
 
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="truncate text-sm font-bold text-slate-800">
+                                                        <p className="truncate text-xs font-bold text-slate-800">
                                                             {it.divisi}
                                                         </p>
 
                                                         <span
-                                                            className={`shrink-0 text-[11px] font-semibold ${
+                                                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                                                 ditolak
-                                                                    ? 'text-red-600'
-                                                                    : 'text-emerald-600'
+                                                                    ? 'bg-red-50 text-red-600'
+                                                                    : 'bg-emerald-50 text-emerald-600'
                                                             }`}
                                                         >
                                                             {ditolak
@@ -313,11 +368,11 @@ export default function NotifPengiriman() {
                                                         </span>
 
                                                         {baru && (
-                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                                                            <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                                                         )}
                                                     </div>
 
-                                                    <p className="mt-0.5 text-xs text-slate-500">
+                                                    <p className="mt-1 text-xs text-slate-600">
                                                         {it.label}
                                                     </p>
 
@@ -351,10 +406,10 @@ export default function NotifPengiriman() {
                         )}
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5">
-                            <span className="text-[11px] text-slate-400">
+                        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2">
+                            <p className="text-center text-[10px] text-slate-400">
                                 Diperbarui tiap 1 menit
-                            </span>
+                            </p>
                         </div>
                     </div>
                 )}

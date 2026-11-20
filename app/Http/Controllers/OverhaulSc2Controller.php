@@ -50,9 +50,9 @@ class OverhaulSc2Controller extends Controller
     // Act  = jumlah kotak Act yang dicentang per bulan   (batang)
     // =====================================================
 
-    public function dashboard(Request $request)
+    // Data dashboard Overhaul. Dipakai oleh PreventifMesinController@welcome (route '/').
+    public function dashboardData(int $tahun): array
     {
-        $tahun = (int) $request->input('tahun', now()->year);
         $tahun = max(2000, min(2100, $tahun));
 
         // Mesin yang sudah dihapus (soft delete) tidak ikut dihitung.
@@ -92,7 +92,7 @@ class OverhaulSc2Controller extends Controller
         $totalPlan = array_sum(array_column($bulanan, 'plan'));
         $totalAct  = array_sum(array_column($bulanan, 'act'));
 
-        return Inertia::render('OverhaulSc2/Dashboard', [
+        return [
             'tahun'         => $tahun,
             'bulanan'       => $bulanan,
             'totalPlan'     => $totalPlan,
@@ -101,7 +101,7 @@ class OverhaulSc2Controller extends Controller
                 ? round(($totalAct / $totalPlan) * 100, 1)
                 : 0,
             'jumlahMesin'   => OverhaulMesin::count(),
-        ]);
+        ];
     }
 
     // =====================================================

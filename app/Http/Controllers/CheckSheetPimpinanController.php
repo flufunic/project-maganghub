@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\CheckSheetNotification;
 
 class CheckSheetPimpinanController extends Controller
 {
@@ -23,12 +24,54 @@ class CheckSheetPimpinanController extends Controller
             ->get()
             ->map(fn ($p) => $this->format($p, $divisis));
 
+        // =====================================================
+        // NOTIFIKASI KHUSUS CHECK SHEET PIMPINAN
+        // =====================================================
+
+        $queryNotifikasi = CheckSheetNotification::with('pengiriman')
+            ->where('user_id', $request->user()->id)
+            ->whereHas('pengiriman')
+            ->latest();
+
+        // Jumlah notifikasi yang belum dibaca
+        $unreadCount = (clone $queryNotifikasi)
+            ->whereNull('dibaca_pada')
+            ->count();
+
+        // Ambil maksimal 10 notifikasi terbaru
+        $notifications = (clone $queryNotifikasi)
+            ->limit(10)
+            ->get()
+            ->map(function ($notification) {
+                return [
+                    'id' => $notification->id,
+                    'judul' => $notification->judul,
+                    'pesan' => $notification->pesan,
+                    'dibaca' => !is_null($notification->dibaca_pada),
+                    'waktu' => $notification->created_at?->diffForHumans(),
+                    'url' => route(
+                        'pimpinan.check-sheet.show',
+                        $notification->pengiriman->id
+                    ),
+                    'read_url' => route(
+                        'pimpinan.check-sheet.notifikasi.baca',
+                        $notification->id
+                    ),
+                ];
+            })
+            ->values();
+
         return Inertia::render('Pimpinan/CheckSheet/Index', [
             'user' => [
                 'name' => $request->user()?->name,
                 'role' => $request->user()?->role,
             ],
+
             'pengirimans' => $pengirimans,
+
+            // Data notifikasi Check Sheet saja
+            'notifications' => $notifications,
+            'unreadCount' => $unreadCount,
         ]);
     }
 

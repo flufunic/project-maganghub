@@ -272,22 +272,34 @@ export default function Index({ checkSheets = [], line, flash }) {
     const handleKirim = () => {
         if (sending) return;
 
+        const divisiId = line?.divisi_id ?? line?.divisi?.id;
+
+        if (!divisiId) {
+            notify('error', 'Divisi tidak ditemukan. Silakan scan ulang barcode mesin.');
+            return;
+        }
+
         router.post(
             '/check-sheet-pengiriman',
-            { minggu_mulai: mingguIni.mulai },
+            {
+                minggu_mulai: mingguIni.mulai,
+                divisi_id: divisiId,
+            },
             {
                 preserveScroll: true,
                 onStart: () => setSending(true),
                 onError: (responseErrors) => {
                     const message =
                         responseErrors?.pengiriman ||
+                        responseErrors?.divisi_id ||
+                        responseErrors?.minggu_mulai ||
                         'Pengiriman gagal. Silakan coba kembali.';
 
                     notify('error', message);
                 },
                 onSuccess: () => {
                     setShowKirim(false);
-                    notify('success', 'Rekap Check Sheet berhasil dikirim.');
+                    notify('success', 'Check Sheet berhasil dikirim ke pimpinan.');
                 },
                 onFinish: () => {
                     setSending(false);

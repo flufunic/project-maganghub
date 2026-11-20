@@ -8,6 +8,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\CheckSheetNotification;
+use App\Models\User;
 
 class CheckSheetPengirimanController extends Controller
 {
@@ -105,6 +107,28 @@ class CheckSheetPengirimanController extends Controller
 
         $pengiriman->deleted_at = null; // pulihkan kalau sebelumnya dihapus
         $pengiriman->save();
+
+
+        // =====================================================
+        // BUAT NOTIFIKASI KHUSUS CHECK SHEET UNTUK PIMPINAN
+        // =====================================================
+
+        $divisis = CheckSheetMingguan::divisiList();
+
+        $namaDivisi = $divisis[$data['divisi_id']] ?? 'Divisi';
+
+        $labelMinggu = CheckSheetMingguan::label($mulai);
+
+        $pimpinans = User::where('role', 'pimpinan')->get();
+
+        foreach ($pimpinans as $pimpinan) {
+            CheckSheetNotification::create([
+                'user_id' => $pimpinan->id,
+                'check_sheet_pengiriman_id' => $pengiriman->id,
+                'judul' => 'Check Sheet Mingguan Baru',
+                'pesan' => "{$namaDivisi} mengirim Check Sheet {$labelMinggu} untuk diperiksa.",
+            ]);
+        }
 
         $namaDivisi = CheckSheetMingguan::divisiList()[$data['divisi_id']] ?? 'Divisi';
 
