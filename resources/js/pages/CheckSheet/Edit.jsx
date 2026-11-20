@@ -496,12 +496,6 @@ export default function Edit({ checkSheet, divisis, mesins = [], line }) {
                     <div className="page-enter">
                         {/* PAGE INTRO */}
                         <div className="mb-6">
-                            <div className="mb-2 flex items-center gap-2">
-                                <span className="h-1.5 w-8 rounded-full bg-blue-600" />
-                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
-                                    Manajemen Dokumen
-                                </span>
-                            </div>
 
                             <h2 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
                                 Edit Check Sheet

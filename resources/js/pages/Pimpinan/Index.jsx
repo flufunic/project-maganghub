@@ -1,105 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import Sidebar from '@/Components/Pimpinan/Sidebar';
+import React, { useEffect, useRef, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import {
+    Menu,
+    FileText,
+    Undo2,
+    AlertTriangle,
+    Layers,
+    Clock3,
+    CheckCircle2,
+    XCircle,
+    CalendarDays,
+    ChevronRight,
+    Pencil,
+    Inbox,
+    X,
+} from 'lucide-react';
+import Sidebar from '@/Components/Sidebar';
 
 /* ------------------------------------------------------------------
-| ICON  (UI saja, tidak ada logic)
+| STATUS
 ------------------------------------------------------------------ */
-const ICONS = {
-    menu: { sw: 2, paths: ['M4 6h16M4 12h16M4 18h16'] },
-    document: {
-        paths: [
-            'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z',
-            'M14 3v5h5',
-        ],
-    },
-    undo: { sw: 2, paths: ['M3 10h10a5 5 0 0 1 0 10H9', 'M7 6 3 10l4 4'] },
-    warning: {
-        sw: 2,
-        paths: ['M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z'],
-    },
-    plus: { paths: ['M12 6v12m6-6H6'] },
-    clock: { paths: ['M12 7v5l3 2'], circle: true },
-    check: { paths: ['m8 12 2.5 2.5L16 9'], circle: true },
-    cross: { paths: ['m9 9 6 6m0-6-6 6'], circle: true },
-    calendar: {
-        paths: [
-            'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z',
-        ],
-    },
-    chevron: { sw: 2, paths: ['M9 5l7 7-7 7'] },
-    x: { sw: 3, paths: ['M6 18 18 6M6 6l12 12'] },
-    clockSmall: { sw: 3, paths: ['M12 7v5l3 2'], circle: true },
-    tick: { sw: 3, paths: ['m5 13 4 4L19 7'] },
-    revisi: {
-        sw: 2,
-        paths: [
-            'M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586Z',
-        ],
-    },
-};
-
-function Icon({ type, className = 'h-5 w-5', strokeWidth }) {
-    const icon = ICONS[type];
-
-    if (!icon) {
-        return null;
-    }
-
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={strokeWidth ?? icon.sw ?? 1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {icon.circle && <circle cx="12" cy="12" r="9" />}
-            {icon.paths.map((d, i) => (
-                <path key={i} d={d} />
-            ))}
-        </svg>
-    );
-}
-
-/* ------------------------------------------------------------------
-| STYLE TOKENS
------------------------------------------------------------------- */
-const glassCard =
-    'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
-
-const thClass =
-    'px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500';
-
-/* Badge status laporan */
 const STATUS = {
     menunggu: {
         label: 'Menunggu Diperiksa',
-        cls: 'border-amber-200 bg-amber-50 text-amber-700',
+        cls: 'bg-amber-50 text-amber-700 ring-amber-200',
         dot: 'bg-amber-500',
-        icon: 'clockSmall',
+        ping: 'bg-amber-400',
+        pulse: true,
     },
     diperiksa: {
         label: 'Sedang Diperiksa',
-        cls: 'border-blue-200 bg-blue-50 text-blue-700',
-        dot: 'bg-blue-500',
-        icon: 'clockSmall',
+        cls: 'bg-sky-50 text-sky-700 ring-sky-200',
+        dot: 'bg-sky-500',
+        ping: 'bg-sky-400',
+        pulse: true,
     },
     disetujui: {
         label: 'Disetujui',
-        cls: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
         dot: 'bg-emerald-500',
-        icon: 'tick',
+        ping: 'bg-emerald-400',
+        pulse: false,
     },
     ditolak: {
         label: 'Ditolak',
-        cls: 'border-red-200 bg-red-50 text-red-700',
-        dot: 'bg-red-500',
-        icon: 'x',
+        cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+        dot: 'bg-rose-500',
+        ping: 'bg-rose-400',
+        pulse: false,
     },
 };
 
@@ -111,6 +59,119 @@ const cocokFilter = (item, filter) => {
     return item.status === filter;
 };
 
+const warnaPersen = (p) => (p >= 80 ? 'bg-emerald-500' : p >= 50 ? 'bg-amber-500' : 'bg-rose-500');
+
+const thClass = 'px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500';
+
+/* ------------------------------------------------------------------
+| HOOK: angka naik pelan-pelan
+------------------------------------------------------------------ */
+function useCountUp(target, duration = 800) {
+    const [value, setValue] = useState(0);
+    const prev = useRef(0);
+
+    useEffect(() => {
+        const reduce =
+            typeof window !== 'undefined' &&
+            window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+        if (reduce || prev.current === target) {
+            setValue(target);
+            prev.current = target;
+            return undefined;
+        }
+
+        const from = prev.current;
+        let raf;
+        let start;
+
+        const tick = (t) => {
+            if (start === undefined) start = t;
+
+            const p = Math.min((t - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+
+            setValue(Math.round(from + (target - from) * eased));
+
+            if (p < 1) {
+                raf = requestAnimationFrame(tick);
+            } else {
+                prev.current = target;
+            }
+        };
+
+        raf = requestAnimationFrame(tick);
+
+        return () => cancelAnimationFrame(raf);
+    }, [target, duration]);
+
+    return value;
+}
+
+/* ------------------------------------------------------------------
+| KOMPONEN KECIL
+------------------------------------------------------------------ */
+function Dot({ cls, ping, pulse }) {
+    return (
+        <span className="relative flex h-2 w-2">
+            {pulse && <span className={`pmp-ping absolute inline-flex h-full w-full rounded-full ${ping}`} />}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${cls}`} />
+        </span>
+    );
+}
+
+function StatCard({ card, aktif, onClick, index }) {
+    const angka = useCountUp(card.value);
+    const [siap, setSiap] = useState(false);
+    const Ico = card.icon;
+
+    useEffect(() => {
+        const id = requestAnimationFrame(() => setSiap(true));
+        return () => cancelAnimationFrame(id);
+    }, []);
+
+    return (
+        <button
+            type="button"
+            title={card.hint}
+            onClick={onClick}
+            aria-pressed={aktif}
+            style={{ animationDelay: `${index * 70}ms` }}
+            className={`pmp-rise group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-900/5 focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                aktif ? `border-transparent ring-2 ${card.tone.ring}` : 'border-slate-200/80'
+            }`}
+        >
+            <div className="flex items-start justify-between">
+                <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110 ${card.tone.icon}`}
+                >
+                    <Ico className="h-5 w-5" strokeWidth={1.9} />
+                </div>
+
+                {aktif && (
+                    <span className="pmp-fade rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        Aktif
+                    </span>
+                )}
+            </div>
+
+            <p className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${card.tone.value}`}>{angka}</p>
+            <p className="mt-0.5 text-xs font-semibold text-slate-600">{card.label}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400">{card.hint}</p>
+
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                    className={`h-full rounded-full transition-[width] duration-1000 ease-out ${card.tone.bar}`}
+                    style={{ width: siap ? card.width : '0%' }}
+                />
+            </div>
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------
+| HALAMAN
+------------------------------------------------------------------ */
 export default function Index({ user, laporans = [], flash }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -121,6 +182,8 @@ export default function Index({ user, laporans = [], flash }) {
     const [itemBatal, setItemBatal] = useState(null);
     const [memproses, setMemproses] = useState(false);
 
+    const namaUser = typeof user === 'string' ? user : user?.name;
+
     const total = laporans.length;
     const totalMenunggu = laporans.filter((i) => cocokFilter(i, 'menunggu')).length;
     const totalDisetujui = laporans.filter((i) => i.status === 'disetujui').length;
@@ -130,9 +193,7 @@ export default function Index({ user, laporans = [], flash }) {
 
     // Klik kartu yang sedang aktif -> kembali ke semua
     const pilihFilter = (nilai) => {
-        setFilter((sekarang) =>
-            sekarang === nilai || nilai === 'semua' ? 'semua' : nilai
-        );
+        setFilter((sekarang) => (sekarang === nilai || nilai === 'semua' ? 'semua' : nilai));
     };
 
     const tutupModal = () => {
@@ -159,7 +220,7 @@ export default function Index({ user, laporans = [], flash }) {
 
     // Tutup modal dengan tombol Esc
     useEffect(() => {
-        if (!itemBatal) return;
+        if (!itemBatal) return undefined;
 
         const onKey = (e) => {
             if (e.key === 'Escape' && !memproses) {
@@ -191,56 +252,56 @@ export default function Index({ user, laporans = [], flash }) {
             label: 'Total Report',
             value: total,
             hint: 'Seluruh report yang dikirim',
-            icon: 'plus',
-            border: 'border-blue-100',
-            accent: 'from-blue-400 to-blue-600',
-            iconBox: 'bg-blue-50 text-blue-600',
-            valueClass: 'text-slate-800',
-            track: 'bg-blue-50',
-            bar: 'bg-blue-500',
+            icon: Layers,
             width: '100%',
+            tone: {
+                icon: 'bg-indigo-50 text-indigo-600',
+                bar: 'bg-indigo-500',
+                ring: 'ring-indigo-500/70',
+                value: 'text-slate-900',
+            },
         },
         {
             key: 'menunggu',
             label: 'Menunggu Diperiksa',
             value: totalMenunggu,
             hint: 'Perlu ditinjau pimpinan',
-            icon: 'clock',
-            border: 'border-amber-100',
-            accent: 'from-amber-400 to-orange-500',
-            iconBox: 'bg-amber-50 text-amber-600',
-            valueClass: 'text-amber-600',
-            track: 'bg-amber-50',
-            bar: 'bg-amber-400',
+            icon: Clock3,
             width: persen(totalMenunggu),
+            tone: {
+                icon: 'bg-amber-50 text-amber-600',
+                bar: 'bg-amber-500',
+                ring: 'ring-amber-500/70',
+                value: 'text-amber-600',
+            },
         },
         {
             key: 'disetujui',
             label: 'Disetujui',
             value: totalDisetujui,
             hint: 'Telah disetujui pimpinan',
-            icon: 'check',
-            border: 'border-emerald-100',
-            accent: 'from-emerald-400 to-green-600',
-            iconBox: 'bg-emerald-50 text-emerald-600',
-            valueClass: 'text-emerald-600',
-            track: 'bg-emerald-50',
-            bar: 'bg-emerald-500',
+            icon: CheckCircle2,
             width: persen(totalDisetujui),
+            tone: {
+                icon: 'bg-emerald-50 text-emerald-600',
+                bar: 'bg-emerald-500',
+                ring: 'ring-emerald-500/70',
+                value: 'text-emerald-600',
+            },
         },
         {
             key: 'ditolak',
             label: 'Ditolak',
             value: totalDitolak,
             hint: 'Menunggu revisi admin',
-            icon: 'cross',
-            border: 'border-red-100',
-            accent: 'from-red-400 to-rose-600',
-            iconBox: 'bg-red-50 text-red-600',
-            valueClass: 'text-red-600',
-            track: 'bg-red-50',
-            bar: 'bg-red-500',
+            icon: XCircle,
             width: persen(totalDitolak),
+            tone: {
+                icon: 'bg-rose-50 text-rose-600',
+                bar: 'bg-rose-500',
+                ring: 'ring-rose-500/70',
+                value: 'text-rose-600',
+            },
         },
     ];
 
@@ -248,192 +309,179 @@ export default function Index({ user, laporans = [], flash }) {
         <>
             <Head title="Dashboard" />
 
-            {/* SIDEBAR */}
-            <Sidebar
-                open={sidebarOpen}
-                onClose={() => setSidebarOpen(false)}
-            />
+            {/* SIDEBAR (di luar pembungkus agar posisi fixed tidak terkurung) */}
+            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
             <style>{`
-                @keyframes pmpGradient {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                @keyframes pmpFloat {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(30px, -30px, 0) scale(1.08); }
-                }
-                @keyframes pmpFloatReverse {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
-                }
+                @keyframes pmpRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+                @keyframes pmpFade { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes pmpPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+                @keyframes pmpFloat { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(28px,-22px,0) scale(1.08); } }
+                @keyframes pmpFloatReverse { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-28px,22px,0) scale(1.1); } }
+                @keyframes pmpLine { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+                @keyframes pmpPing { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.4); opacity: 0; } }
+                @keyframes pmpBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-                .pmp-gradient {
-                    background-size: 250% 250%;
-                    animation: pmpGradient 20s ease infinite;
-                }
+                /* fill-mode "backwards": tidak ada transform tersisa setelah selesai */
+                .pmp-rise { animation: pmpRise .6s cubic-bezier(.22,1,.36,1) backwards; }
+                .pmp-fade { animation: pmpFade .25s ease-out both; }
+                .pmp-pop { animation: pmpPop .35s cubic-bezier(.22,1,.36,1) both; }
                 .pmp-float { animation: pmpFloat 14s ease-in-out infinite; }
                 .pmp-float-reverse { animation: pmpFloatReverse 17s ease-in-out infinite; }
+                .pmp-line { background-size: 200% 100%; animation: pmpLine 7s linear infinite; }
+                .pmp-ping { animation: pmpPing 1.8s cubic-bezier(0,0,.2,1) infinite; }
+                .pmp-bar { transform-origin: left; animation: pmpBar .8s cubic-bezier(.22,1,.36,1) backwards; }
 
                 .pmp-scroll::-webkit-scrollbar { height: 8px; }
                 .pmp-scroll::-webkit-scrollbar-track { background: transparent; }
-                .pmp-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(100, 116, 139, 0.4);
-                    border-radius: 999px;
-                }
+                .pmp-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 999px; }
 
                 @media (prefers-reduced-motion: reduce) {
-                    .pmp-gradient,
-                    .pmp-float,
-                    .pmp-float-reverse { animation: none !important; }
+                    .pmp-rise, .pmp-fade, .pmp-pop, .pmp-float, .pmp-float-reverse,
+                    .pmp-line, .pmp-ping, .pmp-bar { animation: none !important; }
                 }
             `}</style>
 
-            <div className="relative flex min-h-screen flex-col overflow-x-hidden">
-
+            <div className="relative flex min-h-screen flex-col overflow-x-clip text-slate-800">
                 {/* BACKGROUND */}
-                <div className="fixed inset-0 -z-20 overflow-hidden">
-                    <div className="pmp-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
-
-                    <div className="pmp-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
-                    <div className="pmp-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
-                    <div className="pmp-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
+                <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
+                    <div className="absolute inset-0 bg-slate-50" />
+                    <div className="pmp-float absolute -left-32 -top-24 h-[420px] w-[420px] rounded-full bg-blue-300/25 blur-[110px]" />
+                    <div className="pmp-float-reverse absolute -right-32 top-[15%] h-[460px] w-[460px] rounded-full bg-indigo-300/20 blur-[120px]" />
+                    <div className="pmp-float absolute bottom-[-180px] left-[30%] h-[440px] w-[440px] rounded-full bg-sky-300/20 blur-[110px]" />
+                    <div
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                            backgroundImage: 'radial-gradient(rgba(100,116,139,.22) 1px, transparent 1px)',
+                            backgroundSize: '22px 22px',
+                            maskImage: 'linear-gradient(to bottom, black, transparent 65%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, black, transparent 65%)',
+                        }}
+                    />
                 </div>
 
                 {/* HEADER */}
-                <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
-                    <div className="mx-auto flex max-w-7xl items-center px-4 py-3 sm:px-6">
-                        <div className="flex items-center gap-3">
+                <header className="sticky top-0 z-40 bg-gradient-to-r from-[#061033] via-[#0b1d57] to-[#12328a] shadow-lg shadow-slate-950/20">
+                    <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                        <div className="flex min-w-0 items-center gap-3">
                             <button
                                 type="button"
                                 onClick={() => setSidebarOpen(true)}
-                                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition-colors duration-200 hover:bg-white/25"
                                 aria-label="Buka menu"
+                                title="Buka menu"
+                                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all duration-200 hover:bg-white/20 active:scale-95"
                             >
-                                <Icon type="menu" className="h-5 w-5" />
+                                <Menu className="h-5 w-5" strokeWidth={2} />
                             </button>
 
-                            <div>
-                                <h1 className="text-lg font-bold tracking-tight text-white">
+                            <div className="min-w-0">
+                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
                                     Schedule Preventif
                                 </h1>
-
-                                <p className="hidden text-xs text-white/65 sm:block">
+                                <p className="hidden truncate text-xs text-blue-100/60 sm:block">
                                     Approval Report Mingguan Preventif
                                 </p>
                             </div>
                         </div>
                     </div>
+
+                    <div className="pmp-line h-[3px] bg-gradient-to-r from-blue-400 via-violet-400 via-cyan-300 to-blue-400" />
                 </header>
 
                 {/* CONTENT */}
                 <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-
                     {flash?.success && (
-                        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">
+                        <div className="pmp-pop mb-5 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
                             {flash.success}
                         </div>
                     )}
 
-                    {/* JUDUL DATA */}
-                    <div className="mb-5">
-                        <h2 className="text-xl font-bold text-white">
-                            Report Mingguan Preventif
-                        </h2>
+                    {/* JUDUL */}
+                    <div className="pmp-rise mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                                Report Mingguan Preventif
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-500">
+                                Report mingguan yang telah dikirim oleh Admin untuk diperiksa.
+                            </p>
+                        </div>
 
-                        <p className="mt-0.5 text-sm text-blue-100/90">
-                            Report mingguan yang telah dikirim oleh Admin untuk diperiksa.
-                        </p>
+                        {totalMenunggu > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setFilter('menunggu')}
+                                className="inline-flex w-fit cursor-pointer items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 py-1.5 pl-3 pr-4 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+                            >
+                                <Dot cls="bg-amber-500" ping="bg-amber-400" pulse />
+                                {totalMenunggu} report menunggu pemeriksaan
+                            </button>
+                        )}
                     </div>
 
-                    {/* STAT CARDS (bisa diklik untuk filter) */}
-                    {/* STAT CARDS (kompak, bisa diklik untuk filter) */}
-                    <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        {statCards.map((card) => {
-                            const aktif = filter === card.key;
-
-                            return (
-                                <button
-                                    key={card.key}
-                                    type="button"
-                                    title={card.hint}
-                                    onClick={() => pilihFilter(card.key)}
-                                    aria-pressed={aktif}
-                                    className={`relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border bg-white/[0.93] py-2.5 pl-4 pr-3 text-left shadow-[0_10px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl transition-colors duration-200 hover:bg-white ${card.border} ${
-                                        aktif ? 'ring-2 ring-white' : ''
-                                    }`}
-                                >
-                                    <div
-                                        className={`absolute left-0 top-0 h-full w-1 bg-gradient-to-b ${card.accent}`}
-                                    />
-
-                                    <div
-                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${card.iconBox}`}
-                                    >
-                                        <Icon type={card.icon} className="h-[18px] w-[18px]" />
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-[11px] font-medium text-slate-500">
-                                            {card.label}
-                                        </p>
-
-                                        <p className={`text-xl font-bold leading-tight ${card.valueClass}`}>
-                                            {card.value}
-                                        </p>
-                                    </div>
-
-                                    {/* progress tipis di dasar kartu */}
-                                    <div className={`absolute inset-x-0 bottom-0 h-[3px] ${card.track}`}>
-                                        <div
-                                            className={`h-full ${card.bar}`}
-                                            style={{ width: card.width }}
-                                        />
-                                    </div>
-                                </button>
-                            );
-                        })}
+                    {/* KARTU STATISTIK (klik untuk filter) */}
+                    <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+                        {statCards.map((card, i) => (
+                            <StatCard
+                                key={card.key}
+                                card={card}
+                                index={i}
+                                aktif={filter === card.key}
+                                onClick={() => pilihFilter(card.key)}
+                            />
+                        ))}
                     </div>
 
-
-                    {/* RIWAYAT REPORT */}
-                    <div className={`overflow-hidden rounded-3xl ${glassCard}`}>
-
-                        {/* TABLE HEADER */}
-                        <div className="flex flex-col gap-3 border-b border-slate-200/70 bg-gradient-to-r from-blue-50/70 via-white/40 to-white/40 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-
+                    {/* TABEL */}
+                    <div
+                        style={{ animationDelay: '300ms' }}
+                        className="pmp-rise overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+                    >
+                        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                                    <Icon type="calendar" className="h-5 w-5" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                                    <CalendarDays className="h-5 w-5" strokeWidth={1.9} />
                                 </div>
 
                                 <div>
-                                    <h3 className="font-bold text-slate-800">
-                                        {judulTabel}
-                                    </h3>
-
+                                    <h3 className="font-bold text-slate-900">{judulTabel}</h3>
                                     <p className="mt-0.5 text-sm text-slate-500">
                                         Daftar report mingguan yang dikirim oleh Admin.
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                {daftar.length} Report
+                            <div className="flex items-center gap-2">
+                                {filter !== 'semua' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilter('semua')}
+                                        className="pmp-fade inline-flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                                    >
+                                        <X className="h-3 w-3" />
+                                        Reset filter
+                                    </button>
+                                )}
+
+                                <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                    {daftar.length} Report
+                                </div>
                             </div>
                         </div>
 
-                        {/* EMPTY STATE */}
                         {daftar.length === 0 ? (
                             <div className="px-6 py-16 text-center">
-                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-                                    <Icon type="document" className="h-8 w-8 text-slate-400" />
+                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                    {total === 0 ? (
+                                        <FileText className="h-8 w-8" strokeWidth={1.5} />
+                                    ) : (
+                                        <Inbox className="h-8 w-8" strokeWidth={1.5} />
+                                    )}
                                 </div>
 
-                                <h3 className="font-semibold text-slate-700">
-                                    Belum ada data
-                                </h3>
+                                <h3 className="font-semibold text-slate-700">Belum ada data</h3>
 
                                 <p className="mt-1 text-sm text-slate-500">
                                     {filter === 'semua'
@@ -442,79 +490,72 @@ export default function Index({ user, laporans = [], flash }) {
                                 </p>
                             </div>
                         ) : (
-                            /* TABLE */
                             <div className="pmp-scroll overflow-x-auto">
-                                <table className="w-full min-w-[950px] text-sm">
+                                <table className="w-full min-w-[960px] text-sm">
                                     <thead>
-                                        <tr className="bg-slate-50/80">
+                                        <tr className="bg-slate-50/70">
                                             <th className={thClass}>No</th>
                                             <th className={thClass}>Periode</th>
                                             <th className={thClass}>Dikirim Oleh</th>
                                             <th className={thClass}>Waktu Pengiriman</th>
                                             <th className={thClass}>Pencapaian</th>
                                             <th className={thClass}>Status</th>
-                                            <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                Aksi
-                                            </th>
+                                            <th className={`${thClass} text-center`}>Aksi</th>
                                         </tr>
                                     </thead>
 
-                                    <tbody className="divide-y divide-slate-200/60">
+                                    {/* key={filter}: animasi baris diulang tiap ganti filter */}
+                                    <tbody key={filter} className="divide-y divide-slate-100">
                                         {daftar.map((item, index) => {
                                             const st = STATUS[item.status] ?? STATUS.menunggu;
 
                                             return (
                                                 <tr
                                                     key={item.id}
-                                                    className="group transition-colors duration-200 hover:bg-blue-50/60"
+                                                    style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}
+                                                    className="pmp-rise group transition-colors duration-200 hover:bg-indigo-50/40"
                                                 >
                                                     {/* NO */}
-                                                    <td className="px-6 py-4">
-                                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 transition group-hover:bg-blue-100 group-hover:text-blue-600">
+                                                    <td className="px-5 py-4">
+                                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 transition-colors group-hover:bg-indigo-100 group-hover:text-indigo-600">
                                                             {index + 1}
                                                         </span>
                                                     </td>
 
                                                     {/* PERIODE */}
-                                                    <td className="px-6 py-4">
-                                                        <p className="font-semibold text-slate-800">
-                                                            Week {item.week}
-                                                        </p>
-                                                        <p className="mt-0.5 text-xs text-slate-500">
-                                                            {item.periode}
-                                                        </p>
+                                                    <td className="px-5 py-4">
+                                                        <p className="font-semibold text-slate-900">Week {item.week}</p>
+                                                        <p className="mt-0.5 text-xs text-slate-500">{item.periode}</p>
                                                     </td>
 
                                                     {/* DIKIRIM OLEH */}
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-5 py-4">
                                                         <div className="flex items-center gap-2.5">
-                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
-                                                                {(item.dikirim_oleh || 'A')
-                                                                    .charAt(0)
-                                                                    .toUpperCase()}
+                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 text-xs font-bold text-indigo-600">
+                                                                {(item.dikirim_oleh || 'A').charAt(0).toUpperCase()}
                                                             </div>
-
-                                                            <span className="text-slate-600">
-                                                                {item.dikirim_oleh || '-'}
-                                                            </span>
+                                                            <span className="text-slate-600">{item.dikirim_oleh || '-'}</span>
                                                         </div>
                                                     </td>
 
                                                     {/* WAKTU */}
-                                                    <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                                                    <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                                                         {item.dikirim_pada || '-'}
                                                     </td>
 
                                                     {/* PENCAPAIAN */}
-                                                    <td className="min-w-[160px] px-6 py-4">
+                                                    <td className="min-w-[170px] px-5 py-4">
                                                         {item.ringkasan ? (
-                                                            <div className="flex flex-col gap-1">
+                                                            <div className="flex flex-col gap-1.5">
                                                                 <span className="text-xs font-semibold text-slate-700">
-                                                                    {item.ringkasan.sudah}/{item.ringkasan.jumlah} item · {item.ringkasan.persen}%
+                                                                    {item.ringkasan.sudah}/{item.ringkasan.jumlah} item ·{' '}
+                                                                    {item.ringkasan.persen}%
                                                                 </span>
-                                                                <div className="h-1.5 w-full rounded bg-slate-200">
+                                                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                                                     <div
-                                                                        className="h-full rounded bg-emerald-500"
+                                                                        className={`pmp-bar h-full rounded-full ${warnaPersen(
+                                                                            item.ringkasan.persen
+                                                                        )}`}
                                                                         style={{ width: `${item.ringkasan.persen}%` }}
                                                                     />
                                                                 </div>
@@ -525,23 +566,18 @@ export default function Index({ user, laporans = [], flash }) {
                                                     </td>
 
                                                     {/* STATUS + REVISI */}
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col items-start gap-2">
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex flex-col items-start gap-1.5">
                                                             <span
-                                                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${st.cls}`}
+                                                                className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${st.cls}`}
                                                             >
-                                                                <span
-                                                                    className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${st.dot}`}
-                                                                >
-                                                                    <Icon type={st.icon} className="h-2.5 w-2.5" />
-                                                                </span>
+                                                                <Dot cls={st.dot} ping={st.ping} pulse={st.pulse} />
                                                                 {st.label}
                                                             </span>
 
-                                                            {/* BADGE REVISI (perubahan admin setelah dikirim) */}
                                                             {item.jumlah_revisi > 0 && (
-                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-                                                                    <Icon type="revisi" className="h-3.5 w-3.5" />
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-inset ring-violet-200">
+                                                                    <Pencil className="h-3 w-3" />
                                                                     Ada Revisi ({item.jumlah_revisi})
                                                                 </span>
                                                             )}
@@ -549,33 +585,28 @@ export default function Index({ user, laporans = [], flash }) {
                                                     </td>
 
                                                     {/* AKSI */}
-                                                    {/* AKSI */}
-                                                    <td className="px-4 py-3 text-center">
+                                                    <td className="px-5 py-4 text-center">
                                                         <div className="inline-flex items-center gap-1.5">
                                                             <Link
                                                                 href={`/pimpinan/laporan/${item.id}`}
-                                                                className="group/btn inline-flex cursor-pointer items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-blue-300/50 transition-all duration-200 hover:from-blue-700 hover:to-indigo-800"
+                                                                className="group/btn inline-flex cursor-pointer items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-indigo-300/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-indigo-300/50"
                                                             >
                                                                 Lihat Report
-                                                                <Icon
-                                                                    type="chevron"
-                                                                    className="h-3 w-3 transition-transform duration-200 group-hover/btn:translate-x-0.5"
-                                                                />
+                                                                <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover/btn:translate-x-0.5" />
                                                             </Link>
 
                                                             {item.status === 'disetujui' && (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setItemBatal(item)}
-                                                                    className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 transition-colors duration-200 hover:bg-red-100"
+                                                                    className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 transition-colors duration-200 hover:bg-rose-100"
                                                                 >
-                                                                    <Icon type="undo" className="h-3 w-3" />
+                                                                    <Undo2 className="h-3 w-3" />
                                                                     Batalkan
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </td>
-
                                                 </tr>
                                             );
                                         })}
@@ -587,39 +618,37 @@ export default function Index({ user, laporans = [], flash }) {
                 </main>
 
                 {/* FOOTER */}
-                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
-                    <div className="mx-auto flex min-h-[60px] max-w-7xl items-center justify-center px-4 py-4 sm:px-6">
-                        <p className="text-xs font-medium text-white/70">
+                <footer className="mt-auto border-t border-slate-200/70 bg-white/70 backdrop-blur-xl">
+                    <div className="mx-auto flex max-w-7xl items-center justify-center px-5 py-3 sm:px-6">
+                        <p className="text-xs font-medium text-slate-400">
                             © {new Date().getFullYear()} Emma Sarkilla · Sistem Schedule Preventif
                         </p>
                     </div>
                 </footer>
             </div>
 
-            {/* =====================================================
-                MODAL BATALKAN PERSETUJUAN
-            ====================================================== */}
+            {/* MODAL BATALKAN PERSETUJUAN */}
             {itemBatal && (
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm"
+                    className="pmp-fade fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
                     onClick={tutupModal}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="judul-modal-batal"
                 >
                     <div
-                        className="w-full max-w-md overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(2,6,23,0.5)]"
+                        className="pmp-pop w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl shadow-slate-950/30"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="px-6 pb-2 pt-6 text-center">
-                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-                                <Icon type="warning" className="h-7 w-7" />
+                        <div className="px-6 pb-2 pt-7 text-center">
+                            <div className="relative mx-auto mb-4 h-14 w-14">
+                                <span className="pmp-ping absolute inset-0 rounded-2xl bg-rose-300/60" />
+                                <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-lg shadow-rose-300/50">
+                                    <AlertTriangle className="h-7 w-7" strokeWidth={2} />
+                                </span>
                             </div>
 
-                            <h3
-                                id="judul-modal-batal"
-                                className="text-lg font-bold text-slate-800"
-                            >
+                            <h3 id="judul-modal-batal" className="text-lg font-bold tracking-tight text-slate-900">
                                 Batalkan Persetujuan?
                             </h3>
 
@@ -631,17 +660,16 @@ export default function Index({ user, laporans = [], flash }) {
                                 akan dikembalikan ke Admin untuk direvisi, lalu harus dikirim ulang.
                             </p>
 
-                            <p className="mt-2 text-xs text-slate-400">
-                                Isi report (teks dan foto) tidak dihapus.
-                            </p>
+                            <p className="mt-2 text-xs text-slate-400">Isi report (teks dan foto) tidak dihapus.</p>
                         </div>
 
-                        <div className="flex gap-3 px-6 pb-6 pt-5">
+                        <div className="grid grid-cols-2 gap-3 px-6 pb-6 pt-5">
                             <button
                                 type="button"
                                 onClick={tutupModal}
                                 disabled={memproses}
-                                className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                autoFocus
+                                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 Tidak, Kembali
                             </button>
@@ -650,7 +678,7 @@ export default function Index({ user, laporans = [], flash }) {
                                 type="button"
                                 onClick={konfirmasiBatal}
                                 disabled={memproses}
-                                className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-300/50 transition-all duration-200 hover:from-red-600 hover:to-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-rose-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                             >
                                 {memproses ? 'Memproses...' : 'Ya, Batalkan'}
                             </button>

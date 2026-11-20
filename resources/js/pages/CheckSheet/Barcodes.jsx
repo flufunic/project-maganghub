@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import {
     ArrowLeft,
     Check,
@@ -16,10 +16,81 @@ import {
     X,
 } from 'lucide-react';
 
+const NAVY = '#0a1a4d';
+
 const getOrigin = () => (typeof window !== 'undefined' ? window.location.origin : '');
 
 const card =
     'rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.12)]';
+
+/* ------------------------------------------------------------------
+| QR bergaya: titik bulat + pojok rounded + badge di tengah
+| Ukuran mengikuti parent (h-full w-full), bungkus dengan div ber-ukuran.
+------------------------------------------------------------------ */
+function StyledQr({ value, label = 'FJI' }) {
+    const { n, dots, finders } = useMemo(() => {
+        const qr = QRCode.create(value, { errorCorrectionLevel: 'H' });
+        const n = qr.modules.size;
+        const data = qr.modules.data;
+        const center = n / 2;
+        const clear = n * 0.12;
+
+        const inFinder = (r, c) =>
+            (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+
+        const dots = [];
+        for (let r = 0; r < n; r++) {
+            for (let c = 0; c < n; c++) {
+                if (!data[r * n + c] || inFinder(r, c)) continue;
+                const dx = c + 0.5 - center;
+                const dy = r + 0.5 - center;
+                if (Math.sqrt(dx * dx + dy * dy) < clear + 0.8) continue;
+                dots.push([c + 0.5, r + 0.5]);
+            }
+        }
+
+        return { n, dots, finders: [[0, 0], [n - 7, 0], [0, n - 7]] };
+    }, [value]);
+
+    const m = 1;
+
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox={`${-m} ${-m} ${n + m * 2} ${n + m * 2}`}
+            className="h-full w-full"
+            shapeRendering="geometricPrecision"
+        >
+            <rect x={-m} y={-m} width={n + m * 2} height={n + m * 2} fill="#fff" />
+
+            {dots.map(([x, y], i) => (
+                <circle key={i} cx={x} cy={y} r={0.47} fill={NAVY} />
+            ))}
+
+            {finders.map(([x, y], i) => (
+                <g key={i}>
+                    <rect x={x + 0.5} y={y + 0.5} width={6} height={6} rx={2}
+                        fill="none" stroke={NAVY} strokeWidth={1} />
+                    <rect x={x + 2} y={y + 2} width={3} height={3} rx={1.1} fill={NAVY} />
+                </g>
+            ))}
+
+            <circle cx={n / 2} cy={n / 2} r={n * 0.12} fill={NAVY} />
+            <text
+                x={n / 2}
+                y={n / 2}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={n * 0.075}
+                fontWeight="800"
+                fill="#fff"
+                fontFamily="Arial, sans-serif"
+            >
+                {label}
+            </text>
+        </svg>
+    );
+}
 
 /* Bingkai pemindai: empat sudut di sekeliling QR */
 function ScanFrame({ children, className = '' }) {
@@ -429,7 +500,9 @@ export default function Barcodes({ lines = [] }) {
                                         >
                                             <ScanFrame>
                                                 <div className="rounded-xl bg-white p-2.5 shadow-sm print:p-0 print:shadow-none">
-                                                    <QRCodeSVG value={urlOf(line)} size={160} level="M" />
+                                                    <div className="h-[160px] w-[160px]">
+                                                        <StyledQr value={urlOf(line)} />
+                                                    </div>
                                                 </div>
                                             </ScanFrame>
 
@@ -496,7 +569,9 @@ export default function Barcodes({ lines = [] }) {
                                 <div ref={qrRef} className="relative mx-auto w-fit overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
                                     <ScanFrame>
                                         <div className="p-1">
-                                            <QRCodeSVG value={urlOf(preview)} size={216} level="M" />
+                                            <div className="h-[216px] w-[216px]">
+                                                <StyledQr value={urlOf(preview)} />
+                                            </div>
                                         </div>
                                     </ScanFrame>
                                     <span className="bc-scan pointer-events-none absolute inset-x-5 h-0.5 rounded-full bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-70" />

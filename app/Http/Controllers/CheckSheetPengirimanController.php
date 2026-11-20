@@ -121,7 +121,7 @@ class CheckSheetPengirimanController extends Controller
 
         $items = CheckSheetPengiriman::whereNotNull('divisi_id')
             ->whereIn('status', ['diperiksa', 'ditolak'])
-            ->where('updated_at', '>=', now()->subDays(30))
+            ->where('updated_at', '>=', now()->subDays(7))
             ->orderByDesc('updated_at')
             ->limit(15)
             ->get()

@@ -3,9 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Models\RrfNotification;
+use App\Support\Waktu;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use App\Support\Waktu;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -34,8 +34,8 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'import_result' => fn () => $request->session()->get('import_result'), // <-- baru
+                'success'       => fn () => $request->session()->get('success'),
+                'import_result' => fn () => $request->session()->get('import_result'),
             ],
 
             'rrfForm' => [
@@ -56,22 +56,19 @@ class HandleInertiaRequests extends Middleware
                         ->limit(10)
                         ->get()
                         ->map(fn ($notification) => [
-                            'id' => $notification->id,
-                            'judul' => $notification->judul,
-                            'pesan' => $notification->pesan,
-                            'dibaca' => !is_null($notification->dibaca_pada),
-                            'waktu' => Waktu::wib($notification->created_at),
-                            'rrf_no' => $notification->rrf?->rrf_no,
-                            'read_url' => route(
-                                'rrf.notifikasi.baca',
-                                $notification->id
-                            ),
+                            'id'       => $notification->id,
+                            'judul'    => $notification->judul,
+                            'pesan'    => $notification->pesan,
+                            'dibaca'   => !is_null($notification->dibaca_pada),
+                            'waktu'    => Waktu::wib($notification->created_at),
+                            'rrf_no'   => $notification->rrf?->rrf_no,
+                            'read_url' => route('rrf.notifikasi.baca', $notification->id),
                         ])
                         ->values(),
                 ]
                 : [
                     'jumlah_belum_dibaca' => 0,
-                    'daftar' => [],
+                    'daftar'              => [],
                 ],
         ];
     }

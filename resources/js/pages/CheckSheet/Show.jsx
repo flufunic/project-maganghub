@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import MonitoringSection from '@/Components/MonitoringSection';
@@ -42,6 +42,22 @@ const ICONS = {
             'M7 3v5h8',
         ],
     },
+    chevron: { sw: 2, paths: ['M6 9l6 6 6-6'] },
+    note: {
+        paths: [
+            'M11 4H5a2 2 0 00-2 2v13a2 2 0 002 2h13a2 2 0 002-2v-6',
+            'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+        ],
+    },
+    info: { circle: { cx: 12, cy: 12, r: 9 }, paths: ['M12 11v5', 'M12 8h.01'] },
+    search: { circle: { cx: 11, cy: 11, r: 7 }, paths: ['m20 20-4-4'] },
+    building: {
+        rect: { x: 4, y: 3, width: 16, height: 18, rx: 2 },
+        paths: ['M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3'],
+    },
+    layers: { paths: ['M12 2l10 5-10 5L2 7z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'] },
+    hash: { paths: ['M5 9h14M5 15h14', 'M10 3L8 21M16 3l-2 18'] },
+    droplet: { paths: ['M12 2.7s6 6.2 6 10.8a6 6 0 11-12 0c0-4.6 6-10.8 6-10.8z'] },
 };
 
 const Icon = ({ type, className = 'h-4 w-4' }) => {
@@ -63,6 +79,7 @@ const Icon = ({ type, className = 'h-4 w-4' }) => {
             aria-hidden="true"
         >
             {icon.rect && <rect {...icon.rect} />}
+            {icon.circle && <circle {...icon.circle} />}
             {icon.paths.map((d, i) => (
                 <path key={i} d={d} />
             ))}
@@ -70,26 +87,38 @@ const Icon = ({ type, className = 'h-4 w-4' }) => {
     );
 };
 
+const Spinner = ({ className = 'h-4 w-4' }) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className={`animate-spin ${className}`}
+        aria-hidden="true"
+    >
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+        <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+);
+
 // =========================================================
 // STYLE TOKENS
 // =========================================================
 
-const glassCard =
-    'border border-white/40 bg-white/[0.93] shadow-[0_24px_70px_rgba(2,6,23,0.35)] backdrop-blur-2xl';
+const cardClass =
+    'rounded-3xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_48px_-12px_rgba(15,23,42,0.10)]';
 
 const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100';
+    'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
 
-// select di dalam form: cursor telunjuk
-const selectClass = `${inputClass} cursor-pointer`;
+// select di dalam form (panah dibuat sendiri lewat SelectBox)
+const selectClass = `${inputClass} cursor-pointer appearance-none pr-9`;
 
 // select kecil untuk toolbar
 const toolbarSelect =
-    'h-8 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'h-9 w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
 
 // tableHeadBase = tanpa padding horizontal (supaya bisa di-override tanpa konflik px-*)
 const tableHeadBase =
-    'border-r border-white/10 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
+    'border-b border-slate-200 py-3 text-[11px] font-semibold text-slate-500 whitespace-nowrap';
 
 const tableHead = `${tableHeadBase} px-3`;
 
@@ -98,7 +127,54 @@ const tableHead = `${tableHeadBase} px-3`;
 
 // input kecil untuk sel Actual / Selisih / Catatan
 const miniInput =
-    'w-full rounded border border-slate-200 bg-white px-1 py-0.5 text-center text-[11px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'w-full rounded-md border border-slate-200 bg-white px-1 py-1 text-center text-[11px] outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
+
+// tombol
+const btnBase =
+    'inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3.5 text-xs font-bold outline-none transition-all duration-200 active:scale-[0.97] focus-visible:ring-4';
+
+const btnPrimary = `${btnBase} bg-blue-600 text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 focus-visible:ring-blue-500/30`;
+const btnAmber = `${btnBase} bg-amber-500 text-white shadow-md shadow-amber-500/25 hover:bg-amber-600 focus-visible:ring-amber-500/30`;
+const btnSoftBlue = `${btnBase} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 focus-visible:ring-blue-500/20`;
+const btnSoftGreen = `${btnBase} border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus-visible:ring-emerald-500/20`;
+
+// =========================================================
+// OVERLAY HELPER (Esc menutup overlay paling atas + kunci scroll)
+// =========================================================
+
+let overlayCount = 0;
+
+const useOverlay = (ref, onClose) => {
+    const closeRef = useRef(onClose);
+    closeRef.current = onClose;
+
+    useEffect(() => {
+        overlayCount += 1;
+        document.body.style.overflow = 'hidden';
+
+        const onKey = (e) => {
+            if (e.key !== 'Escape') return;
+
+            const semua = document.querySelectorAll('[data-overlay]');
+
+            if (semua[semua.length - 1] === ref.current) {
+                closeRef.current?.();
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            overlayCount -= 1;
+
+            if (overlayCount <= 0) {
+                overlayCount = 0;
+                document.body.style.overflow = '';
+            }
+        };
+    }, [ref]);
+};
 
 // =========================================================
 // SMALL COMPONENTS
@@ -106,26 +182,44 @@ const miniInput =
 
 const IconButton = ({ title, onClick, variant = 'blue', children }) => {
     const variants = {
-        blue: 'border-blue-200 bg-blue-50 text-blue-600 hover:border-blue-300 hover:bg-blue-100',
-        red: 'border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100',
-        slate: 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
+        blue: 'bg-blue-50 text-blue-600 ring-1 ring-inset ring-blue-200/70 hover:bg-blue-100 hover:text-blue-700',
+        red: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200/70 hover:bg-red-100 hover:text-red-700',
+        amber: 'bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200/70 hover:bg-amber-100 hover:text-amber-700',
+        slate: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200 hover:bg-slate-200 hover:text-slate-800',
     };
 
     return (
         <button
             type="button"
             title={title}
+            aria-label={title}
             onClick={onClick}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${variants[variant]}`}
+            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg outline-none transition-all duration-200 active:scale-90 focus-visible:ring-4 focus-visible:ring-blue-500/20 ${variants[variant]}`}
         >
             {children}
         </button>
     );
 };
 
+const SelectBox = ({ variant = 'form', children, ...props }) => (
+    <div className="relative">
+        <select
+            {...props}
+            className={variant === 'sm' ? toolbarSelect : selectClass}
+        >
+            {children}
+        </select>
+
+        <Icon
+            type="chevron"
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+        />
+    </div>
+);
+
 const Field = ({ label, children, error, required = false, className = '' }) => (
     <div className={className}>
-        <label className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
             {label}
             {required && <span className="ml-1 text-red-500">*</span>}
         </label>
@@ -138,45 +232,71 @@ const Field = ({ label, children, error, required = false, className = '' }) => 
     </div>
 );
 
-// Header section ringkas: judul + jumlah (teks biasa) + tombol aksi
-const SectionHead = ({ title, desc, count, tone = 'blue', action }) => (
-    <div
-        className={`flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-            tone === 'amber' ? 'bg-amber-50/40' : 'bg-blue-50/40'
-        }`}
-    >
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+// Header section: ikon + judul + jumlah + tombol aksi
+const SectionHead = ({ title, desc, count, tone = 'blue', icon = 'clipboard', action }) => {
+    const tones = {
+        blue: 'bg-blue-50 text-blue-600',
+        amber: 'bg-amber-50 text-amber-600',
+    };
 
-            {count !== undefined && (
-                <span className="text-xs font-semibold text-slate-400">
-                    {count}
+    return (
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex min-w-0 items-center gap-3">
+                <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}
+                >
+                    <Icon type={icon} className="h-5 w-5" />
                 </span>
-            )}
 
-            <span className="hidden text-xs text-slate-400 md:inline">
-                · {desc}
-            </span>
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="truncate text-sm font-bold text-slate-900">
+                            {title}
+                        </h2>
+
+                        {count !== undefined && (
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-500">
+                                {count}
+                            </span>
+                        )}
+                    </div>
+
+                    {desc && (
+                        <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
+                            {desc}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {action}
         </div>
+    );
+};
 
-        {action}
-    </div>
+const InfoChip = ({ icon, label, value, mono = false }) => (
+    <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs">
+        <Icon type={icon} className="h-3.5 w-3.5 text-slate-400" />
+        <span className="text-slate-400">{label}</span>
+        <span
+            className={`font-semibold text-slate-800 ${mono ? 'font-mono text-blue-700' : ''}`}
+        >
+            {value}
+        </span>
+    </span>
 );
 
 const FormBanner = ({ text, tone = 'blue' }) => {
     const tones = {
-        blue: ['border-blue-100 from-blue-50/80 to-indigo-50/50', 'bg-blue-500'],
-        indigo: ['border-indigo-100 from-indigo-50/80 to-violet-50/50', 'bg-indigo-500'],
-        amber: ['border-amber-100 from-amber-50/80 to-orange-50/50', 'bg-amber-500'],
-        orange: ['border-orange-100 from-orange-50/80 to-amber-50/50', 'bg-orange-500'],
+        blue: 'border-blue-500 bg-blue-50/60',
+        indigo: 'border-indigo-500 bg-indigo-50/60',
+        amber: 'border-amber-500 bg-amber-50/60',
+        orange: 'border-orange-500 bg-orange-50/60',
     };
 
     return (
-        <div className={`rounded-xl border bg-gradient-to-r px-4 py-3 ${tones[tone][0]}`}>
-            <div className="flex items-center gap-3">
-                <div className={`h-1.5 w-1.5 rounded-full ${tones[tone][1]}`} />
-                <h4 className="text-sm font-bold text-slate-800">{text}</h4>
-            </div>
+        <div className={`rounded-xl border-l-4 px-4 py-3 ${tones[tone]}`}>
+            <h4 className="text-sm font-bold text-slate-800">{text}</h4>
         </div>
     );
 };
@@ -193,7 +313,7 @@ const FormActions = ({
         <button
             type="button"
             onClick={onCancel}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 outline-none transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-slate-300/50"
         >
             Batal
         </button>
@@ -201,12 +321,13 @@ const FormActions = ({
         <button
             type="submit"
             disabled={processing || disabled}
-            className={`cursor-pointer rounded-xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 text-sm font-bold text-white outline-none transition-all duration-200 active:scale-[0.97] focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${
                 tone === 'amber'
-                    ? 'from-amber-500 to-orange-500 shadow-amber-300/50 hover:from-amber-600 hover:to-orange-600'
-                    : 'from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50 hover:from-blue-600 hover:via-indigo-700 hover:to-violet-700'
+                    ? 'bg-amber-500 shadow-lg shadow-amber-500/25 hover:bg-amber-600 focus-visible:ring-amber-500/30'
+                    : 'bg-blue-600 shadow-lg shadow-blue-600/25 hover:bg-blue-700 focus-visible:ring-blue-500/30'
             }`}
         >
+            {processing && <Spinner />}
             {processing ? processingLabel : label}
         </button>
     </div>
@@ -230,10 +351,10 @@ const ItemFields = ({
                         value={nomor}
                         readOnly
                         placeholder="Pilih shift dulu"
-                        className="w-full cursor-not-allowed rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-2.5 text-sm font-bold text-blue-700 outline-none placeholder:font-medium placeholder:text-blue-300"
+                        className="w-full cursor-not-allowed rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-2.5 text-sm font-bold text-blue-700 outline-none placeholder:font-medium placeholder:text-blue-300"
                     />
 
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-500">
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">
                         Otomatis
                     </span>
                 </div>
@@ -244,15 +365,14 @@ const ItemFields = ({
             </Field>
 
             <Field label="Shift" required error={errors.shift}>
-                <select
+                <SelectBox
                     value={data.shift}
                     onChange={(e) => setData('shift', e.target.value)}
-                    className={selectClass}
                 >
                     <option value="">Pilih Shift</option>
                     <option value="A">Shift A</option>
                     <option value="B">Shift B</option>
-                </select>
+                </SelectBox>
             </Field>
         </div>
 
@@ -332,14 +452,14 @@ const PreventifPicker = ({ options = [], value = [], onChange }) => {
     const dipilihList = options.filter((p) => terpilih.includes(String(p.no)));
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
             {/* Chip item yang sudah dipilih */}
             {dipilihList.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                     {dipilihList.map((p) => (
                         <span
                             key={p.no}
-                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700"
+                            className="idx-pop-in inline-flex max-w-full items-center gap-1.5 rounded-lg bg-indigo-50 py-1 pl-2.5 pr-1.5 text-[11px] font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200/80"
                         >
                             <span className="truncate">
                                 {p.divisi} {p.no_item}. {p.item_preventif}
@@ -348,33 +468,41 @@ const PreventifPicker = ({ options = [], value = [], onChange }) => {
                             <button
                                 type="button"
                                 onClick={() => toggle(p.no)}
-                                className="cursor-pointer text-indigo-400 transition hover:text-red-500"
+                                className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-md text-indigo-400 transition hover:bg-indigo-100 hover:text-red-500"
                                 title="Hapus pilihan"
+                                aria-label="Hapus pilihan"
                             >
-                                ×
+                                <Icon type="close" className="h-3 w-3" />
                             </button>
                         </span>
                     ))}
                 </div>
             )}
 
-            <input
-                type="text"
-                value={cari}
-                onChange={(e) => setCari(e.target.value)}
-                placeholder="Cari item preventif... (contoh: air loading)"
-                className={inputClass}
-            />
+            <div className="relative">
+                <Icon
+                    type="search"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                />
+
+                <input
+                    type="text"
+                    value={cari}
+                    onChange={(e) => setCari(e.target.value)}
+                    placeholder="Cari item preventif... (contoh: air loading)"
+                    className={`${inputClass} pl-10`}
+                />
+            </div>
 
             <div className="idx-scroll max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white">
                 {Object.keys(grup).length === 0 ? (
-                    <p className="px-3 py-4 text-center text-xs text-slate-400">
+                    <p className="px-3 py-6 text-center text-xs text-slate-400">
                         Item tidak ditemukan.
                     </p>
                 ) : (
                     Object.entries(grup).map(([divisi, items]) => (
                         <div key={divisi}>
-                            <p className="sticky top-0 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <p className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-500">
                                 {divisi}
                             </p>
 
@@ -392,7 +520,7 @@ const PreventifPicker = ({ options = [], value = [], onChange }) => {
                                             type="checkbox"
                                             checked={aktif}
                                             onChange={() => toggle(p.no)}
-                                            className="mt-0.5 cursor-pointer"
+                                            className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-indigo-600"
                                         />
 
                                         <span className="leading-snug text-slate-700">
@@ -443,15 +571,14 @@ const AbnormalityFields = ({
                 </Field>
 
                 <Field label="Status" required error={errors.status}>
-                    <select
+                    <SelectBox
                         value={data.status}
                         onChange={(e) => setData('status', e.target.value)}
-                        className={selectClass}
                     >
                         <option value="Open">Open</option>
                         <option value="Progress">Progress</option>
                         <option value="Closed">Closed</option>
-                    </select>
+                    </SelectBox>
                 </Field>
             </div>
 
@@ -498,10 +625,13 @@ const AbnormalityFields = ({
                     onChange={(ids) => setData('preventif_mesin_ids', ids)}
                 />
 
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
-                    Boleh pilih lebih dari satu. Jika dipilih, abnormality ini muncul
-                    sebagai notifikasi &quot;perlu pengecekan lebih lanjut&quot; di
-                    semua item preventif tersebut sampai statusnya <b>Closed</b>.
+                <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
+                    <Icon type="info" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                    <span>
+                        Boleh pilih lebih dari satu. Jika dipilih, abnormality ini muncul
+                        sebagai notifikasi &quot;perlu pengecekan lebih lanjut&quot; di
+                        semua item preventif tersebut sampai statusnya <b>Closed</b>.
+                    </span>
                 </p>
             </Field>
         </>
@@ -516,21 +646,23 @@ const CheckBtn = ({ checked, tone = 'emerald', title, onClick }) => (
     <button
         type="button"
         title={title}
+        aria-label={title}
+        aria-pressed={checked}
         onClick={onClick}
-        className={`mx-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition-all duration-200 ${
+        className={`mx-auto flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 outline-none transition-all duration-200 active:scale-90 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${
             checked
                 ? tone === 'blue'
-                    ? 'border-blue-300 bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-sm hover:from-blue-500 hover:to-indigo-600'
-                    : 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-sm hover:from-emerald-500 hover:to-teal-600'
-                : 'border-slate-200 bg-slate-50 text-transparent hover:border-blue-300 hover:bg-blue-50'
+                    ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30'
+                    : 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                : 'border-slate-200 bg-white text-transparent hover:border-blue-400 hover:bg-blue-50'
         }`}
     >
-        {checked && <Icon type="check" className="h-3.5 w-3.5" />}
+        {checked && <Icon type="check" className="idx-check h-3.5 w-3.5" />}
     </button>
 );
 
 // =========================================================
-// TOMBOL CATATAN (icon 📝, titik merah kalau sudah ada catatan)
+// TOMBOL CATATAN (ikon catatan, titik merah kalau sudah ada catatan)
 // =========================================================
 
 const CatatanBtn = ({ ada, onClick }) => (
@@ -538,13 +670,14 @@ const CatatanBtn = ({ ada, onClick }) => (
         type="button"
         onClick={onClick}
         title={ada ? 'Lihat / ubah catatan' : 'Tambah catatan'}
-        className={`relative mx-auto cursor-pointer text-sm leading-none transition hover:scale-110 ${
-            ada ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+        aria-label={ada ? 'Lihat atau ubah catatan' : 'Tambah catatan'}
+        className={`relative mx-auto flex h-5 w-5 cursor-pointer items-center justify-center rounded-md outline-none transition-all duration-200 hover:scale-110 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${
+            ada ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'
         }`}
     >
-        📝
+        <Icon type="note" className="h-3.5 w-3.5" />
         {ada && (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
         )}
     </button>
 );
@@ -596,7 +729,7 @@ const NilaiCell = ({ nilai, onSave }) => {
     const selisihAda = nilai.selisih !== null && nilai.selisih !== 0;
 
     return (
-        <div className="mx-auto flex w-24 flex-col gap-0.5">
+        <div className="mx-auto flex w-24 flex-col gap-1">
             <input
                 type="number"
                 step="any"
@@ -610,12 +743,12 @@ const NilaiCell = ({ nilai, onSave }) => {
 
             <div
                 title="Selisih otomatis (actual ini - actual sebelumnya)"
-                className={`flex h-[22px] items-center justify-center rounded border px-1 text-[11px] ${
+                className={`flex h-[24px] items-center justify-center rounded-md px-1 text-[11px] ${
                     nilai.selisih === null
-                        ? 'border-slate-100 bg-slate-50 text-slate-300'
+                        ? 'bg-slate-50 text-slate-300'
                         : selisihAda
-                        ? 'border-red-200 bg-red-50 font-bold text-red-600'
-                        : 'border-slate-200 bg-slate-50 text-slate-500'
+                        ? 'bg-red-50 font-bold text-red-600 ring-1 ring-inset ring-red-200'
+                        : 'bg-slate-50 text-slate-500'
                 }`}
             >
                 {nilai.selisih === null ? 'Sel' : nilai.selisih}
@@ -647,54 +780,59 @@ const Modal = ({
     children,
     maxWidth = 'max-w-2xl',
 }) => {
+    const overlayRef = useRef(null);
+
+    useOverlay(overlayRef, onClose);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#030a26]/60 p-4 backdrop-blur-md">
+        <div
+            ref={overlayRef}
+            data-overlay
+            className="idx-overlay fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 backdrop-blur-md sm:items-center sm:p-4"
+        >
             <div
                 role="dialog"
                 aria-modal="true"
-                className={`relative w-full ${maxWidth} overflow-hidden rounded-2xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40`}
+                className={`idx-sheet relative flex max-h-[92vh] w-full ${maxWidth} flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-slate-950/30 sm:rounded-3xl`}
             >
-                <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
-
-                <div className="border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/40 to-indigo-50/50 px-6 py-4">
-                    <div className="flex items-start gap-3">
-                        <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md ${
-                                icon === 'alert'
-                                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-300/50'
-                                    : 'bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600 shadow-indigo-300/50'
-                            }`}
-                        >
-                            <Icon
-                                type={icon === 'alert' ? 'alert' : 'clipboard'}
-                                className="h-5 w-5"
-                            />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                            <h3 className="text-base font-bold tracking-tight text-slate-900">
-                                {title}
-                            </h3>
-
-                            {description && (
-                                <p className="mt-0.5 text-sm leading-5 text-slate-500">
-                                    {description}
-                                </p>
-                            )}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                            title="Tutup"
-                        >
-                            <Icon type="close" className="h-4 w-4" />
-                        </button>
+                <div className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                    <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            icon === 'alert'
+                                ? 'bg-amber-50 text-amber-600'
+                                : 'bg-blue-50 text-blue-600'
+                        }`}
+                    >
+                        <Icon
+                            type={icon === 'alert' ? 'alert' : 'clipboard'}
+                            className="h-5 w-5"
+                        />
                     </div>
+
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-base font-bold tracking-tight text-slate-900">
+                            {title}
+                        </h3>
+
+                        {description && (
+                            <p className="mt-0.5 text-sm leading-5 text-slate-500">
+                                {description}
+                            </p>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-4 focus-visible:ring-slate-300/50"
+                        title="Tutup"
+                        aria-label="Tutup"
+                    >
+                        <Icon type="close" className="h-4 w-4" />
+                    </button>
                 </div>
 
-                <div className="max-h-[75vh] overflow-y-auto p-6">
+                <div className="idx-scroll overflow-y-auto p-5 sm:p-6">
                     {children}
                 </div>
             </div>
@@ -706,16 +844,25 @@ const Modal = ({
 // DIALOG KONFIRMASI (simpan / edit / hapus)
 // =========================================================
 
-const ConfirmDialog = ({ dialog, onCancel }) => {
-    if (!dialog) {
-        return null;
-    }
+const ConfirmDialogInner = ({ dialog, onCancel }) => {
+    const overlayRef = useRef(null);
+    const cancelRef = useRef(null);
+    const confirmRef = useRef(null);
+
+    useOverlay(overlayRef, onCancel);
 
     const isRed = dialog.tone === 'red';
 
+    // aksi hapus: fokus awal di "Batal" supaya tidak terhapus tidak sengaja
+    useEffect(() => {
+        (isRed ? cancelRef : confirmRef).current?.focus();
+    }, [isRed]);
+
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            ref={overlayRef}
+            data-overlay
+            className="idx-overlay fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 backdrop-blur-md sm:items-center sm:p-4"
             onMouseDown={(e) => {
                 if (e.target === e.currentTarget) {
                     onCancel();
@@ -725,15 +872,23 @@ const ConfirmDialog = ({ dialog, onCancel }) => {
             <div
                 role="alertdialog"
                 aria-modal="true"
-                className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/60 bg-white shadow-2xl shadow-slate-950/40"
+                aria-labelledby="confirm-title"
+                aria-describedby="confirm-desc"
+                className="idx-sheet w-full max-w-sm overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-slate-950/30 sm:rounded-3xl"
             >
-                <div className="px-5 pb-4 pt-5">
-                    <div className="flex items-start gap-3">
+                <div className="px-6 pb-2 pt-7 text-center">
+                    <div
+                        className={`idx-icon-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-8 ${
+                            isRed
+                                ? 'bg-red-50 ring-red-50/60'
+                                : 'bg-blue-50 ring-blue-50/60'
+                        }`}
+                    >
                         <span
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                            className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg ${
                                 isRed
-                                    ? 'bg-red-50 text-red-600'
-                                    : 'bg-blue-50 text-blue-600'
+                                    ? 'bg-red-600 shadow-red-600/30'
+                                    : 'bg-blue-600 shadow-blue-600/30'
                             }`}
                         >
                             <Icon
@@ -741,35 +896,41 @@ const ConfirmDialog = ({ dialog, onCancel }) => {
                                 className="h-5 w-5"
                             />
                         </span>
-
-                        <div className="min-w-0">
-                            <h2 className="text-base font-bold text-slate-900">
-                                {dialog.title}
-                            </h2>
-
-                            <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                                {dialog.message}
-                            </p>
-                        </div>
                     </div>
+
+                    <h2
+                        id="confirm-title"
+                        className="mt-5 text-lg font-extrabold tracking-tight text-slate-900"
+                    >
+                        {dialog.title}
+                    </h2>
+
+                    <p
+                        id="confirm-desc"
+                        className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-500"
+                    >
+                        {dialog.message}
+                    </p>
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                <div className="grid grid-cols-2 gap-3 px-6 pb-6 pt-6">
                     <button
+                        ref={cancelRef}
                         type="button"
                         onClick={onCancel}
-                        className="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                        className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 outline-none transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-slate-300/50"
                     >
                         Batal
                     </button>
 
                     <button
+                        ref={confirmRef}
                         type="button"
                         onClick={() => dialog.onConfirm?.()}
-                        className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-bold text-white transition ${
+                        className={`inline-flex h-11 cursor-pointer items-center justify-center rounded-xl text-sm font-bold text-white shadow-lg outline-none transition active:scale-[0.97] focus-visible:ring-4 ${
                             isRed
-                                ? 'bg-red-600 hover:bg-red-700'
-                                : 'bg-blue-600 hover:bg-blue-700'
+                                ? 'bg-red-600 shadow-red-600/25 hover:bg-red-700 focus-visible:ring-red-500/30'
+                                : 'bg-blue-600 shadow-blue-600/25 hover:bg-blue-700 focus-visible:ring-blue-500/30'
                         }`}
                     >
                         {dialog.confirmLabel ?? 'Ya'}
@@ -780,11 +941,19 @@ const ConfirmDialog = ({ dialog, onCancel }) => {
     );
 };
 
+const ConfirmDialog = ({ dialog, onCancel }) => {
+    if (!dialog) {
+        return null;
+    }
+
+    return <ConfirmDialogInner dialog={dialog} onCancel={onCancel} />;
+};
+
 // =========================================================
 // MODAL CATATAN CHECKLIST (mode Plan/Act & mode biasa)
 // =========================================================
 
-const CatatanModal = ({
+const CatatanModalInner = ({
     target,
     value,
     onChange,
@@ -795,49 +964,57 @@ const CatatanModal = ({
     bulan,
     tahun,
 }) => {
-    if (!target) {
-        return null;
-    }
+    const overlayRef = useRef(null);
+
+    useOverlay(overlayRef, onClose);
 
     const hari = Number(String(target.tanggal).substring(8, 10));
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#030a26]/60 px-4 backdrop-blur-md">
-            <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/50 bg-white shadow-2xl shadow-slate-950/40">
-                <div className="border-b border-slate-100 px-6 py-5">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-600 shadow-sm">
-                                📝
-                            </div>
-
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">
-                                    {target.judul ?? 'Catatan Checklist'}
-                                </h2>
-
-                                <p className="mt-0.5 text-xs text-slate-500">
-                                    {hari} {namaBulan[bulan - 1]} {tahun}
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                        >
-                            ×
-                        </button>
+        <div
+            ref={overlayRef}
+            data-overlay
+            className="idx-overlay fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/50 backdrop-blur-md sm:items-center sm:p-4"
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                className="idx-sheet w-full max-w-lg overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-slate-950/30 sm:rounded-3xl"
+            >
+                <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                        <Icon type="note" className="h-5 w-5" />
                     </div>
 
-                    <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                        {target.label}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-base font-bold text-slate-900">
+                            {target.judul ?? 'Catatan Checklist'}
+                        </h2>
+
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            {hari} {namaBulan[bulan - 1]} {tahun}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-4 focus-visible:ring-slate-300/50"
+                        aria-label="Tutup"
+                    >
+                        <Icon type="close" className="h-4 w-4" />
+                    </button>
                 </div>
 
-                <div className="px-6 py-5">
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <div className="px-5 py-5 sm:px-6">
+                    <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3">
+                        <Icon type="clipboard" className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                        <p className="text-sm leading-snug text-slate-600">
+                            {target.label}
+                        </p>
+                    </div>
+
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
                         Catatan
                     </label>
 
@@ -848,19 +1025,19 @@ const CatatanModal = ({
                         maxLength={255}
                         autoFocus
                         placeholder="Tulis catatan untuk checklist ini..."
-                        className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                        className={`${inputClass} resize-none`}
                     />
 
-                    <p className="mt-1 text-right text-[11px] text-slate-400">
+                    <p className="mt-1.5 text-right text-[11px] tabular-nums text-slate-400">
                         {value.length}/255
                     </p>
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+                        className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 outline-none transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-slate-300/50"
                     >
                         Batal
                     </button>
@@ -869,14 +1046,23 @@ const CatatanModal = ({
                         type="button"
                         onClick={onSave}
                         disabled={saving}
-                        className="cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/25 outline-none transition-all duration-200 hover:bg-blue-700 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                     >
+                        {saving && <Spinner />}
                         {saving ? 'Menyimpan...' : 'Simpan Catatan'}
                     </button>
                 </div>
             </div>
         </div>
     );
+};
+
+const CatatanModal = (props) => {
+    if (!props.target) {
+        return null;
+    }
+
+    return <CatatanModalInner {...props} />;
 };
 
 // =========================================================
@@ -1005,22 +1191,26 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
                             setFile(e.target.files[0] ?? null);
                             setPreview(null);
                         }}
-                        className={`${inputClass} cursor-pointer`}
+                        className={`${inputClass} cursor-pointer file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-100`}
                     />
                 </Field>
 
                 {loading && (
-                    <p className="text-sm text-slate-500">Membaca file...</p>
+                    <p className="flex items-center gap-2 text-sm text-slate-500">
+                        <Spinner className="h-4 w-4 text-blue-600" />
+                        Membaca file...
+                    </p>
                 )}
 
                 {error && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                    <div className="idx-fade flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                        <Icon type="alert" className="mt-0.5 h-4 w-4 shrink-0" />
                         {error}
                     </div>
                 )}
 
                 {preview && (
-                    <>
+                    <div className="idx-fade space-y-6">
                         <FormBanner
                             text="Cocokkan Kolom (terisi otomatis, bisa diubah)"
                             tone="indigo"
@@ -1028,7 +1218,7 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
 
                         {MAP_FIELDS.map((f) => (
                             <div key={f.key}>
-                                <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                                <p className="mb-1 text-xs font-semibold text-slate-700">
                                     {f.label}
                                     {f.required && (
                                         <span className="ml-1 text-red-500">*</span>
@@ -1046,10 +1236,10 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
                                                 key={i}
                                                 type="button"
                                                 onClick={() => toggleCol(f.key, i)}
-                                                className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                                                className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold outline-none transition-all duration-200 active:scale-95 focus-visible:ring-4 focus-visible:ring-indigo-500/20 ${
                                                     active
-                                                        ? 'border-indigo-300 bg-indigo-600 text-white shadow-sm'
-                                                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/25'
+                                                        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/60'
                                                 }`}
                                             >
                                                 {f.key === 'inspection_point' && active && (
@@ -1066,19 +1256,23 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
                         ))}
 
                         <div>
-                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                            <p className="mb-2 text-xs font-semibold text-slate-700">
                                 Terapkan ke Shift
                             </p>
 
-                            <div className="flex gap-4">
+                            <div className="flex gap-3">
                                 {['A', 'B'].map((s) => (
                                     <label
                                         key={s}
-                                        className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700"
+                                        className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+                                            shifts.includes(s)
+                                                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
                                     >
                                         <input
                                             type="checkbox"
-                                            className="cursor-pointer"
+                                            className="h-3.5 w-3.5 cursor-pointer accent-blue-600"
                                             checked={shifts.includes(s)}
                                             onChange={() => toggleShift(s)}
                                         />
@@ -1089,18 +1283,18 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
                         </div>
 
                         <div>
-                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                            <p className="mb-2 text-xs font-semibold text-slate-700">
                                 Contoh data ({preview.total_rows} baris terdeteksi)
                             </p>
 
                             <div className="idx-scroll overflow-x-auto rounded-xl border border-slate-200">
                                 <table className="w-full text-xs">
-                                    <thead className="bg-slate-100 text-slate-600">
+                                    <thead className="bg-slate-50 text-slate-500">
                                         <tr>
                                             {preview.headers.map((h, i) => (
                                                 <th
                                                     key={i}
-                                                    className="whitespace-nowrap px-3 py-2 text-left font-bold"
+                                                    className="whitespace-nowrap px-3 py-2.5 text-left font-semibold"
                                                 >
                                                     {headerLabel(h, i)}
                                                 </th>
@@ -1123,11 +1317,12 @@ const ImportModal = ({ checkSheet, onClose, onDone }) => {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+                        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700">
+                            <Icon type="alert" className="mt-0.5 h-4 w-4 shrink-0" />
                             Import bersifat menambah data. Jika file yang sama
                             diimport dua kali, item akan terduplikasi.
                         </div>
-                    </>
+                    </div>
                 )}
 
                 <FormActions
@@ -1242,23 +1437,20 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
             },
         });
 
-    const th = 'border-r border-white/10 px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap';
-    const td = 'border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600';
+    const th = 'border-b border-slate-200 px-3 py-3 text-[11px] font-semibold text-slate-500 whitespace-nowrap';
+    const td = 'border-b border-slate-100 px-3 py-2.5 text-xs text-slate-600';
 
     return (
         <>
-            <section className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}>
+            <section className={`idx-rise mb-5 overflow-hidden ${cardClass}`}>
                 <SectionHead
                     tone="blue"
+                    icon="droplet"
                     title={`Pelumasan${line ? ' · ' + line.nama_line : ''}`}
                     desc="Jadwal pelumasan per sub mesin untuk line ini."
                     count={`${rows.length} data`}
                     action={
-                        <button
-                            type="button"
-                            onClick={bukaTambah}
-                            className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
-                        >
+                        <button type="button" onClick={bukaTambah} className={btnPrimary}>
                             <Icon type="plus" className="h-3.5 w-3.5" />
                             Tambah
                         </button>
@@ -1268,7 +1460,7 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
                 <div className="idx-scroll overflow-x-auto">
                     <table className="w-full min-w-[1000px] border-collapse text-sm">
                         <thead>
-                            <tr className="bg-[#0a1a4d] text-white">
+                            <tr className="bg-slate-50">
                                 <th rowSpan={2} className={`w-12 text-center ${th}`}>No</th>
                                 <th rowSpan={2} className={`text-left ${th}`}>Sub Mesin</th>
                                 <th rowSpan={2} className={`text-left ${th}`}>Jenis Pelumasan</th>
@@ -1276,13 +1468,13 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
                                 <th rowSpan={2} className={`text-left ${th}`}>Method</th>
                                 <th rowSpan={2} className={`text-left ${th}`}>Tools</th>
                                 <th rowSpan={2} className={`text-center ${th}`}>Time (Min)</th>
-                                <th colSpan={4} className={`text-center ${th}`}>Interval</th>
+                                <th colSpan={4} className={`border-b border-slate-200 px-3 py-2 text-center text-[11px] font-semibold text-slate-500`}>Interval</th>
                                 <th rowSpan={2} className={`text-left ${th}`}>PIC</th>
                                 <th rowSpan={2} className={`w-24 text-center ${th}`}>Aksi</th>
                             </tr>
-                            <tr className="bg-[#13307a] text-blue-200">
+                            <tr className="bg-slate-50">
                                 {INTERVALS.map((i) => (
-                                    <th key={i.key} className="w-14 border-r border-white/10 px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider">
+                                    <th key={i.key} className="w-14 border-b border-slate-200 px-1 py-1.5 text-center text-[10px] font-semibold text-slate-400">
                                         {i.label}
                                     </th>
                                 ))}
@@ -1292,14 +1484,24 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
                         <tbody>
                             {rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={13} className="px-6 py-10 text-center text-xs text-slate-400">
-                                        Belum ada data pelumasan{line ? ` untuk ${line.nama_line}` : ''}.
+                                    <td colSpan={13} className="px-6 py-12 text-center">
+                                        <div className="mx-auto flex max-w-sm flex-col items-center">
+                                            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                                <Icon type="droplet" className="h-6 w-6" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-700">
+                                                Belum ada data pelumasan
+                                            </p>
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                {line ? `Tambahkan jadwal pelumasan untuk ${line.nama_line}.` : 'Tambahkan jadwal pelumasan pertama.'}
+                                            </p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 rows.map((row, idx) => (
-                                    <tr key={row.id} className="transition-colors hover:bg-blue-50/50">
-                                        <td className={`${td} text-center font-bold text-slate-500`}>{idx + 1}</td>
+                                    <tr key={row.id} className="transition-colors hover:bg-slate-50/80">
+                                        <td className={`${td} text-center font-bold text-slate-400`}>{idx + 1}</td>
                                         <td className={td}>{row.sub_mesin || '-'}</td>
                                         <td className={`${td} font-semibold text-slate-800`}>{row.jenis_pelumasan}</td>
                                         <td className={td}>{row.qty || '-'}</td>
@@ -1308,15 +1510,17 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
                                         <td className={`${td} text-center`}>{row.time_minutes ?? '-'}</td>
 
                                         {INTERVALS.map((i) => (
-                                            <td key={i.key} className={`${td} text-center font-bold text-indigo-600`}>
-                                                {row.interval === i.key ? 'o' : ''}
+                                            <td key={i.key} className={`${td} text-center`}>
+                                                {row.interval === i.key && (
+                                                    <span className="mx-auto block h-2.5 w-2.5 rounded-full bg-indigo-500 ring-4 ring-indigo-100" />
+                                                )}
                                             </td>
                                         ))}
 
                                         <td className={td}>{row.pic || '-'}</td>
 
                                         <td className="border-b border-slate-100 px-2 py-2">
-                                            <div className="flex justify-center gap-1.5">
+                                            <div className="flex justify-center gap-1">
                                                 <IconButton title="Edit" variant="blue" onClick={() => bukaEdit(row)}>
                                                     <Icon type="edit" />
                                                 </IconButton>
@@ -1378,14 +1582,13 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
                             </Field>
 
                             <Field label="Interval" error={form.errors.interval}>
-                                <select value={form.data.interval}
-                                    onChange={(e) => form.setData('interval', e.target.value)}
-                                    className={`${inputClass} cursor-pointer`}>
+                                <SelectBox value={form.data.interval}
+                                    onChange={(e) => form.setData('interval', e.target.value)}>
                                     <option value="">Pilih interval</option>
                                     {INTERVALS.map((i) => (
                                         <option key={i.key} value={i.key}>{i.label}</option>
                                     ))}
-                                </select>
+                                </SelectBox>
                             </Field>
 
                             <Field label="PIC" error={form.errors.pic}>
@@ -1479,7 +1682,7 @@ export default function Show({
     // Dialog konfirmasi: { title, message, confirmLabel, tone, icon, onConfirm }
     const [confirmDialog, setConfirmDialog] = useState(null);
 
-    // Toast: { type: 'success' | 'error', message }
+    // Toast: { id, type: 'success' | 'error', message }
     const [toast, setToast] = useState(null);
 
     // Catatan checklist (mode Plan/Act & biasa)
@@ -1487,12 +1690,13 @@ export default function Show({
     const [catatanText, setCatatanText] = useState('');
     const [savingCatatan, setSavingCatatan] = useState(false);
 
-    const notify = (message, type = 'success') => setToast({ type, message });
+    const notify = (message, type = 'success') =>
+        setToast({ id: Date.now(), type, message });
 
     // Toast dari flash backend
     useEffect(() => {
         if (flash?.success) {
-            setToast({ type: 'success', message: flash.success });
+            setToast({ id: Date.now(), type: 'success', message: flash.success });
         }
     }, [flash]);
 
@@ -1639,14 +1843,14 @@ export default function Show({
 
     const getStatusClass = (status) => {
         if (status === 'Closed') {
-            return 'text-emerald-700';
+            return 'bg-emerald-50 text-emerald-700 ring-emerald-200/80';
         }
 
         if (status === 'Progress') {
-            return 'text-amber-700';
+            return 'bg-amber-50 text-amber-700 ring-amber-200/80';
         }
 
-        return 'text-red-700';
+        return 'bg-red-50 text-red-700 ring-red-200/80';
     };
 
     const getStatusDot = (status) => {
@@ -2184,41 +2388,64 @@ export default function Show({
             <Head title={`${checkSheet.nama_checksheet} - Check Sheet`} />
 
             <style>{`
-                @keyframes idxGradient {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                @keyframes idxFloat {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(30px, -30px, 0) scale(1.08); }
-                }
-                @keyframes idxFloatReverse {
-                    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-                    50% { transform: translate3d(-35px, 25px, 0) scale(1.1); }
-                }
                 @keyframes idxRise {
-                    from { opacity: 0; transform: translateY(18px); }
+                    from { opacity: 0; transform: translateY(14px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+                @keyframes idxFade {
+                    from { opacity: 0; transform: translateY(6px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes idxOverlay {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes idxSheet {
+                    0% { opacity: 0; transform: translateY(28px) scale(.96); }
+                    60% { opacity: 1; transform: translateY(-3px) scale(1.005); }
+                    100% { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes idxIconPop {
+                    0% { transform: scale(.4) rotate(-30deg); opacity: 0; }
+                    70% { transform: scale(1.1) rotate(6deg); opacity: 1; }
+                    100% { transform: scale(1) rotate(0); opacity: 1; }
+                }
+                @keyframes idxPopIn {
+                    from { opacity: 0; transform: scale(.85); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes idxCheck {
+                    0% { transform: scale(0) rotate(-20deg); }
+                    70% { transform: scale(1.25); }
+                    100% { transform: scale(1) rotate(0); }
+                }
                 @keyframes idxToast {
-                    from { opacity: 0; transform: translateX(24px); }
-                    to { opacity: 1; transform: translateX(0); }
+                    from { opacity: 0; transform: translateX(28px) scale(.97); }
+                    to { opacity: 1; transform: translateX(0) scale(1); }
+                }
+                @keyframes idxProgress {
+                    from { transform: scaleX(1); }
+                    to { transform: scaleX(0); }
                 }
 
-                .idx-gradient {
-                    background-size: 250% 250%;
-                    animation: idxGradient 20s ease infinite;
-                }
-                .idx-float { animation: idxFloat 14s ease-in-out infinite; }
-                .idx-float-reverse { animation: idxFloatReverse 17s ease-in-out infinite; }
-                .idx-rise { animation: idxRise 0.7s ease-out both; }
-                .idx-toast { animation: idxToast 0.3s ease-out both; }
+                .idx-rise { animation: idxRise .55s cubic-bezier(.22,1,.36,1) both; }
+                .idx-fade { animation: idxFade .35s cubic-bezier(.22,1,.36,1) both; }
+                .idx-overlay { animation: idxOverlay .2s ease-out both; }
+                .idx-sheet { animation: idxSheet .38s cubic-bezier(.22,1,.36,1) both; }
+                .idx-icon-pop { animation: idxIconPop .5s cubic-bezier(.34,1.56,.64,1) .1s both; }
+                .idx-pop-in { animation: idxPopIn .25s cubic-bezier(.34,1.56,.64,1) both; }
+                .idx-check { animation: idxCheck .3s cubic-bezier(.34,1.56,.64,1) both; }
+                .idx-toast { animation: idxToast .35s cubic-bezier(.22,1,.36,1) both; }
+                .idx-progress { animation: idxProgress 4s linear both; transform-origin: left; }
 
                 .idx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
                 .idx-scroll::-webkit-scrollbar-track { background: transparent; }
                 .idx-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(100, 116, 139, 0.4);
+                    background: rgba(100, 116, 139, 0.35);
                     border-radius: 999px;
+                }
+                .idx-scroll::-webkit-scrollbar-thumb:hover {
+                    background: rgba(100, 116, 139, 0.55);
                 }
 
                 /* hilangkan spinner panah pada input number di sel KWH */
@@ -2230,43 +2457,49 @@ export default function Show({
                 .idx-nilai input[type=number] { -moz-appearance: textfield; }
 
                 @media (prefers-reduced-motion: reduce) {
-                    .idx-gradient,
-                    .idx-float,
-                    .idx-float-reverse,
+                    .idx-rise,
+                    .idx-fade,
+                    .idx-overlay,
+                    .idx-sheet,
+                    .idx-icon-pop,
+                    .idx-pop-in,
+                    .idx-check,
                     .idx-toast,
-                    .idx-rise { animation: none !important; }
+                    .idx-progress { animation: none !important; }
+
+                    *, *::before, *::after {
+                        transition-duration: .01ms !important;
+                    }
                 }
             `}</style>
 
-            <div className="relative flex min-h-screen flex-col overflow-x-hidden text-slate-800">
-                {/* BACKGROUND */}
-                <div className="fixed inset-0 -z-20 overflow-hidden">
-                    <div className="idx-gradient absolute inset-0 bg-gradient-to-br from-[#030a26] via-[#0a2260] to-[#1d4ed8]" />
-
-                    <div className="idx-float absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-blue-400/20 blur-[100px]" />
-                    <div className="idx-float-reverse absolute right-[-120px] top-[30%] h-[500px] w-[500px] rounded-full bg-indigo-500/25 blur-[110px]" />
-                    <div className="idx-float absolute bottom-[-160px] left-[30%] h-[450px] w-[450px] rounded-full bg-sky-400/15 blur-[110px]" />
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-slate-100 text-slate-800">
+                {/* BACKGROUND ACCENTS */}
+                <div className="pointer-events-none fixed inset-0 overflow-hidden">
+                    <div className="absolute -right-40 -top-40 h-[480px] w-[480px] rounded-full bg-blue-200/40 blur-[110px]" />
+                    <div className="absolute -bottom-48 -left-32 h-[420px] w-[420px] rounded-full bg-indigo-200/30 blur-[110px]" />
                 </div>
 
                 {/* =================================================
                     HEADER (RINGKAS, SATU BARIS)
                 ================================================== */}
-                <header className="sticky top-0 z-40 border-b border-white/15 bg-[#030a26]/45 shadow-[0_8px_30px_rgba(2,6,23,0.25)] backdrop-blur-2xl">
-                    <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+                <header className="sticky top-0 z-40 bg-[#071735] shadow-lg shadow-slate-950/10">
+                    <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
                         <Link
                             href={backUrl}
                             title="Kembali"
-                            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white transition hover:bg-white/25"
+                            aria-label="Kembali"
+                            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white outline-none transition hover:bg-white/20 active:scale-95 focus-visible:ring-4 focus-visible:ring-white/30"
                         >
-                            <Icon type="back" className="h-4 w-4" />
+                            <Icon type="back" className="h-5 w-5" />
                         </Link>
 
                         <div className="min-w-0">
-                            <h1 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
+                            <h1 className="truncate text-sm font-bold tracking-wide text-white sm:text-base">
                                 {checkSheet.nama_checksheet}
                             </h1>
 
-                            <p className="truncate text-[11px] text-white/60">
+                            <p className="mt-0.5 truncate text-[11px] font-medium text-blue-200/80">
                                 <Link
                                     href={backUrl}
                                     className="cursor-pointer transition hover:text-white"
@@ -2278,17 +2511,12 @@ export default function Show({
 
                                 {line && (
                                     <>
-                                        <span className="mx-1.5 text-white/30">·</span>
-                                        <span className="font-semibold text-blue-200">
+                                        <span className="mx-1.5 text-white/30">/</span>
+                                        <span className="font-semibold text-white/90">
                                             {line.nama_line}
                                         </span>
                                     </>
                                 )}
-
-                                <span className="mx-1.5 text-white/30">·</span>
-                                <span className="font-mono">
-                                    {checkSheet.nomor_dokumen ?? '-'}
-                                </span>
                             </p>
                         </div>
                     </div>
@@ -2297,86 +2525,77 @@ export default function Show({
                 {/* =================================================
                     MAIN
                 ================================================== */}
-                <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-4 sm:px-6 lg:px-8">
-                    {/* INFO + PERIODE (SATU TOOLBAR KECIL) */}
-                    <section
-                        className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}
-                    >
-                        <div className="flex flex-col gap-3 px-4 py-3 xl:flex-row xl:items-end xl:justify-between">
+                <main className="relative z-10 mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+                    {/* INFO + PERIODE */}
+                    <section className={`idx-rise mb-5 ${cardClass}`}>
+                        <div className="flex flex-col gap-5 p-4 sm:p-5 xl:flex-row xl:items-end xl:justify-between">
                             {/* INFO */}
-                            <dl className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
-                                <div>
-                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        Divisi
-                                    </dt>
-                                    <dd className="mt-0.5 font-semibold text-slate-800">
-                                        {checkSheet.divisi?.nama_divisi ?? '-'}
-                                    </dd>
-                                </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-400">
+                                    Periode {namaBulan[bulan - 1]} {tahun}
+                                </p>
 
-                                {line && (
-                                    <div>
-                                        <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Line
-                                        </dt>
-                                        <dd className="mt-0.5 font-semibold text-slate-800">
-                                            {line.nama_line}
-                                        </dd>
-                                    </div>
-                                )}
+                                <h2 className="mt-1 text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
+                                    {checkSheet.nama_checksheet}
+                                </h2>
 
-                                <div>
-                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        Nama Check Sheet
-                                    </dt>
-                                    <dd className="mt-0.5 font-semibold text-slate-800">
-                                        {checkSheet.nama_checksheet}
-                                    </dd>
-                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <InfoChip
+                                        icon="building"
+                                        label="Divisi"
+                                        value={checkSheet.divisi?.nama_divisi ?? '-'}
+                                    />
 
-                                <div>
-                                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        Nomor Dokumen
-                                    </dt>
-                                    <dd className="mt-0.5 font-mono font-semibold text-blue-700">
-                                        {checkSheet.nomor_dokumen ?? '-'}
-                                    </dd>
+                                    {line && (
+                                        <InfoChip
+                                            icon="layers"
+                                            label="Line"
+                                            value={line.nama_line}
+                                        />
+                                    )}
+
+                                    <InfoChip
+                                        icon="hash"
+                                        label="Dokumen"
+                                        value={checkSheet.nomor_dokumen ?? '-'}
+                                        mono
+                                    />
                                 </div>
-                            </dl>
+                            </div>
 
                             {/* FILTER PERIODE */}
-                            <div className="flex flex-wrap items-end gap-2">
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="flex min-w-[130px] flex-col gap-1.5">
+                                    <span className="text-[11px] font-semibold text-slate-500">
                                         Bulan
                                     </span>
 
-                                    <select
+                                    <SelectBox
+                                        variant="sm"
                                         value={bulan}
                                         onChange={(e) =>
                                             ubahPeriode(e.target.value, tahun)
                                         }
-                                        className={toolbarSelect}
                                     >
                                         {namaBulan.map((nama, index) => (
                                             <option key={nama} value={index + 1}>
                                                 {nama}
                                             </option>
                                         ))}
-                                    </select>
+                                    </SelectBox>
                                 </label>
 
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                <label className="flex min-w-[100px] flex-col gap-1.5">
+                                    <span className="text-[11px] font-semibold text-slate-500">
                                         Tahun
                                     </span>
 
-                                    <select
+                                    <SelectBox
+                                        variant="sm"
                                         value={tahun}
                                         onChange={(e) =>
                                             ubahPeriode(bulan, e.target.value)
                                         }
-                                        className={toolbarSelect}
                                     >
                                         {Array.from(
                                             { length: 7 },
@@ -2387,54 +2606,53 @@ export default function Show({
                                                 {year}
                                             </option>
                                         ))}
-                                    </select>
+                                    </SelectBox>
                                 </label>
 
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                <label className="flex min-w-[130px] flex-col gap-1.5">
+                                    <span className="text-[11px] font-semibold text-slate-500">
                                         Shift
                                     </span>
 
-                                    <select
+                                    <SelectBox
+                                        variant="sm"
                                         value={shiftFilter}
                                         onChange={(e) =>
                                             setShiftFilter(e.target.value)
                                         }
-                                        className={toolbarSelect}
                                     >
                                         <option value="all">Semua Shift</option>
                                         <option value="A">Shift A</option>
                                         <option value="B">Shift B</option>
-                                    </select>
+                                    </SelectBox>
                                 </label>
 
                                 <a
                                     href={`/check-sheets/${checkSheet.id}/export-excel?bulan=${bulan}&tahun=${tahun}&line_id=${line?.id ?? ''}`}
-                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                    className={btnSoftGreen}
                                 >
                                     <Icon type="excel" className="h-3.5 w-3.5" />
                                     Export Excel
                                 </a>
                             </div>
                         </div>
-
-                        <div className="h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
                     </section>
 
                     {/* INSPECTION POINT */}
                     <section
-                        style={{ animationDelay: '100ms' }}
-                        className={`idx-rise mb-4 overflow-hidden rounded-2xl ${glassCard}`}
+                        style={{ animationDelay: '80ms' }}
+                        className={`idx-rise mb-5 overflow-hidden ${cardClass}`}
                     >
                         <SectionHead
                             tone="blue"
+                            icon="clipboard"
                             title="Inspection Point"
                             desc={
                                 pakaiActual
                                     ? 'Isi Actual dan Catatan harian, Selisih dihitung otomatis.'
                                     : pakaiPlanAct
-                                    ? 'Centang Plan / Act, klik 📝 untuk menambah catatan.'
-                                    : 'Kelola titik pemeriksaan, checklist harian, dan catatan (📝).'
+                                    ? 'Centang Plan / Act, klik ikon catatan untuk menambah catatan.'
+                                    : 'Kelola titik pemeriksaan, checklist harian, dan catatan.'
                             }
                             count={`${filteredItems.length} item`}
                             action={
@@ -2445,7 +2663,7 @@ export default function Show({
                                                 <button
                                                     type="button"
                                                     onClick={() => centangSemua('plan')}
-                                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                                                    className={btnSoftBlue}
                                                 >
                                                     <Icon type="check" className="h-3.5 w-3.5" />
                                                     Centang Semua Plan
@@ -2455,7 +2673,7 @@ export default function Show({
                                             <button
                                                 type="button"
                                                 onClick={() => centangSemua('status')}
-                                                className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                                className={btnSoftGreen}
                                             >
                                                 <Icon type="check" className="h-3.5 w-3.5" />
                                                 {pakaiPlanAct ? 'Centang Semua Act' : 'Centang Semua'}
@@ -2466,7 +2684,7 @@ export default function Show({
                                     <button
                                         type="button"
                                         onClick={() => setShowImportModal(true)}
-                                        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                        className={btnSoftGreen}
                                     >
                                         <Icon type="upload" className="h-3.5 w-3.5" />
                                         Import Excel
@@ -2475,7 +2693,7 @@ export default function Show({
                                     <button
                                         type="button"
                                         onClick={() => setShowAddItemModal(true)}
-                                        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 text-xs font-bold text-white transition hover:from-blue-700 hover:to-indigo-800"
+                                        className={btnPrimary}
                                     >
                                         <Icon type="plus" className="h-3.5 w-3.5" />
                                         Tambah
@@ -2486,7 +2704,7 @@ export default function Show({
 
                         {/* Keterangan cara baca sel (khusus KWH) */}
                         {pakaiActual && (
-                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-500">
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500 sm:px-5">
                                 <span className="font-bold text-slate-600">
                                     Tiap tanggal: Act / Sel / Catatan
                                 </span>
@@ -2511,14 +2729,14 @@ export default function Show({
 
                         {/* Keterangan icon catatan (mode Plan/Act & biasa) */}
                         {!pakaiActual && (
-                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-500">
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500 sm:px-5">
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span>📝</span>
+                                    <Icon type="note" className="h-3.5 w-3.5 text-slate-400" />
                                     Klik untuk menambah / melihat catatan
                                 </span>
 
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="relative inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+                                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
                                     Titik merah = sudah ada catatan
                                 </span>
                             </div>
@@ -2528,11 +2746,11 @@ export default function Show({
                             {/* border-separate + border-spacing-0 => sticky column tidak ada celah */}
                             <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
                                 <thead>
-                                    <tr className="text-white">
+                                    <tr>
                                         {/* No (sticky, lebar dikunci 48px) */}
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`sticky left-0 z-20 w-12 min-w-[48px] max-w-[48px] bg-[#0a1a4d] px-0 text-center ${tableHeadBase}`}
+                                            className={`sticky left-0 z-20 w-12 min-w-[48px] max-w-[48px] bg-slate-50 px-0 text-center ${tableHeadBase}`}
                                         >
                                             No
                                         </th>
@@ -2540,35 +2758,35 @@ export default function Show({
                                         {/* Inspection Point (sticky, offset 48px = lebar kolom No) */}
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`sticky left-[48px] z-20 min-w-[220px] bg-[#0a1a4d] text-left shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)] ${tableHead}`}
+                                            className={`sticky left-[48px] z-20 min-w-[220px] bg-slate-50 text-left shadow-[4px_0_8px_-4px_rgba(15,23,42,0.12)] ${tableHead}`}
                                         >
                                             Inspection Point
                                         </th>
 
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`min-w-[160px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                            className={`min-w-[160px] bg-slate-50 text-left ${tableHead}`}
                                         >
                                             Condition
                                         </th>
 
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`min-w-[170px] bg-[#0a1a4d] text-left ${tableHead}`}
+                                            className={`min-w-[170px] bg-slate-50 text-left ${tableHead}`}
                                         >
                                             Method
                                         </th>
 
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`w-20 bg-[#0a1a4d] text-center ${tableHead}`}
+                                            className={`w-20 bg-slate-50 text-center ${tableHead}`}
                                         >
                                             Shift
                                         </th>
 
                                         <th
                                             rowSpan={barisHeader}
-                                            className={`w-24 bg-[#0a1a4d] text-center ${tableHead}`}
+                                            className={`w-24 bg-slate-50 text-center ${tableHead}`}
                                         >
                                             Aksi
                                         </th>
@@ -2593,9 +2811,9 @@ export default function Show({
                                                             : duaBaris
                                                             ? ''
                                                             : 'w-10 min-w-10'
-                                                    } border-r border-white/10 bg-[#0a1a4d] px-1 py-3 text-center text-[11px] font-bold`}
+                                                    } border-b border-l border-slate-200 bg-slate-50 px-1 py-3 text-center text-[11px] font-bold text-slate-600`}
                                                 >
-                                                    <div className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/10">
+                                                    <div className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-white tabular-nums shadow-sm ring-1 ring-slate-200">
                                                         {tanggalValue}
                                                     </div>
                                                 </th>
@@ -2605,7 +2823,7 @@ export default function Show({
 
                                     {/* Baris header kedua: Plan | Act per tanggal */}
                                     {duaBaris && (
-                                        <tr className="text-white">
+                                        <tr>
                                             {tanggal.map((itemTanggal, index) => {
                                                 const key =
                                                     getTanggalLengkap(
@@ -2616,10 +2834,10 @@ export default function Show({
 
                                                 return (
                                                     <React.Fragment key={key}>
-                                                        <th className="w-10 min-w-[40px] border-r border-white/10 bg-[#13307a] px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-blue-200">
+                                                        <th className="w-10 min-w-[40px] border-b border-l border-slate-200 bg-slate-50 px-1 py-1.5 text-center text-[10px] font-bold text-blue-600">
                                                             Plan
                                                         </th>
-                                                        <th className="w-10 min-w-[40px] border-r border-white/10 bg-[#13307a] px-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-emerald-200">
+                                                        <th className="w-10 min-w-[40px] border-b border-slate-200 bg-slate-50 px-1 py-1.5 text-center text-[10px] font-bold text-emerald-600">
                                                             Act
                                                         </th>
                                                     </React.Fragment>
@@ -2634,18 +2852,18 @@ export default function Show({
                                         <tr>
                                             <td
                                                 colSpan={6 + tanggal.length * (duaBaris ? 2 : 1)}
-                                                className="px-6 py-12 text-center"
+                                                className="px-6 py-14 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                                                        <Icon type="clipboard" className="h-6 w-6" />
+                                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                                        <Icon type="clipboard" className="h-7 w-7" />
                                                     </div>
 
                                                     <p className="text-sm font-semibold text-slate-700">
                                                         Belum ada Inspection Point
                                                     </p>
 
-                                                    <p className="mt-1 text-xs text-slate-400">
+                                                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
                                                         Tambahkan inspection point atau
                                                         import dari Excel untuk mulai
                                                         menggunakan checklist.
@@ -2663,34 +2881,40 @@ export default function Show({
                                             return (
                                                 <tr
                                                     key={item.id}
-                                                    className="group transition-colors hover:bg-blue-50/50"
+                                                    className="group transition-colors hover:bg-slate-50"
                                                 >
                                                     {/* No (sticky) - nomor urut per shift */}
-                                                    <td className="sticky left-0 z-10 w-12 min-w-[48px] max-w-[48px] border-b border-r border-slate-100 bg-white px-0 py-2 text-center text-xs font-bold text-slate-500 group-hover:bg-blue-50">
+                                                    <td className="sticky left-0 z-10 w-12 min-w-[48px] max-w-[48px] border-b border-slate-100 bg-white px-0 py-2 text-center text-xs font-bold tabular-nums text-slate-400 transition-colors group-hover:bg-slate-50">
                                                         {nomorUrut[item.id]}
                                                     </td>
 
                                                     {/* Inspection Point (sticky) */}
-                                                    <td className="sticky left-[48px] z-10 border-b border-r border-slate-100 bg-white px-3 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)] group-hover:bg-blue-50">
+                                                    <td className="sticky left-[48px] z-10 border-b border-slate-100 bg-white px-3 py-2 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.10)] transition-colors group-hover:bg-slate-50">
                                                         <div className="text-sm font-semibold text-slate-800">
                                                             {item.inspection_point}
                                                         </div>
                                                     </td>
 
-                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
+                                                    <td className="border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
                                                         {item.condition || '-'}
                                                     </td>
 
-                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-xs text-slate-600">
+                                                    <td className="border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
                                                         {item.method || '-'}
                                                     </td>
 
-                                                    <td className="border-b border-r border-slate-100 px-3 py-2 text-center text-xs font-bold text-indigo-600">
-                                                        {item.shift || '-'}
+                                                    <td className="border-b border-slate-100 px-3 py-2 text-center">
+                                                        {item.shift ? (
+                                                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-xs font-bold text-indigo-600">
+                                                                {item.shift}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-300">-</span>
+                                                        )}
                                                     </td>
 
-                                                    <td className="border-b border-r border-slate-100 px-2 py-2">
-                                                        <div className="flex justify-center gap-1.5">
+                                                    <td className="border-b border-slate-100 px-2 py-2">
+                                                        <div className="flex justify-center gap-1">
                                                             <IconButton
                                                                 title="Edit"
                                                                 onClick={() => bukaEditItem(item)}
@@ -2725,7 +2949,7 @@ export default function Show({
                                                             return (
                                                                 <td
                                                                     key={tanggalLengkap || idx}
-                                                                    className="idx-nilai border-b border-r border-slate-100 px-1 py-1.5 text-center align-top"
+                                                                    className="idx-nilai border-b border-l border-slate-100 px-1 py-1.5 text-center align-top"
                                                                 >
                                                                     <NilaiCell
                                                                         nilai={nilai}
@@ -2755,7 +2979,7 @@ export default function Show({
                                                                     key={tanggalLengkap || idx}
                                                                 >
                                                                     <td
-                                                                        className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                        className={`border-b border-l border-slate-100 px-1 py-1.5 text-center transition-colors ${
                                                                             plan
                                                                                 ? 'bg-blue-50/70'
                                                                                 : ''
@@ -2797,7 +3021,7 @@ export default function Show({
                                                                     </td>
 
                                                                     <td
-                                                                        className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                        className={`border-b border-slate-100 px-1 py-1.5 text-center transition-colors ${
                                                                             act
                                                                                 ? 'bg-emerald-50/70'
                                                                                 : ''
@@ -2854,7 +3078,7 @@ export default function Show({
                                                         return (
                                                             <td
                                                                 key={tanggalLengkap || idx}
-                                                                className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
+                                                                className={`border-b border-l border-slate-100 px-1 py-1.5 text-center transition-colors ${
                                                                     checked ? 'bg-emerald-50/70' : ''
                                                                 }`}
                                                             >
@@ -2912,7 +3136,7 @@ export default function Show({
                             notify={notify}
                         />
                     )}
-                    
+
                     {/* PELUMASAN */}
                     {pakaiPelumasan && (
                         <LubrikasiSection
@@ -2925,18 +3149,20 @@ export default function Show({
 
                     {/* ABNORMALITY (per bulan & tahun yang dipilih) */}
                     <section
-                        style={{ animationDelay: '200ms' }}
-                        className={`idx-rise overflow-hidden rounded-2xl ${glassCard}`}
+                        style={{ animationDelay: '160ms' }}
+                        className={`idx-rise overflow-hidden ${cardClass}`}
                     >
                         <SectionHead
                             tone="amber"
+                            icon="alert"
                             title={`Abnormality ${namaBulan[bulan - 1]} ${tahun}${line ? ' · ' + line.nama_line : ''}`}
+                            desc="Catat kondisi tidak normal beserta tindak lanjutnya."
                             count={`${checkSheet.abnormalities?.length ?? 0} data`}
                             action={
                                 <button
                                     type="button"
                                     onClick={bukaTambahAbnormality}
-                                    className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 text-xs font-bold text-white transition hover:from-amber-600 hover:to-orange-600"
+                                    className={btnAmber}
                                 >
                                     <Icon type="plus" className="h-3.5 w-3.5" />
                                     Tambah
@@ -2947,7 +3173,7 @@ export default function Show({
                         <div className="idx-scroll overflow-x-auto">
                             <table className="w-full min-w-[800px] border-collapse text-sm">
                                 <thead>
-                                    <tr className="bg-gradient-to-r from-[#0a1a4d] via-indigo-900 to-violet-900 text-white">
+                                    <tr className="bg-slate-50">
                                         <th className={`w-32 text-left ${tableHead}`}>
                                             Tanggal
                                         </th>
@@ -2960,7 +3186,7 @@ export default function Show({
                                             Countermeasure
                                         </th>
 
-                                        <th className={`w-28 text-center ${tableHead}`}>
+                                        <th className={`w-32 text-center ${tableHead}`}>
                                             Status
                                         </th>
 
@@ -2968,7 +3194,7 @@ export default function Show({
                                             PIC
                                         </th>
 
-                                        <th className="w-24 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                                        <th className={`w-24 text-center ${tableHead}`}>
                                             Aksi
                                         </th>
                                     </tr>
@@ -2980,11 +3206,11 @@ export default function Show({
                                         <tr>
                                             <td
                                                 colSpan="6"
-                                                className="px-6 py-12 text-center"
+                                                className="px-6 py-14 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
-                                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-500">
-                                                        <Icon type="alert" className="h-6 w-6" />
+                                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+                                                        <Icon type="alert" className="h-7 w-7" />
                                                     </div>
 
                                                     <p className="text-sm font-semibold text-slate-700">
@@ -2992,7 +3218,7 @@ export default function Show({
                                                         {namaBulan[bulan - 1]} {tahun}
                                                     </p>
 
-                                                    <p className="mt-1 text-xs text-slate-400">
+                                                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
                                                         Tambahkan data abnormality jika
                                                         ditemukan kondisi tidak normal.
                                                     </p>
@@ -3009,23 +3235,23 @@ export default function Show({
                                                 return (
                                                     <tr
                                                         key={abnormality.id}
-                                                        className="group border-b border-slate-100 transition-colors last:border-b-0 hover:bg-amber-50/40"
+                                                        className="group border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50/80"
                                                     >
-                                                        <td className="px-3 py-3 text-xs font-semibold text-slate-700">
+                                                        <td className="px-3 py-3 align-top text-xs font-semibold text-slate-700">
                                                             {formatTanggal(abnormality.tanggal)}
                                                         </td>
 
-                                                        <td className="px-3 py-3 text-sm font-semibold text-slate-800">
+                                                        <td className="px-3 py-3 align-top text-sm font-semibold text-slate-800">
                                                             {abnormality.abnormality || '-'}
 
                                                             {/* Item preventif yang terhubung (bisa lebih dari satu) */}
                                                             {preventifTerkait.length > 0 && (
-                                                                <span className="mt-1.5 flex flex-col gap-1">
+                                                                <span className="mt-2 flex flex-col gap-1">
                                                                     {preventifTerkait.map((p) => (
                                                                         <span
                                                                             key={p.no}
                                                                             title="Terhubung ke Schedule Preventif Mesin"
-                                                                            className="flex w-fit max-w-full items-start gap-1.5 rounded-md border border-indigo-100 bg-indigo-50 px-2 py-1 text-[11px] font-semibold leading-snug text-indigo-700"
+                                                                            className="flex w-fit max-w-full items-start gap-1.5 rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-semibold leading-snug text-indigo-700 ring-1 ring-inset ring-indigo-100"
                                                                         >
                                                                             <Icon
                                                                                 type="clipboard"
@@ -3041,13 +3267,13 @@ export default function Show({
                                                             )}
                                                         </td>
 
-                                                        <td className="px-3 py-3 text-sm leading-5 text-slate-600">
+                                                        <td className="px-3 py-3 align-top text-sm leading-5 text-slate-600">
                                                             {abnormality.countermeasure || '-'}
                                                         </td>
 
-                                                        <td className="px-3 py-3 text-center">
+                                                        <td className="px-3 py-3 text-center align-top">
                                                             <span
-                                                                className={`inline-flex items-center gap-1.5 text-xs font-bold ${getStatusClass(
+                                                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${getStatusClass(
                                                                     abnormality.status
                                                                 )}`}
                                                             >
@@ -3061,12 +3287,12 @@ export default function Show({
                                                             </span>
                                                         </td>
 
-                                                        <td className="px-3 py-3 text-sm text-slate-600">
+                                                        <td className="px-3 py-3 align-top text-sm text-slate-600">
                                                             {abnormality.pic || '-'}
                                                         </td>
 
-                                                        <td className="px-2 py-3">
-                                                            <div className="flex justify-center gap-1.5">
+                                                        <td className="px-2 py-3 align-top">
+                                                            <div className="flex justify-center gap-1">
                                                                 <IconButton
                                                                     title="Edit"
                                                                     onClick={() =>
@@ -3100,10 +3326,12 @@ export default function Show({
                 </main>
 
                 {/* FOOTER */}
-                <footer className="mt-auto border-t border-white/15 bg-[#030a26]/45 backdrop-blur-2xl">
+                <footer className="relative z-10 mt-auto border-t border-slate-200/80 bg-white/60 backdrop-blur">
                     <div className="mx-auto flex max-w-[1500px] items-center justify-center px-5 py-3 sm:px-6 lg:px-8">
-                        <p className="text-xs font-medium text-white/70">
-                            © {new Date().getFullYear()} Emma Sarkilla · Check Sheet Prediktif
+                        <p className="text-[11px] font-medium text-slate-400">
+                            © {new Date().getFullYear()} Emma Sarkilla
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            Check Sheet Prediktif
                         </p>
                     </div>
                 </footer>
@@ -3114,53 +3342,54 @@ export default function Show({
             ====================================================== */}
             {toast && (
                 <div
+                    key={toast.id}
                     role="status"
                     aria-live="polite"
-                    className={`idx-toast fixed right-5 top-5 z-[120] flex w-[340px] max-w-[calc(100vw-2.5rem)] items-start gap-3 overflow-hidden rounded-xl border bg-white p-3.5 shadow-2xl shadow-slate-950/40 ${
-                        toast.type === 'error'
-                            ? 'border-red-100'
-                            : 'border-emerald-100'
-                    }`}
+                    className="idx-toast fixed right-4 top-4 z-[120] w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/25 ring-1 ring-slate-200/80 sm:right-5 sm:top-5"
                 >
-                    <div
-                        className={`absolute left-0 top-0 h-full w-1 ${
-                            toast.type === 'error'
-                                ? 'bg-gradient-to-b from-red-400 to-rose-600'
-                                : 'bg-gradient-to-b from-emerald-400 to-green-600'
-                        }`}
-                    />
+                    <div className="flex items-start gap-3 p-3.5">
+                        <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                                toast.type === 'error'
+                                    ? 'bg-red-50 text-red-600'
+                                    : 'bg-emerald-50 text-emerald-600'
+                            }`}
+                        >
+                            <Icon
+                                type={toast.type === 'error' ? 'alert' : 'check'}
+                                className="h-4 w-4"
+                            />
+                        </span>
 
-                    <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                            toast.type === 'error'
-                                ? 'bg-red-50 text-red-600'
-                                : 'bg-emerald-50 text-emerald-600'
-                        }`}
-                    >
-                        <Icon
-                            type={toast.type === 'error' ? 'alert' : 'check'}
-                            className="h-4 w-4"
-                        />
-                    </span>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                            <p className="text-sm font-bold text-slate-800">
+                                {toast.type === 'error' ? 'Gagal' : 'Berhasil'}
+                            </p>
 
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800">
-                            {toast.type === 'error' ? 'Gagal' : 'Berhasil'}
-                        </p>
+                            <p className="mt-0.5 break-words text-sm leading-snug text-slate-500">
+                                {toast.message}
+                            </p>
+                        </div>
 
-                        <p className="mt-0.5 break-words text-sm leading-snug text-slate-500">
-                            {toast.message}
-                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setToast(null)}
+                            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-300 outline-none transition hover:bg-slate-100 hover:text-slate-500 focus-visible:ring-4 focus-visible:ring-slate-300/50"
+                            aria-label="Tutup"
+                        >
+                            <Icon type="close" className="h-3.5 w-3.5" />
+                        </button>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setToast(null)}
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
-                        aria-label="Tutup"
-                    >
-                        <Icon type="close" className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="h-1 bg-slate-100">
+                        <div
+                            className={`idx-progress h-full w-full ${
+                                toast.type === 'error'
+                                    ? 'bg-red-500'
+                                    : 'bg-emerald-500'
+                            }`}
+                        />
+                    </div>
                 </div>
             )}
 

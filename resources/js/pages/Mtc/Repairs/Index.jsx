@@ -614,30 +614,6 @@ export default function Index({ repairs = {}, filters = {}, canCreateRrf = false
                                 </p>
                             </div>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                            {isPimpinan && (
-                                <Link
-                                    href="/mtc/rrf"
-                                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                                >
-                                    <ClipboardList className="h-4 w-4" /> Daftar RRF
-                                </Link>
-                            )}
-
-                            {canCreateRrf && (
-                                <button
-                                    type="button"
-                                    onClick={sinkronisasi}
-                                    disabled={loading}
-                                    className="group relative inline-flex h-10 cursor-pointer items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-semibold text-white shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                                >
-                                    <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-700 group-hover:left-[150%]" />
-                                    <RefreshCw className={`relative h-4 w-4 ${loading ? 'animate-spin' : 'transition-transform duration-500 group-hover:rotate-180'}`} />
-                                    <span className="relative">{loading ? 'Menyinkronkan...' : 'Sinkronkan API'}</span>
-                                </button>
-                            )}
-                        </div>
                     </div>
                 </section>
 
