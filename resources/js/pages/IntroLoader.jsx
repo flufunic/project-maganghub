@@ -348,7 +348,7 @@ export default function IntroLoader({ onFinish }) {
                         textShadow: '0 2px 18px rgba(0,0,0,0.9)',
                     }}
                 >
-                    Preventive Maintenance
+                    Maintenance System
                 </h2>
                 <p
                     className="mt-1 text-center text-sm font-medium text-white/60"

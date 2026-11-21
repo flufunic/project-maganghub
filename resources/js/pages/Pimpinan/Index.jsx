@@ -557,7 +557,7 @@ export default function Index({ user, laporans = [], flash }) {
                                     Schedule Preventif
                                 </h1>
                                 <p className="hidden truncate text-xs text-blue-100/60 sm:block">
-                                    Approval Report Mingguan Preventif
+                                    Approval Report Mingguan
                                 </p>
                             </div>
                         </div>
