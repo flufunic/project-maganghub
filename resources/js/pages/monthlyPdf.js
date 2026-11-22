@@ -12,24 +12,32 @@ const esc = (value) =>
         .replace(/"/g, '&quot;');
 
 /* ------------------------------------------------------------------
-| WARNA DIVISI (sama dengan Welcome.jsx)
+| WARNA DIVISI
+| Diambil dari database (tabel preventif_divisis, kolom "warna"),
+| dikirim lewat prop `warnaDivisi` dari Welcome.jsx.
 ------------------------------------------------------------------ */
-const WARNA_DIVISI = {
-    Sewing: { bg: '#ea580c', text: '#ffffff' },
-    Headrest: { bg: '#c084fc', text: '#3b0764' },
-    Utility: { bg: '#1e3a8a', text: '#ffffff' },
-    Saidan: { bg: '#86efac', text: '#14532d' },
-    Lainnya: { bg: '#94a3b8', text: '#ffffff' },
+// Peta warna dari server: { Sewing: '#ea580c', ... }. Diisi saat cetak.
+let PETA_WARNA = {};
+
+// Warna teks hitam/putih otomatis sesuai terang-gelapnya latar
+const warnaTeks = (hex) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex));
+
+    if (!m) return '#ffffff';
+
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#0f172a' : '#ffffff';
 };
 
-const WARNA_CADANGAN = [
-    { bg: '#fdba74', text: '#7c2d12' },
-    { bg: '#fde047', text: '#713f12' },
-    { bg: '#5eead4', text: '#134e4a' },
-];
+const getWarna = (divisi) => {
+    const bg = PETA_WARNA[divisi] ?? '#94a3b8';
 
-const getWarna = (divisi, index) =>
-    WARNA_DIVISI[divisi] ?? WARNA_CADANGAN[index % WARNA_CADANGAN.length];
+    return { bg, text: warnaTeks(bg) };
+};
 
 /* ------------------------------------------------------------------
 | BAGIAN LAPORAN BULANAN
@@ -207,10 +215,10 @@ const buildAnnualChart = (annualReport, stackDivisi) => {
             const actPct = act > 0 ? Math.max((act / max) * 100, 3) : 0;
 
             const segments = stackDivisi
-                .map((divisi, i) => ({
+                .map((divisi) => ({
                     divisi,
                     value: Number(r.act_per_divisi?.[divisi] || 0),
-                    warna: getWarna(divisi, i),
+                    warna: getWarna(divisi),
                 }))
                 .filter((s) => s.value > 0);
 
@@ -266,8 +274,8 @@ const buildAnnualChart = (annualReport, stackDivisi) => {
 
     const legendDivisi = stackDivisi
         .map(
-            (divisi, i) =>
-                `<span><i class="sq" style="background:${getWarna(divisi, i).bg}"></i>ACT ${esc(divisi)}</span>`
+            (divisi) =>
+                `<span><i class="sq" style="background:${getWarna(divisi).bg}"></i>ACT ${esc(divisi)}</span>`
         )
         .join('');
 
@@ -578,7 +586,10 @@ export function printLaporanBulanan({
     totalAct = 0,
     totalPlan = 0,
     totalJadwal = 0,
+    warnaDivisi = {},
 }) {
+    PETA_WARNA = warnaDivisi;
+
     const periode = `${namaBulan} ${tahun}`;
 
     const html = `<!DOCTYPE html>
@@ -631,7 +642,10 @@ export function printLaporanTahunan({
     annualReport = [],
     daftarDivisi = [],
     annualDetail = [],
+    warnaDivisi = {},
 }) {
+    PETA_WARNA = warnaDivisi;
+
     const awal = annualReport[0];
     const akhir = annualReport[annualReport.length - 1];
 

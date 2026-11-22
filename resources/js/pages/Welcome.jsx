@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { printLaporanBulanan, printLaporanTahunan } from './monthlyPdf';
 import IntroLoader from './IntroLoader';
-import { KpiTile } from './DashKit';
+import { KpiTile, setDivColors } from './DashKit';
 import { AnnualDashboard, MonthlyDashboard } from './PreventifCharts';
 import { CheckSheetDashboard } from './CheckSheetChart';
 import { OverhaulDashboard } from './OverhaulChart';
@@ -346,6 +346,7 @@ export default function Welcome({
     bulanSelesai = 12,
     tahunSelesai,
     namaBulan = {},
+    warnaDivisi = {},
     checkSheet = {
         tahun: new Date().getFullYear(),
         divisi: [],
@@ -361,6 +362,7 @@ export default function Welcome({
         jumlahMesin: 0,
     },
 }) {
+    setDivColors(warnaDivisi);
     const isLoggedIn = Boolean(usePage().props?.auth?.user);
 
     const [selectedMonth, setSelectedMonth] = useState(Number(bulan));
@@ -506,7 +508,7 @@ export default function Welcome({
     };
 
     const downloadAnnualPdf = () => {
-        printLaporanTahunan({ annualReport, daftarDivisi, annualDetail });
+        printLaporanTahunan({ annualReport, daftarDivisi, annualDetail, warnaDivisi });
     };
 
     /* ---------------- DATA PREVENTIF ---------------- */

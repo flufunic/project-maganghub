@@ -129,9 +129,10 @@ export function MonthlyDashboard({ divisiReport, detail = [], totalAct, totalPla
     const total = totalAct + totalPlan;
     const pct = total > 0 ? (totalAct / total) * 100 : 0;
 
-    const top = [...detail]
-        .sort((a, b) => Number(b.plan || 0) - Number(a.plan || 0))
-        .slice(0, 6);
+// semua item yang masih punya sisa jadwal, terbanyak di atas (daftar scroll di dalam card)
+    const top = detail
+        .filter((a) => Number(a.plan || 0) > 0)
+        .sort((a, b) => Number(b.plan || 0) - Number(a.plan || 0));
 
     const rows = top.map((it) => ({
         label: `${it.divisi} · ${it.item_preventif || '-'}`,

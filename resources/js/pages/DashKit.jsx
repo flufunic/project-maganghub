@@ -17,7 +17,8 @@ export const C = {
     blue: '#1d4ed8',
 };
 
-const DIV_COLOR = {
+// Warna bawaan 4 divisi lama (dipakai kalau server belum mengirim warna)
+const DIV_COLOR_DEFAULT = {
     Sewing: '#ea580c',
     Headrest: '#a855f7',
     Utility: '#1e3a8a',
@@ -26,7 +27,28 @@ const DIV_COLOR = {
 };
 const DIV_FALLBACK = ['#2563eb', '#0ea5e9', '#f59e0b', '#6366f1'];
 
+// Peta warna aktif. Diisi dari database lewat setDivColors().
+let DIV_COLOR = { ...DIV_COLOR_DEFAULT };
+
+export const setDivColors = (map = {}) => {
+    DIV_COLOR = { ...DIV_COLOR_DEFAULT, ...map };
+};
+
 export const divColor = (d, i = 0) => DIV_COLOR[d] ?? DIV_FALLBACK[i % DIV_FALLBACK.length];
+
+// Warna teks hitam/putih otomatis sesuai terang-gelapnya latar
+export const textOn = (hex) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex));
+
+    if (!m) return '#ffffff';
+
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#0f172a' : '#ffffff';
+};
 
 export const fmt = (v, max = 0, min = 0) =>
     Number(v || 0).toLocaleString('id-ID', {
@@ -563,7 +585,7 @@ export function XYChart({
                                                             textAnchor="middle"
                                                             fontSize="9.5"
                                                             fontWeight="800"
-                                                            fill="#fff"
+                                                            fill={textOn(s.color)}
                                                             style={{ opacity: animated ? 1 : 0, transition: 'opacity 500ms 700ms' }}
                                                         >
                                                             {fmt(v, 1)}
@@ -1026,6 +1048,11 @@ export function GaugeChart({ pct = 0, color = C.green, animated, label = 'Pencap
 | BATANG HORIZONTAL
 | rows: [{ label, text, segments: [{ value, color, name }], tipRows? }]
 ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+| BATANG HORIZONTAL
+| rows: [{ label, text, segments: [{ value, color, name }], tipRows? }]
+| Kalau barisnya banyak, daftar scroll di dalam card.
+------------------------------------------------------------------ */
 export function HBars({ rows, animated, max }) {
     return (
         <ChartBox>
@@ -1040,55 +1067,58 @@ export function HBars({ rows, animated, max }) {
                     );
 
                 return (
-                    <div className="flex h-full flex-col justify-around gap-1">
-                        {rows.map((r, i) => (
-                            <div
-                                key={`${r.label}-${i}`}
-                                className="cursor-default rounded-lg px-1.5 py-1 transition-colors hover:bg-slate-100"
-                                onMouseMove={(e) =>
-                                    show(
-                                        e,
-                                        <TipBox
-                                            title={r.label}
-                                            rows={
-                                                r.tipRows ??
-                                                r.segments.map((s) => ({
-                                                    color: s.color,
-                                                    label: s.name,
-                                                    value: fmt(s.value, 1),
-                                                }))
-                                            }
-                                        />
-                                    )
-                                }
-                                onMouseLeave={hide}
-                            >
-                                <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
-                                    <span className="truncate font-semibold text-slate-700">
-                                        {r.label}
-                                    </span>
-                                    <span className="font-extrabold tabular-nums text-slate-900">
-                                        {r.text}
-                                    </span>
-                                </div>
+                    <div className="dash-scroll h-full overflow-y-auto overflow-x-hidden pr-1">
+                        {/* min-h-full: kalau sedikit tetap rata se-tinggi card, kalau banyak jadi scroll */}
+                        <div className="flex min-h-full flex-col justify-around gap-1">
+                            {rows.map((r, i) => (
+                                <div
+                                    key={`${r.label}-${i}`}
+                                    className="shrink-0 cursor-default rounded-lg px-1.5 py-1 transition-colors hover:bg-slate-100"
+                                    onMouseMove={(e) =>
+                                        show(
+                                            e,
+                                            <TipBox
+                                                title={r.label}
+                                                rows={
+                                                    r.tipRows ??
+                                                    r.segments.map((s) => ({
+                                                        color: s.color,
+                                                        label: s.name,
+                                                        value: fmt(s.value, 1),
+                                                    }))
+                                                }
+                                            />
+                                        )
+                                    }
+                                    onMouseLeave={hide}
+                                >
+                                    <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
+                                        <span className="truncate font-semibold text-slate-700">
+                                            {r.label}
+                                        </span>
+                                        <span className="shrink-0 font-extrabold tabular-nums text-slate-900">
+                                            {r.text}
+                                        </span>
+                                    </div>
 
-                                <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-200">
-                                    {r.segments.map((s, j) => (
-                                        <div
-                                            key={j}
-                                            className="h-full"
-                                            style={{
-                                                width: animated
-                                                    ? `${Math.min(100, (Number(s.value || 0) / m) * 100)}%`
-                                                    : '0%',
-                                                background: s.color,
-                                                transition: `width 950ms cubic-bezier(.22,1,.36,1) ${i * 70}ms`,
-                                            }}
-                                        />
-                                    ))}
+                                    <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-200">
+                                        {r.segments.map((s, j) => (
+                                            <div
+                                                key={j}
+                                                className="h-full"
+                                                style={{
+                                                    width: animated
+                                                        ? `${Math.min(100, (Number(s.value || 0) / m) * 100)}%`
+                                                        : '0%',
+                                                    background: s.color,
+                                                    transition: `width 950ms cubic-bezier(.22,1,.36,1) ${i * 70}ms`,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 );
             }}

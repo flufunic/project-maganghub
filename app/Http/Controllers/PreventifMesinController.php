@@ -13,6 +13,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\PreventifMesinPlanOverride;
+use App\Models\PreventifDivisi;
+use Illuminate\Validation\Rule;
 
 class PreventifMesinController extends Controller
 {
@@ -172,7 +174,7 @@ class PreventifMesinController extends Controller
         $namaBulan = self::NAMA_BULAN;
 
         // Daftar divisi: divisi utama dulu (urutan tetap), sisanya menyusul
-        $urutanUtama = ['Sewing', 'Headrest', 'Utility', 'Saidan'];
+        $urutanUtama = PreventifDivisi::orderBy('urutan')->orderBy('id')->pluck('nama')->all();
 
         $divisiAda = $preventifMesins
             ->pluck('divisi')
@@ -295,7 +297,7 @@ class PreventifMesinController extends Controller
             'tahun' => $tahun,
 
             'detail' => $detail,
-
+            'warnaDivisi' => PreventifDivisi::pluck('warna', 'nama'),
             'totalItem' => $totalItem,
             'totalJadwal' => $totalJadwal,
             'totalAct' => $totalAct,
@@ -653,16 +655,26 @@ class PreventifMesinController extends Controller
 
     public function create(): Response
     {
-        $divisis = ['Sewing', 'Headrest', 'Utility', 'Saidan'];
+        $divisis = $this->daftarDivisiMaster();
+
+        // jumlah item aktif per divisi (untuk menonaktifkan tombol hapus)
+        $dipakai = PreventifMesin::where('is_hidden', false)
+            ->selectRaw('divisi, COUNT(*) as total')
+            ->groupBy('divisi')
+            ->pluck('total', 'divisi');
 
         $nextNo = [];
 
         foreach ($divisis as $divisi) {
-            // hanya item yang masih tampil (tidak disembunyikan)
-            $nextNo[$divisi] = PreventifMesin::nomorBerikutnya($divisi);
+            $nextNo[$divisi->nama] = PreventifMesin::nomorBerikutnya($divisi->nama);
         }
 
         return Inertia::render('PreventifMesin/Create', [
+            'divisis' => $divisis->map(fn ($d) => [
+                'id' => $d->id,
+                'nama' => $d->nama,
+                'dipakai' => (int) ($dipakai[$d->nama] ?? 0),
+            ])->values(),
             'nextNo' => $nextNo,
         ]);
     }
@@ -671,13 +683,17 @@ class PreventifMesinController extends Controller
     {
         return Inertia::render('PreventifMesin/Edit', [
             'preventifMesin' => $preventifMesin,
+            'divisis' => $this->daftarDivisiMaster()->map(fn ($d) => [
+                'id' => $d->id,
+                'nama' => $d->nama,
+            ])->values(),
         ]);
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'divisi' => ['required', 'string'],
+            'divisi' => ['required', 'string', Rule::exists('preventif_divisis', 'nama')],
             'item_preventif' => ['required', 'string'],
 
             'periode_nilai' => ['nullable', 'numeric', 'min:1'],
@@ -725,7 +741,7 @@ class PreventifMesinController extends Controller
     public function update(Request $request, PreventifMesin $preventifMesin)
     {
         $request->validate([
-            'divisi' => ['required', 'string'],
+            'divisi' => ['required', 'string', Rule::exists('preventif_divisis', 'nama')],
             'item_preventif' => ['required', 'string'],
 
             'no_item' => ['nullable', 'integer', 'min:1'],
@@ -976,6 +992,10 @@ class PreventifMesinController extends Controller
         return $tanggalPlan;
     }
 
+    private function daftarDivisiMaster(): \Illuminate\Support\Collection
+    {
+        return PreventifDivisi::orderBy('urutan')->orderBy('id')->get(['id', 'nama']);
+    }
 
     public function getTanggalPlanEfektif(
         PreventifMesin $preventifMesin,

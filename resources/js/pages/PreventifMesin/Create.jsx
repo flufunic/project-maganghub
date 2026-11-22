@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 
 // =========================================================
 // ICONS  (UI saja, tidak ada logic)
@@ -81,8 +81,6 @@ const Icon = ({ type, className = 'h-4 w-4' }) => {
 const inputBase =
     'w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:shadow-md focus:shadow-blue-500/10 focus:ring-4 focus:ring-blue-500/10';
 
-const DIVISI = ['Sewing', 'Headrest', 'Utility', 'Saidan'];
-
 const SATUAN = [
     { value: 'hari', label: 'Hari' },
     { value: 'minggu', label: 'Minggu' },
@@ -141,32 +139,132 @@ const Section = ({ icon, title, desc, ms = 0, children }) => (
     </section>
 );
 
-// Pilihan divisi berupa kartu (menggantikan select)
-const DivisiPicker = ({ value, onPick }) => (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Divisi">
-        {DIVISI.map((item) => {
-            const active = value === item;
+// Pilihan divisi berupa kartu.
+// Jika onAdd & onRemove diberikan, muncul tombol "Kelola divisi"
+// untuk menambah / menghapus divisi.
+const DivisiPicker = ({ divisis, value, onPick, onAdd, onRemove }) => {
+    const [manage, setManage] = useState(false);
+    const [nama, setNama] = useState('');
+    const [adding, setAdding] = useState(false);
 
-            return (
-                <button
-                    key={item}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => onPick(item)}
-                    className={`group relative flex cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-3 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                        active
-                            ? 'border-blue-500 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
-                            : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-600'
-                    }`}
-                >
-                    {active && <Icon type="check" className="fm-pop h-3.5 w-3.5" />}
-                    {item}
-                </button>
-            );
-        })}
-    </div>
-);
+    const manageable = Boolean(onAdd && onRemove);
+
+    const submitAdd = () => {
+        const clean = nama.trim().replace(/\s+/g, ' ');
+
+        if (!clean || adding) {
+            return;
+        }
+
+        setAdding(true);
+
+        onAdd(clean, {
+            onSuccess: () => setNama(''),
+            onFinish: () => setAdding(false),
+        });
+    };
+
+    return (
+        <div className="space-y-3">
+            {manageable && (
+                <div className="flex justify-end">
+                    <button
+                        type="button"
+                        onClick={() => setManage((v) => !v)}
+                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                            manage
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        }`}
+                    >
+                        <Icon type={manage ? 'check' : 'edit'} className="h-3.5 w-3.5" />
+                        {manage ? 'Selesai' : 'Kelola divisi'}
+                    </button>
+                </div>
+            )}
+
+            {divisis.length === 0 && (
+                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs text-slate-400">
+                    Belum ada divisi.{' '}
+                    {manageable ? 'Klik "Kelola divisi" untuk menambahkan.' : ''}
+                </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Divisi">
+                {divisis.map((item) => {
+                    const active = value === item.nama;
+                    const terpakai = (item.dipakai ?? 0) > 0;
+
+                    return (
+                        <div key={item.id} className="relative">
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                onClick={() => onPick(item.nama)}
+                                className={`group relative flex w-full cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-3 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
+                                    active
+                                        ? 'border-blue-500 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                                        : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-600'
+                                } ${manage ? 'pr-8' : ''}`}
+                            >
+                                {active && <Icon type="check" className="fm-pop h-3.5 w-3.5" />}
+                                <span className="truncate">{item.nama}</span>
+                            </button>
+
+                            {manage && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRemove(item)}
+                                    disabled={terpakai}
+                                    title={
+                                        terpakai
+                                            ? `Masih dipakai ${item.dipakai} item preventif`
+                                            : `Hapus divisi ${item.nama}`
+                                    }
+                                    aria-label={`Hapus divisi ${item.nama}`}
+                                    className="fm-pop absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-500 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+                                >
+                                    <Icon type="close" className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {manage && (
+                <div className="fm-fade flex gap-2 rounded-xl border border-blue-100 bg-blue-50/50 p-2">
+                    <input
+                        type="text"
+                        value={nama}
+                        maxLength={50}
+                        onChange={(e) => setNama(e.target.value)}
+                        onKeyDown={(e) => {
+                            // Enter jangan men-submit form utama
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                submitAdd();
+                            }
+                        }}
+                        placeholder="Nama divisi baru, contoh: Press"
+                        className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    />
+
+                    <button
+                        type="button"
+                        onClick={submitAdd}
+                        disabled={adding || !nama.trim()}
+                        className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <Icon type="plus" className="h-4 w-4" />
+                        {adding ? 'Menambah...' : 'Tambah'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Pilihan satuan periode (klik lagi untuk mengosongkan)
 const SatuanPicker = ({ value, onPick }) => (
@@ -230,7 +328,7 @@ const Stepper = ({ value, onChange, placeholder }) => {
 };
 
 // Alert di dalam form (muncul dengan efek getar)
-const FormAlert = ({ message, onClose }) => {
+const FormAlert = ({ message, title = 'Data belum lengkap', onClose }) => {
     if (!message) {
         return null;
     }
@@ -246,7 +344,7 @@ const FormAlert = ({ message, onClose }) => {
             </span>
 
             <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-red-700">Data belum lengkap</p>
+                <p className="text-sm font-semibold text-red-700">{title}</p>
                 <p className="mt-0.5 text-sm leading-5 text-red-600">{message}</p>
             </div>
 
@@ -262,7 +360,7 @@ const FormAlert = ({ message, onClose }) => {
     );
 };
 
-// Dialog konfirmasi (menggantikan ConfirmModal agar tidak perlu file lain)
+// Dialog konfirmasi
 const CONFIRM_TONES = {
     blue: {
         ring: 'bg-blue-400/40',
@@ -289,6 +387,7 @@ const ConfirmDialog = ({
     title,
     message,
     confirmLabel = 'Ya',
+    loadingLabel = 'Menyimpan...',
     tone = 'blue',
     loading = false,
     onConfirm,
@@ -362,7 +461,7 @@ const ConfirmDialog = ({
                         {loading ? (
                             <span className="relative flex items-center gap-2">
                                 <span className="fm-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-white" />
-                                Menyimpan...
+                                {loadingLabel}
                             </span>
                         ) : (
                             <span className="relative">{confirmLabel}</span>
@@ -499,9 +598,18 @@ const FormCard = ({ onSubmit, children }) => (
     </form>
 );
 
-export default function Create({ nextNo }) {
+// =========================================================
+// PAGE
+// =========================================================
+
+export default function Create({ divisis = [], nextNo = {} }) {
     const [alert, setAlert] = useState('');
+    const [alertTitle, setAlertTitle] = useState('Data belum lengkap');
     const [confirmSave, setConfirmSave] = useState(false);
+
+    // divisi yang akan dihapus (null = dialog tertutup)
+    const [hapusDivisi, setHapusDivisi] = useState(null);
+    const [menghapus, setMenghapus] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
         divisi: '',
@@ -513,6 +621,14 @@ export default function Create({ nextNo }) {
         jumlah_dilakukan: 1,
     });
 
+    // No Item selalu mengikuti divisi terpilih & daftar terbaru dari server
+    const noItem = data.divisi ? (nextNo[data.divisi] ?? '') : '';
+
+    const tampilkanAlert = (message, title = 'Data belum lengkap') => {
+        setAlertTitle(title);
+        setAlert(message);
+    };
+
     // =========================
     // SUBMIT -> validasi, lalu tampilkan konfirmasi
     // =========================
@@ -520,12 +636,12 @@ export default function Create({ nextNo }) {
         e.preventDefault();
 
         if (!data.divisi) {
-            setAlert('Divisi wajib diisi.');
+            tampilkanAlert('Divisi wajib diisi.');
             return;
         }
 
         if (!data.item_preventif.trim()) {
-            setAlert('Item Preventif wajib diisi.');
+            tampilkanAlert('Item Preventif wajib diisi.');
             return;
         }
 
@@ -534,7 +650,7 @@ export default function Create({ nextNo }) {
             data.jumlah_dilakukan === null ||
             Number(data.jumlah_dilakukan) < 1
         ) {
-            setAlert('Jumlah Dilakukan minimal 1.');
+            tampilkanAlert('Jumlah Dilakukan minimal 1.');
             return;
         }
 
@@ -553,13 +669,61 @@ export default function Create({ nextNo }) {
     };
 
     // =========================
-    // DIVISI
+    // TAMBAH DIVISI
     // =========================
-    const handleDivisiChange = (divisi) => {
-        setData({
-            ...data,
-            divisi,
-            no_item: divisi ? nextNo[divisi] : '',
+    const tambahDivisi = (nama, callbacks) => {
+        router.post(
+            '/preventif-divisi',
+            { nama },
+            {
+                preserveScroll: true,
+                preserveState: true, // isi form tidak hilang
+                onSuccess: () => {
+                    setAlert('');
+                    setData('divisi', nama); // langsung terpilih
+                    callbacks?.onSuccess?.();
+                },
+                onError: (errs) => {
+                    tampilkanAlert(
+                        errs.nama ?? 'Divisi gagal ditambahkan.',
+                        'Divisi gagal ditambahkan'
+                    );
+                },
+                onFinish: () => callbacks?.onFinish?.(),
+            }
+        );
+    };
+
+    // =========================
+    // HAPUS DIVISI (setelah konfirmasi)
+    // =========================
+    const doHapusDivisi = () => {
+        if (!hapusDivisi) {
+            return;
+        }
+
+        setMenghapus(true);
+
+        router.delete(`/preventif-divisi/${hapusDivisi.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setAlert('');
+
+                if (data.divisi === hapusDivisi.nama) {
+                    setData('divisi', '');
+                }
+            },
+            onError: (errs) => {
+                tampilkanAlert(
+                    errs.divisi ?? 'Divisi gagal dihapus.',
+                    'Divisi tidak bisa dihapus'
+                );
+            },
+            onFinish: () => {
+                setMenghapus(false);
+                setHapusDivisi(null);
+            },
         });
     };
 
@@ -572,7 +736,11 @@ export default function Create({ nextNo }) {
                 subtitle="Preventif Mesin / Tambah Data"
             >
                 <FormCard onSubmit={submit}>
-                    <FormAlert message={alert} onClose={() => setAlert('')} />
+                    <FormAlert
+                        message={alert}
+                        title={alertTitle}
+                        onClose={() => setAlert('')}
+                    />
 
                     {/* DATA ITEM */}
                     <Section
@@ -582,7 +750,13 @@ export default function Create({ nextNo }) {
                         ms={80}
                     >
                         <Field label="Divisi" required error={errors.divisi}>
-                            <DivisiPicker value={data.divisi} onPick={handleDivisiChange} />
+                            <DivisiPicker
+                                divisis={divisis}
+                                value={data.divisi}
+                                onPick={(nama) => setData('divisi', nama)}
+                                onAdd={tambahDivisi}
+                                onRemove={(item) => setHapusDivisi(item)}
+                            />
                         </Field>
 
                         <Field
@@ -597,7 +771,7 @@ export default function Create({ nextNo }) {
                         >
                             <input
                                 type="text"
-                                value={data.no_item}
+                                value={noItem}
                                 readOnly
                                 placeholder="Otomatis"
                                 className="w-full cursor-not-allowed rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm font-bold text-blue-700 outline-none"
@@ -701,6 +875,19 @@ export default function Create({ nextNo }) {
                 loading={processing}
                 onConfirm={doSave}
                 onCancel={() => setConfirmSave(false)}
+            />
+
+            {/* KONFIRMASI HAPUS DIVISI */}
+            <ConfirmDialog
+                open={hapusDivisi !== null}
+                title="Hapus divisi?"
+                message={`Divisi "${hapusDivisi?.nama ?? ''}" akan dihapus dari daftar. Tindakan ini tidak bisa dibatalkan.`}
+                confirmLabel="Ya, Hapus"
+                loadingLabel="Menghapus..."
+                tone="red"
+                loading={menghapus}
+                onConfirm={doHapusDivisi}
+                onCancel={() => setHapusDivisi(null)}
             />
         </>
     );

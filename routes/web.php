@@ -26,6 +26,7 @@ use App\Http\Controllers\RepairMtcController;
 use App\Http\Controllers\Mtc\MtcRrfController;
 use App\Http\Controllers\Mtc\MtcRrfExportController;
 use App\Http\Controllers\CheckSheetNotificationController;
+use App\Http\Controllers\PreventifDivisiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -111,6 +112,13 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         PreventifMesinController::class,
         'updateBulanan',
     ])->name('preventif-mesin.bulanan');
+
+    Route::post('/preventif-divisi', [
+        PreventifDivisiController::class,
+        'store'])->name('preventif-divisi.store');
+    Route::delete('/preventif-divisi/{divisi}', [
+        PreventifDivisiController::class,
+        'destroy'])->name('preventif-divisi.destroy');
 
 
     /*
