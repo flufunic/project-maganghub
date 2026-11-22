@@ -20,7 +20,6 @@ class CheckSheetController extends Controller
 {
     // Divisi yang ditampilkan di grafik dashboard
     // (harus sama persis dengan divisis.nama_divisi)
-    private const DASHBOARD_DIVISI = ['Headrest', 'Saidan', 'Utility'];
 
     private const DASHBOARD_BULAN = [
         1  => 'Jan', 2  => 'Feb', 3  => 'Mar', 4  => 'Apr',
@@ -45,7 +44,28 @@ class CheckSheetController extends Controller
         $awal  = "{$tahun}-01-01";
         $akhir = "{$tahun}-12-31";
 
-        $divisiList = self::DASHBOARD_DIVISI;
+        // Divisi yang punya minimal 1 check sheet aktif (otomatis ikut bertambah)
+        $divisiList = DB::table('divisis as d')
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('check_sheets as s')
+                    ->whereColumn('s.divisi_id', 'd.id')
+                    ->whereNull('s.deleted_at');
+            })
+            ->orderBy('d.id')
+            ->pluck('d.nama_divisi')
+            ->all();
+
+        if (empty($divisiList)) {
+            return [
+                'tahun'   => $tahun,
+                'divisi'  => [],
+                'laporan' => [],
+                'total'   => [],
+            ];
+        }
+
+        // ... lanjutkan kode lama mulai dari "// ---------- 1. JUMLAH CENTANG ----------"
 
         // ---------- 1. JUMLAH CENTANG ----------
         $centangRows = DB::table('check_sheet_checklists as c')

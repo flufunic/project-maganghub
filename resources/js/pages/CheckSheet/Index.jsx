@@ -139,7 +139,7 @@ export default function Index({ checkSheets = [], line, flash }) {
 
     const role = auth?.user?.role;
     const bolehKirim = !role || role === 'admin';
-
+    const bolehKelola = !role || role === 'admin' || role === 'pimpinan';
     const [showSidebar, setShowSidebar] = useState(false);
     const [selectedCheckSheet, setSelectedCheckSheet] = useState(null);
     const [deleting, setDeleting] = useState(false);
@@ -479,6 +479,12 @@ export default function Index({ checkSheets = [], line, flash }) {
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2">
+                                    {bolehKelola && (
+                                        <Link href="/master/divisi" className={secondaryButton}>
+                                            <Icon name="layers" className="h-4 w-4" />
+                                            Master Divisi
+                                        </Link>
+                                    )}
                                     {bolehKirim && (
                                         <>
                                             <Link

@@ -15,6 +15,8 @@ import {
     SlidersHorizontal,
     FileText,
     Factory,
+    Layers,
+    QrCode,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------
@@ -36,6 +38,8 @@ const ICONS = {
     joken: SlidersHorizontal,
     sop: FileText,
     mesin: Factory,
+    divisi: Layers,
+    barcode: QrCode,
 };
 
 function Icon({ type, className = 'h-5 w-5' }) {
@@ -133,6 +137,24 @@ const LAPORAN_MINGGUAN = {
     match: (p) => mulai(p, '/laporan-mingguan'),
 };
 
+const MASTER_DIVISI = {
+    key: 'master-divisi',
+    href: '/master/divisi',
+    icon: 'divisi',
+    title: 'Kelola Divisi & Line',
+    desc: 'Tambah divisi & mesin baru',
+    match: (p) => mulai(p, '/master/divisi'),
+};
+
+const CETAK_BARCODE = {
+    key: 'cetak-barcode',
+    href: '/check-sheets-barcodes',
+    icon: 'barcode',
+    title: 'Cetak Barcode',
+    desc: 'QR tiap line / mesin',
+    match: (p) => p === '/check-sheets-barcodes',
+};
+
 /* ------------------------------------------------------------------
 | MENU PER ROLE
 | Tambah / ubah role cukup di sini.
@@ -175,7 +197,7 @@ const ROLES = {
                 menus: [
                     MENU.preventif,
                     MENU.schedule,
-                    MENU.checksheet,
+                    { ...MENU.checksheet, children: [MASTER_DIVISI, CETAK_BARCODE] },
                     MENU.overhaul,
                     MENU.joken,
                     MENU.sop,
@@ -194,7 +216,7 @@ const ROLES = {
                 menus: [
                     { ...MENU.preventif, children: [LAPORAN_MINGGUAN] },
                     MENU.schedule,
-                    MENU.checksheet,
+                    { ...MENU.checksheet, children: [MASTER_DIVISI, CETAK_BARCODE] },
                     MENU.overhaul,
                     MENU.joken,
                     { ...MENU.rrf, desc: 'Kelola data repair QMOS dan buat RRF Maintenance' },

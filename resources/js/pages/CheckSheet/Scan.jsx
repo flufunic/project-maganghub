@@ -605,25 +605,6 @@ export default function Scan({ notifikasi = [] }) {
 
                                 {/* DIVIDER */}
                                 <div className="border-t border-slate-100" />
-
-                                {/* FOOTER ACTION */}
-                                <div className="flex items-center justify-between gap-2">
-                                    {/* <div className="flex items-center gap-1.5 text-slate-400">
-                                        <Icon type="file" className="h-3 w-3" />
-                                        <span className="text-[9px]">
-                                            Butuh barcode mesin baru?
-                                        </span>
-                                    </div> */}
-
-                                    <Link
-                                        href="/check-sheets-barcodes"
-                                        className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100"
-                                    >
-                                        <Icon type="file" className="h-3 w-3" />
-                                        Cetak Barcode
-                                        <Icon type="arrow" className="h-3 w-3" />
-                                    </Link>
-                                </div>
                             </div>
                         </div>
 

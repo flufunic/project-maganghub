@@ -27,6 +27,7 @@ use App\Http\Controllers\Mtc\MtcRrfController;
 use App\Http\Controllers\Mtc\MtcRrfExportController;
 use App\Http\Controllers\CheckSheetNotificationController;
 use App\Http\Controllers\PreventifDivisiController;
+use App\Http\Controllers\DivisiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -550,6 +551,23 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         OverhaulSc2Controller::class,
         'hapusDokumen',
     ])->name('overhaul-dokumen.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Master Divisi & Line (hanya admin)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('master')->group(function () {
+
+        Route::get('/divisi', [DivisiController::class, 'index'])->name('divisi.index');
+        Route::post('/divisi', [DivisiController::class, 'store'])->name('divisi.store');
+        Route::put('/divisi/{divisi}', [DivisiController::class, 'update'])->name('divisi.update');
+        Route::delete('/divisi/{divisi}', [DivisiController::class, 'destroy'])->name('divisi.destroy');
+
+        Route::post('/divisi/{divisi}/lines', [DivisiController::class, 'storeLine'])->name('divisi.lines.store');
+        Route::delete('/lines/{line}', [DivisiController::class, 'destroyLine'])->name('lines.destroy');
+    });
 
 
     /*

@@ -541,7 +541,7 @@ export default function Index({ user, laporans = [], flash }) {
                 {/* HEADER */}
                 <header className="sticky top-0 z-40 bg-gradient-to-r from-[#061033] via-[#0b1d57] to-[#12328a] shadow-lg shadow-slate-950/20">
                     <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-                        <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
                             <button
                                 type="button"
                                 onClick={() => setSidebarOpen(true)}
@@ -553,21 +553,16 @@ export default function Index({ user, laporans = [], flash }) {
                             </button>
 
                             <div className="min-w-0">
-                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
+                                <h1 className="text-base font-semibold leading-tight tracking-tight text-white sm:text-lg">
                                     Schedule Preventif
                                 </h1>
-                                <p className="hidden truncate text-xs text-blue-100/60 sm:block">
+                                <p className="text-xs leading-tight text-blue-100/60">
                                     Approval Report Mingguan
                                 </p>
                             </div>
                         </div>
-                        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-                            <div className="flex min-w-0 items-center gap-3">
-                                {/* tombol menu + judul (tetap) */}
-                            </div>
 
-                            <BellNotifikasi items={laporanBaru} onLihatSemua={() => setFilter('menunggu')} />
-                        </div>
+                        <BellNotifikasi items={laporanBaru} onLihatSemua={() => setFilter('menunggu')} />
                     </div>
 
                     <div className="pmp-line h-[3px] bg-gradient-to-r from-blue-400 via-violet-400 via-cyan-300 to-blue-400" />
