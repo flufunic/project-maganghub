@@ -711,3 +711,403 @@ export function printLaporanTahunan({
 
     printHtml({ html, judulFile: `Laporan Periode PM - ${periode}` });
 }
+/* ==================================================================
+| TEMPELKAN DI PALING BAWAH monthlyPdf.js
+| (tidak perlu mengubah kode lama; semua helper sudah ada di file itu)
+================================================================== */
+
+/* ---------- CSS tambahan ---------- */
+const STYLE_EXTRA = `
+    .section-title { font-size: 16px; margin: 0 0 10px; padding: 6px 10px; border-left: 5px solid #1447b8; background: #eff6ff; color: #1e3a8a; break-after: avoid; page-break-after: avoid; }
+    .sub-title { font-size: 12px; margin: 12px 0 6px; color: #334155; break-after: avoid; }
+    .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .kpi { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 10px; break-inside: avoid; }
+    .kpi small { display: block; color: #64748b; font-size: 9px; }
+    .kpi b { font-size: 16px; }
+    .plot-sm { height: 150px; }
+    th.grp { text-align: center; color: #1d4ed8; border-bottom: 0; background: #e0e7ff; }
+    .sq-legend { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+`;
+
+/* ---------- helper umum ---------- */
+const show = (v, suf = '') => (v === null || v === undefined ? '-' : `${v}${suf}`);
+
+const buildKpi = (items) =>
+    `<div class="kpi-row">${items
+        .map(
+            ([label, value, color]) =>
+                `<div class="kpi"><small>${esc(label)}</small><b style="color:${color || '#0f172a'}">${esc(value)}</b></div>`
+        )
+        .join('')}</div>`;
+
+/* Grafik batang berkelompok generik (dipakai Check Sheet & Overhaul)
+   series: [{ name, color, values: [] }]  | cats: ['Jan', ...] */
+const buildGroupedChart = ({ cats, series, suffix = '', small = false }) => {
+    const max = Math.max(
+        1,
+        ...series.flatMap((s) => s.values.map((v) => Number(v || 0)))
+    );
+    const barW = Math.max(7, Math.floor(56 / Math.max(series.length, 1)));
+
+    const ticks = [0, 1, 2, 3, 4]
+        .map((i) => {
+            const value = Math.round(((max * i) / 4) * 10) / 10;
+            return `
+                <div class="grid-line" style="bottom:${i * 25}%"></div>
+                <span class="y-label" style="bottom:${i * 25}%">${value}</span>`;
+        })
+        .join('');
+
+    const groups = cats
+        .map((c, i) => {
+            const bars = series
+                .map((s) => {
+                    const n = Number(s.values[i] || 0);
+                    const pct = n > 0 ? Math.max((n / max) * 100, 3) : 0;
+
+                    return `
+                    <div class="bar-wrap" style="width:${barW}px">
+                        ${
+                            n > 0
+                                ? `<span class="bar-value" style="bottom:calc(${pct}% + 2px);color:${s.color};font-size:8px">${n}${suffix}</span>`
+                                : ''
+                        }
+                        <div class="bar" style="height:${pct}%;background:${s.color};border-radius:3px 3px 0 0"></div>
+                    </div>`;
+                })
+                .join('');
+
+            return `
+            <div class="group">
+                <div class="group-bars" style="gap:2px">${bars}</div>
+                <div class="group-label">${esc(c)}</div>
+            </div>`;
+        })
+        .join('');
+
+    const legend = series
+        .map((s) => `<span><i class="sq-legend" style="background:${s.color}"></i>${esc(s.name)}</span>`)
+        .join('');
+
+    return `
+        <div class="chart">
+            <div class="plot ${small ? 'plot-sm' : ''}">
+                ${ticks}
+                <div class="groups">${groups}</div>
+            </div>
+        </div>
+        <div class="legend">${legend}</div>`;
+};
+
+/* ---------- BAGIAN: PREVENTIF PERIODE ---------- */
+const sectionAnnual = ({ annualReport, daftarDivisi, annualDetail }) => {
+    const stackDivisi =
+        daftarDivisi.length > 0
+            ? daftarDivisi
+            : Array.from(new Set(annualReport.flatMap((r) => Object.keys(r.act_per_divisi ?? {}))));
+
+    const awal = annualReport[0];
+    const akhir = annualReport[annualReport.length - 1];
+    const periode = awal
+        ? awal.bulan === akhir.bulan && awal.tahun === akhir.tahun
+            ? `${awal.nama_bulan} ${awal.tahun}`
+            : `${awal.nama_bulan} ${awal.tahun} - ${akhir.nama_bulan} ${akhir.tahun}`
+        : '-';
+
+    if (!annualReport.length) {
+        return `<h2 class="section-title">Preventive Maintenance - Periode</h2>
+                <p class="empty">Tidak ada data pada periode yang dipilih.</p>`;
+    }
+
+    const tAct = annualReport.reduce((s, r) => s + Number(r.act || 0), 0);
+    const tPlan = annualReport.reduce((s, r) => s + Number(r.plan || 0), 0);
+    const pct = tPlan > 0 ? ((tAct / tPlan) * 100).toFixed(1) : '0.0';
+
+    return `
+    <h2 class="section-title">Preventive Maintenance - Periode (${esc(periode)})</h2>
+    ${buildKpi([
+        ['Total jadwal', tPlan],
+        ['Sudah preventif', tAct, '#2563eb'],
+        ['Belum preventif', Math.max(tPlan - tAct, 0), '#d97706'],
+        ['Pencapaian', `${pct}%`, '#059669'],
+    ])}
+    <div class="card">
+        <h2>Laporan ACT &amp; Plan per Periode</h2>
+        ${buildAnnualChart(annualReport, stackDivisi)}
+    </div>
+    <h2 class="sub-title">Ringkasan per Bulan</h2>
+    ${buildAnnualSummary(annualReport)}
+    <div class="page-break"></div>
+    <h2 class="sub-title">Rincian Item per Bulan <small style="font-weight:500;color:#64748b">(ACT / Jadwal)</small></h2>
+    ${buildAnnualDetail(annualReport, annualDetail)}`;
+};
+
+/* ---------- BAGIAN: PREVENTIF BULANAN ---------- */
+const sectionMonthly = ({ namaBulan, tahun, divisiReport, detail, totalAct, totalPlan, totalJadwal }) => `
+    <h2 class="section-title">Preventive Maintenance - Bulanan (${esc(namaBulan)} ${esc(tahun)})</h2>
+    <div class="card">
+        <h2>ACT vs Plan per Divisi</h2>
+        ${
+            divisiReport.length > 0
+                ? buildBarChart(divisiReport)
+                : '<p class="empty">Tidak ada jadwal preventif pada bulan yang dipilih.</p>'
+        }
+    </div>
+    <div class="card" style="margin-top:12px">
+        <h2>Persentase ACT vs Plan</h2>
+        ${buildPie({ totalAct, totalPlan, totalJadwal })}
+    </div>
+    <h2 class="sub-title">Detail Preventive Maintenance (${detail.length} item)</h2>
+    ${buildTable(detail)}`;
+
+/* ---------- BAGIAN: CHECK SHEET ---------- */
+const sectionCheckSheet = ({ checkSheet }) => {
+    const divisi = checkSheet.divisi ?? [];
+    const laporan = checkSheet.laporan ?? [];
+    const total = checkSheet.total ?? {};
+    const nd = divisi.length;
+    const col = (d) => getWarna(d).bg;
+    const cats = laporan.map((m) => String(m.nama_bulan || '').slice(0, 3));
+
+    const totals = divisi.map((d) => total[d]).filter(Boolean);
+    const centang = totals.reduce((s, t) => s + Number(t.centang || 0), 0);
+    const abn = totals.reduce((s, t) => s + Number(t.abnormality || 0), 0);
+    const pList = totals.map((t) => t.persen).filter((v) => v !== null && v !== undefined).map(Number);
+    const avg = pList.length ? pList.reduce((s, v) => s + v, 0) / pList.length : 0;
+
+    const make = (key) =>
+        divisi.map((d) => ({
+            name: d,
+            color: col(d),
+            values: laporan.map((m) => m[key]?.[d] ?? 0),
+        }));
+
+    if (!nd || !laporan.length) {
+        return `<h2 class="section-title">Check Sheet Prediktif (${esc(checkSheet.tahun)})</h2>
+                <p class="empty">Tidak ada data check sheet pada tahun yang dipilih.</p>`;
+    }
+
+    const head1 = `
+        <tr>
+            <th></th>
+            <th class="grp c" colspan="${nd}">Terisi</th>
+            <th class="grp c" colspan="${nd}">Persentase</th>
+            <th class="grp c" colspan="${nd}">Abnormality</th>
+        </tr>`;
+    const head2 = `
+        <tr>
+            <th>Bulan</th>
+            ${[0, 1, 2].map(() => divisi.map((d) => `<th class="c">${esc(d)}</th>`).join('')).join('')}
+        </tr>`;
+
+    const rows = laporan
+        .map(
+            (m) => `
+        <tr>
+            <td>${esc(m.nama_bulan)}</td>
+            ${divisi.map((d) => `<td class="c">${esc(show(m.centang?.[d]))}</td>`).join('')}
+            ${divisi.map((d) => `<td class="c">${esc(show(m.persen?.[d], '%'))}</td>`).join('')}
+            ${divisi.map((d) => `<td class="c amber">${esc(show(m.abnormality?.[d]))}</td>`).join('')}
+        </tr>`
+        )
+        .join('');
+
+    const foot = `
+        <tr>
+            <td><b>Total ${esc(checkSheet.tahun)}</b></td>
+            ${divisi.map((d) => `<td class="c"><b>${esc(show(total[d]?.centang))}</b></td>`).join('')}
+            ${divisi.map((d) => `<td class="c"><b>${esc(show(total[d]?.persen, '%'))}</b></td>`).join('')}
+            ${divisi.map((d) => `<td class="c"><b>${esc(show(total[d]?.abnormality))}</b></td>`).join('')}
+        </tr>`;
+
+    return `
+    <h2 class="section-title">Check Sheet Prediktif (Januari - Desember ${esc(checkSheet.tahun)})</h2>
+    ${buildKpi([
+        ['Terisi (total centang)', centang],
+        ['Rata-rata pengisian', `${avg.toFixed(1)}%`, '#2563eb'],
+        ['Abnormality', abn, '#d97706'],
+        ['Divisi dipantau', nd],
+    ])}
+    <div class="card">
+        <h2>Check Sheet Terisi</h2>
+        ${buildGroupedChart({ cats, series: make('centang'), small: true })}
+    </div>
+    <div class="card" style="margin-top:10px">
+        <h2>Persentase Pengisian</h2>
+        ${buildGroupedChart({ cats, series: make('persen'), suffix: '%', small: true })}
+    </div>
+    <div class="page-break"></div>
+    <div class="card">
+        <h2>Abnormality</h2>
+        ${buildGroupedChart({ cats, series: make('abnormality'), small: true })}
+    </div>
+    <h2 class="sub-title">Rincian per Bulan</h2>
+    <table>
+        <thead>${head1}${head2}</thead>
+        <tbody>${rows}</tbody>
+        <tfoot>${foot}</tfoot>
+    </table>`;
+};
+
+/* ---------- BAGIAN: OVERHAUL ---------- */
+const sectionOverhaul = ({ overhaul }) => {
+    const data = overhaul.bulanan ?? [];
+    const plan = Number(overhaul.totalPlan || 0);
+    const act = Number(overhaul.totalAct || 0);
+    const pct = Number(overhaul.persentaseAct || 0);
+
+    if (!data.length) {
+        return `<h2 class="section-title">Overhaul Mesin SC2 (${esc(overhaul.tahun)})</h2>
+                <p class="empty">Tidak ada data overhaul pada tahun yang dipilih.</p>`;
+    }
+
+    const cats = data.map((d) => String(d.nama_bulan || '').slice(0, 3));
+    const cum = (key) => {
+        let s = 0;
+        return data.map((d) => (s += Number(d[key] || 0)));
+    };
+    const cumPlan = cum('plan');
+    const cumAct = cum('act');
+
+    const rows = data
+        .map((d, i) => {
+            const p = Number(d.plan || 0);
+            const a = Number(d.act || 0);
+
+            return `
+        <tr>
+            <td>${esc(d.nama_bulan)}</td>
+            <td class="c">${p}</td>
+            <td class="c blue">${a}</td>
+            <td class="c">${p > 0 ? Math.round((a / p) * 100) + '%' : '-'}</td>
+            <td class="c">${cumPlan[i]}</td>
+            <td class="c">${cumAct[i]}</td>
+        </tr>`;
+        })
+        .join('');
+
+    return `
+    <h2 class="section-title">Overhaul Mesin SC2 (Januari - Desember ${esc(overhaul.tahun)})</h2>
+    ${buildKpi([
+        ['Total plan', plan],
+        ['Sudah overhaul', act, '#2563eb'],
+        ['Belum overhaul', Math.max(plan - act, 0), '#d97706'],
+        ['Pencapaian', `${pct.toFixed(1)}%`, '#059669'],
+    ])}
+    <div class="card">
+        <h2>Plan vs Act per Bulan</h2>
+        ${buildGroupedChart({
+            cats,
+            series: [
+                { name: 'Plan', color: '#06b6d4', values: data.map((d) => Number(d.plan || 0)) },
+                { name: 'Act', color: '#f97316', values: data.map((d) => Number(d.act || 0)) },
+            ],
+        })}
+    </div>
+    <div class="card" style="margin-top:10px">
+        <h2>Kumulatif Plan vs Act</h2>
+        ${buildGroupedChart({
+            cats,
+            small: true,
+            series: [
+                { name: 'Plan (kumulatif)', color: '#06b6d4', values: cumPlan },
+                { name: 'Act (kumulatif)', color: '#f97316', values: cumAct },
+            ],
+        })}
+    </div>
+    <h2 class="sub-title">Rincian per Bulan</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Bulan</th><th class="c">Plan</th><th class="c">Act</th>
+                <th class="c">Pencapaian</th><th class="c">Plan Kumulatif</th><th class="c">Act Kumulatif</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+            <tr>
+                <td><b>Total ${esc(overhaul.tahun)}</b></td>
+                <td class="c"><b>${plan}</b></td>
+                <td class="c blue"><b>${act}</b></td>
+                <td class="c"><b>${pct}%</b></td>
+                <td class="c"></td><td class="c"></td>
+            </tr>
+        </tfoot>
+    </table>`;
+};
+
+/* ------------------------------------------------------------------
+| PDF GABUNGAN
+| include: ['annual', 'monthly', 'checksheet', 'overhaul'] (urutan tetap)
+| Contoh: printLaporanLengkap(props)                       -> semua
+|         printLaporanLengkap(props, ['checksheet'])       -> hanya check sheet
+------------------------------------------------------------------ */
+export function printLaporanLengkap(
+    {
+        namaBulan = 'Bulan',
+        tahun,
+        divisiReport = [],
+        detail = [],
+        totalAct = 0,
+        totalPlan = 0,
+        totalJadwal = 0,
+        annualReport = [],
+        daftarDivisi = [],
+        annualDetail = [],
+        checkSheet = { tahun: '', divisi: [], laporan: [], total: {} },
+        overhaul = { tahun: '', bulanan: [], totalPlan: 0, totalAct: 0, persentaseAct: 0 },
+        warnaDivisi = {},
+    },
+    include = ['annual', 'monthly', 'checksheet', 'overhaul']
+) {
+    PETA_WARNA = warnaDivisi;
+
+    const builders = {
+        annual: () => sectionAnnual({ annualReport, daftarDivisi, annualDetail }),
+        monthly: () =>
+            sectionMonthly({ namaBulan, tahun, divisiReport, detail, totalAct, totalPlan, totalJadwal }),
+        checksheet: () => sectionCheckSheet({ checkSheet }),
+        overhaul: () => sectionOverhaul({ overhaul }),
+    };
+
+    const order = ['annual', 'monthly', 'checksheet', 'overhaul'].filter((k) => include.includes(k));
+
+    const body = order
+        .map((k, i) => `<section class="${i > 0 ? 'page-break' : ''}">${builders[k]()}</section>`)
+        .join('');
+
+    const judul =
+        order.length === 4
+            ? 'Laporan Maintenance Lengkap'
+            : order.length === 1
+              ? {
+                    annual: 'Laporan Periode Preventive Maintenance',
+                    monthly: 'Laporan Bulanan Preventive Maintenance',
+                    checksheet: 'Laporan Check Sheet Prediktif',
+                    overhaul: 'Laporan Overhaul Mesin SC2',
+                }[order[0]]
+              : 'Laporan Maintenance';
+
+    const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <title>${esc(judul)}</title>
+    <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        ${STYLE}
+        ${STYLE_EXTRA}
+    </style>
+</head>
+<body>
+    <header>
+        <small>Maintenance Monitoring System</small>
+        <h1>${esc(judul)}</h1>
+    </header>
+    ${body}
+    ${footerHtml()}
+</body>
+</html>`;
+
+    printHtml({ html, judulFile: judul });
+}

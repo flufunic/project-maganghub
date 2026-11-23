@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { printLaporanBulanan, printLaporanTahunan } from './monthlyPdf';
+import { printLaporanBulanan, printLaporanTahunan, printLaporanLengkap } from './monthlyPdf';
 import IntroLoader from './IntroLoader';
 import { KpiTile, setDivColors } from './DashKit';
 import { AnnualDashboard, MonthlyDashboard } from './PreventifCharts';
@@ -504,12 +504,35 @@ export default function Welcome({
             totalAct,
             totalPlan,
             totalJadwal,
+            warnaDivisi,
         });
     };
 
     const downloadAnnualPdf = () => {
         printLaporanTahunan({ annualReport, daftarDivisi, annualDetail, warnaDivisi });
     };
+
+    // PDF gabungan. include: 'annual' | 'monthly' | 'checksheet' | 'overhaul'
+    // Tanpa argumen = semua bagian dalam satu PDF.
+    const downloadPdf = (include) =>
+        printLaporanLengkap(
+            {
+                namaBulan: namaBulan[Number(bulan)] || 'Bulan',
+                tahun,
+                divisiReport,
+                detail,
+                totalAct,
+                totalPlan,
+                totalJadwal,
+                annualReport,
+                daftarDivisi,
+                annualDetail,
+                checkSheet,
+                overhaul,
+                warnaDivisi,
+            },
+            include
+        );
 
     /* ---------------- DATA PREVENTIF ---------------- */
     const totalForPie = totalAct + totalPlan;
@@ -932,6 +955,14 @@ export default function Welcome({
                                 ))}
                             </select>
 
+                            <GhostBtn
+                                onClick={() => downloadPdf()}
+                                title="Unduh semua laporan (Preventif, Check Sheet, Overhaul)"
+                            >
+                                <Icon d={ICON_DOWNLOAD} className="h-3.5 w-3.5" strokeWidth={2} />
+                                <span className="hidden sm:inline">PDF Semua</span>
+                            </GhostBtn>
+
                             <LiveClock />
 
                             {!isLoggedIn && (
@@ -1060,17 +1091,26 @@ export default function Welcome({
                             )}
 
                             {activeSlide === 'checksheet' && (
-                                <Sel
-                                    id="cs_tahun"
-                                    label="Tahun"
-                                    width={78}
-                                    value={csYear}
-                                    options={YEAR_OPTIONS}
-                                    onChange={(year) => {
-                                        setCsYear(year);
-                                        sendFilter({ tahun_checksheet: year });
-                                    }}
-                                />
+                                <>
+                                    <Sel
+                                        id="cs_tahun"
+                                        label="Tahun"
+                                        width={78}
+                                        value={csYear}
+                                        options={YEAR_OPTIONS}
+                                        onChange={(year) => {
+                                            setCsYear(year);
+                                            sendFilter({ tahun_checksheet: year });
+                                        }}
+                                    />
+                                    <GhostBtn
+                                        onClick={() => downloadPdf(['checksheet'])}
+                                        title="Unduh PDF Check Sheet"
+                                    >
+                                        <Icon d={ICON_DOWNLOAD} className="h-3.5 w-3.5" strokeWidth={2} />
+                                        PDF
+                                    </GhostBtn>
+                                </>
                             )}
 
                             {activeSlide === 'overhaul' && (
@@ -1086,6 +1126,13 @@ export default function Welcome({
                                             sendFilter({ tahun_overhaul: year });
                                         }}
                                     />
+                                    <GhostBtn
+                                        onClick={() => downloadPdf(['overhaul'])}
+                                        title="Unduh PDF Overhaul"
+                                    >
+                                        <Icon d={ICON_DOWNLOAD} className="h-3.5 w-3.5" strokeWidth={2} />
+                                        PDF
+                                    </GhostBtn>
                                     {isLoggedIn && (
                                         <Link
                                             href={`/overhaul-sc2?tahun=${ohYear}`}
