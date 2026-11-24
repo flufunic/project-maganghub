@@ -176,7 +176,7 @@ class MachineImporter
                 $raw   = $get($row, 'no_kontrol');
                 $panel = $get($row, 'panel_monitor_kwh');
 
-                // merged cell: nilai hanya ada di baris pertama, baris bawahnya kosong
+                // merged cell: nilai hanya ada di baris pertama
                 if ($fillDown) {
                     if ($panel !== '') {
                         $lastPanel = $panel;
@@ -197,50 +197,82 @@ class MachineImporter
                 $units = ControlNumberParser::expand($raw);
                 $qty   = $get($row, 'qty');
 
-                if ($qty !== '' && (int) $qty !== count($units)) {
+                // Qty lebih kecil dari rentang: ambil sebanyak Qty dari awal rentang
+                if ($qty !== '' && (int) $qty > 0 && (int) $qty < count($units)) {
+                    $warnings[] = "Baris {$line}: Qty={$qty}, jadi hanya " . (int) $qty . ' unit pertama dari rentang yang diimport.';
+                    $units = array_slice($units, 0, (int) $qty);
+                } elseif ($qty !== '' && (int) $qty !== count($units)) {
                     $warnings[] = "Baris {$line}: Qty={$qty} tapi no kontrol menghasilkan " . count($units) . ' unit.';
                 }
 
-                $type = MachineType::updateOrCreate(
-                    ['no_kontrol_raw' => $raw],
-                    [
-                        'nama_alat'            => $nama,
-                        'merk'                 => $get($row, 'merk') ?: null,
-                        'model_type'           => $get($row, 'model_type') ?: null,
-                        'negara_pembuat'       => $get($row, 'negara_pembuat') ?: null,
-                        'tahun_pembuatan'      => $num($get($row, 'tahun_pembuatan')),
-                        'start_operasional'    => $num($get($row, 'start_operasional')),
-                        'electric_consumption' => $get($row, 'electric_consumption') ?: null,
-                        'supplier_name'        => $get($row, 'supplier_name') ?: null,
-                        'supplier_active'      => $bool($get($row, 'supplier_active')),
-                        'supplier_repair'      => $bool($get($row, 'supplier_repair')),
-                        'secondtier'           => $get($row, 'secondtier') ?: null,
-                        'kontak_person'        => $get($row, 'kontak_person') ?: null,
-                        'keterangan'           => $get($row, 'keterangan') ?: null,
-                        'panel_monitor_kwh'    => $panel ?: null,
-                        'qty'                  => count($units),
-                    ]
-                );
+                // jenis mesin lama hasil import sebelumnya (masih berbentuk rentang)
+                $oldType = MachineType::where('no_kontrol_raw', $raw)->first();
 
-                if ($type->wasRecentlyCreated) {
-                    $typesNew++;
-                }
+                $attrs = [
+                    'nama_alat'            => $nama,
+                    'merk'                 => $get($row, 'merk') ?: null,
+                    'model_type'           => $get($row, 'model_type') ?: null,
+                    'negara_pembuat'       => $get($row, 'negara_pembuat') ?: null,
+                    'tahun_pembuatan'      => $num($get($row, 'tahun_pembuatan')),
+                    'start_operasional'    => $num($get($row, 'start_operasional')),
+                    'electric_consumption' => $get($row, 'electric_consumption') ?: null,
+                    'supplier_name'        => $get($row, 'supplier_name') ?: null,
+                    'supplier_active'      => $bool($get($row, 'supplier_active')),
+                    'supplier_repair'      => $bool($get($row, 'supplier_repair')),
+                    'secondtier'           => $get($row, 'secondtier') ?: null,
+                    'kontak_person'        => $get($row, 'kontak_person') ?: null,
+                    'keterangan'           => $get($row, 'keterangan') ?: null,
+                    'panel_monitor_kwh'    => $panel ?: null,
+                    'qty'                  => 1,
+                ];
 
+                // SATU JENIS MESIN PER UNIT
                 foreach ($units as $no) {
-                    $m = Machine::withTrashed()->firstOrCreate(
-                        ['no_kontrol' => $no],
-                        ['machine_type_id' => $type->id, 'barcode' => $no]
+                    $type = MachineType::withTrashed()->updateOrCreate(
+                        ['no_kontrol_raw' => $no],
+                        $attrs
                     );
 
-                    if ($m->wasRecentlyCreated) {
+                    if ($type->trashed()) {
+                        $type->restore();
+                    }
+                    if ($type->wasRecentlyCreated) {
+                        $typesNew++;
+                    }
+
+                    $m = Machine::withTrashed()->where('no_kontrol', $no)->first();
+
+                    if (!$m) {
+                        Machine::create([
+                            'machine_type_id' => $type->id,
+                            'no_kontrol'      => $no,
+                            'barcode'         => $no,
+                        ]);
                         $machinesNew++;
-                    } elseif ($m->trashed()) {
-                        // unit yang pernah dihapus diaktifkan lagi
+                        continue;
+                    }
+
+                    $dariRentangLama = $oldType && (int) $m->machine_type_id === (int) $oldType->id;
+                    $samaType        = (int) $m->machine_type_id === (int) $type->id;
+
+                    if ($m->trashed()) {
                         $m->restore();
                         $m->update(['machine_type_id' => $type->id]);
                         $machinesNew++;
-                    } elseif ((int) $m->machine_type_id !== (int) $type->id) {
+                    } elseif ($dariRentangLama) {
+                        // pindahkan unit dari baris rentang lama ke baris tunggal
+                        $m->update(['machine_type_id' => $type->id]);
+                    } elseif (!$samaType) {
                         $warnings[] = "Baris {$line}: {$no} sudah terdaftar di jenis mesin lain, dilewati.";
+                    }
+                }
+
+                // bersihkan baris rentang lama: unit yang tidak ikut lagi dihapus (soft delete)
+                if ($oldType && !in_array($oldType->no_kontrol_raw, $units, true)) {
+                    $oldType->machines()->whereNotIn('no_kontrol', $units)->delete();
+
+                    if ($oldType->machines()->count() === 0) {
+                        $oldType->delete();
                     }
                 }
             }

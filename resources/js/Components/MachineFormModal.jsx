@@ -319,7 +319,7 @@ export default function MachineFormModal({ mesin, options = {}, onClose }) {
                                     value={form.nama_alat}
                                     onChange={(e) => set('nama_alat', e.target.value)}
                                     list="dl-nama_alat"
-                                    placeholder="Contoh: Hydraulic Press"
+                                    placeholder="Contoh: Saidan"
                                     className={`${inputBase} ${ring('nama_alat')}`}
                                 />
                             </Field>
@@ -329,7 +329,7 @@ export default function MachineFormModal({ mesin, options = {}, onClose }) {
                                     type="text"
                                     value={form.no_kontrol_raw}
                                     onChange={(e) => set('no_kontrol_raw', e.target.value)}
-                                    placeholder="FJI - SC2 - M.HD 004 - 024"
+                                    placeholder="FJI - SC2 - M.HD 004"
                                     className={`${inputBase} font-mono ${ring('no_kontrol_raw')}`}
                                 />
                             </Field>
