@@ -36,4 +36,9 @@ class CheckSheetItem extends Model
     {
         return $this->hasMany(CheckSheetChecklist::class);
     }
+
+    public function abnormalities(): HasMany
+    {
+        return $this->hasMany(CheckSheetAbnormality::class, 'check_sheet_item_id');
+    }
 }

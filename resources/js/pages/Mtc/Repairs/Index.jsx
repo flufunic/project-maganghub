@@ -469,10 +469,10 @@ export default function Index({ repairs = {}, filters = {}, canCreateRrf = false
 
     // Pesan sukses hilang sendiri setelah 6 detik
     useEffect(() => {
-        if (!pesanSukses) return undefined;
+        if (!pesanSukses || ditutup.includes(pesanSukses)) return undefined;
         const timer = setTimeout(() => setDitutup((d) => [...d, pesanSukses]), 6000);
         return () => clearTimeout(timer);
-    }, [pesanSukses]);
+    }, [pesanSukses, ditutup]);
 
     const tutupPesan = (pesan) => setDitutup((d) => [...d, pesan]);
 
@@ -501,6 +501,8 @@ export default function Index({ repairs = {}, filters = {}, canCreateRrf = false
         router.post('/mtc/rrf/repair-mtc/sync', {}, {
             preserveScroll: true,
             onStart: () => setLoading(true),
+            onSuccess: (page) => console.log('FLASH:', page.props.flash),
+            onError: (err) => console.log('ERROR:', err),
             onFinish: () => setLoading(false),
         });
     };
@@ -614,6 +616,20 @@ export default function Index({ repairs = {}, filters = {}, canCreateRrf = false
                                 </p>
                             </div>
                         </div>
+
+                        {/* TOMBOL SINKRONKAN API */}
+                        {canCreateRrf && (
+                            <button
+                                type="button"
+                                onClick={sinkronisasi}
+                                disabled={loading}
+                                className="group relative inline-flex h-10 cursor-pointer items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-semibold text-white shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                            >
+                                <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-700 group-hover:left-[150%]" />
+                                <RefreshCw className={`relative h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                <span className="relative">{loading ? 'Menyinkronkan...' : 'Sinkronkan API'}</span>
+                            </button>
+                        )}
                     </div>
                 </section>
 

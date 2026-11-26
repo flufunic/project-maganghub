@@ -17,6 +17,7 @@ import {
     Factory,
     Layers,
     QrCode,
+    ListChecks,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------
@@ -34,6 +35,7 @@ const ICONS = {
     preventif: Wrench,
     schedule: CalendarClock,
     checksheet: Activity,
+    checksheetPreventif: ListChecks,
     overhaul: Cog,
     joken: SlidersHorizontal,
     sop: FileText,
@@ -69,6 +71,14 @@ const MENU = {
         title: 'Preventif Mesin',
         desc: 'Maintenance schedule',
         match: (p) => mulai(p, '/preventif-mesin'),
+    },
+    checksheetPreventif: {
+        key: 'checksheet-preventif',
+        href: '/checksheet-preventif',
+        icon: 'checksheetPreventif',
+        title: 'Check Sheet Preventif',
+        desc: 'Form preventif & countermeasure',
+        match: (p) => mulai(p, '/checksheet-preventif'),
     },
     schedule: {
         key: 'schedule-preventif',
@@ -196,6 +206,7 @@ const ROLES = {
                 judul: 'Menu Maintenance',
                 menus: [
                     MENU.preventif,
+                    MENU.checksheetPreventif,
                     MENU.schedule,
                     { ...MENU.checksheet, children: [MASTER_DIVISI, CETAK_BARCODE] },
                     MENU.overhaul,
@@ -215,6 +226,7 @@ const ROLES = {
                 judul: 'Menu Maintenance',
                 menus: [
                     { ...MENU.preventif, children: [LAPORAN_MINGGUAN] },
+                    MENU.checksheetPreventif,
                     MENU.schedule,
                     { ...MENU.checksheet, children: [MASTER_DIVISI, CETAK_BARCODE] },
                     MENU.overhaul,

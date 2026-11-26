@@ -1436,17 +1436,27 @@ export default function Index({
                                                                                 {notif.abnormality}
                                                                             </p>
 
-                                                                            {notif.url && (
-                                                                                <Link
-                                                                                    href={notif.url}
-                                                                                    onClick={(e) =>
-                                                                                        e.stopPropagation()
-                                                                                    }
-                                                                                    className="mt-1.5 inline-block text-[11px] font-semibold text-blue-600 hover:underline"
-                                                                                >
-                                                                                    Buka checksheet →
-                                                                                </Link>
-                                                                            )}
+                                                                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                                                                                {notif.url_perbaikan && (
+                                                                                    <Link
+                                                                                        href={notif.url_perbaikan}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        className="inline-block text-[11px] font-bold text-red-600 hover:underline"
+                                                                                    >
+                                                                                        Tangani di Checksheet Preventif →
+                                                                                    </Link>
+                                                                                )}
+
+                                                                                {notif.url && (
+                                                                                    <Link
+                                                                                        href={notif.url}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        className="inline-block text-[11px] font-semibold text-blue-600 hover:underline"
+                                                                                    >
+                                                                                        Lihat checksheet harian
+                                                                                    </Link>
+                                                                                )}
+                                                                            </div>
                                                                         </>
                                                                     )}
 
@@ -1860,8 +1870,11 @@ export default function Index({
                                                                                             <span className="font-semibold text-slate-700">{a.tanggal_format}</span>
                                                                                             {a.mesin ? ` · ${a.mesin}` : ''}
                                                                                             {' — '}{a.abnormality}{' '}
-                                                                                            <Link href={a.url} className="font-semibold text-blue-600 hover:underline">
-                                                                                                Lihat checksheet
+                                                                                            <Link
+                                                                                                href={a.url_perbaikan ?? a.url}
+                                                                                                className="font-semibold text-blue-600 hover:underline"
+                                                                                            >
+                                                                                                Tangani di Checksheet Preventif
                                                                                             </Link>
                                                                                         </li>
                                                                                     ))}

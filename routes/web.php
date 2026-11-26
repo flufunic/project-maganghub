@@ -28,6 +28,7 @@ use App\Http\Controllers\Mtc\MtcRrfExportController;
 use App\Http\Controllers\CheckSheetNotificationController;
 use App\Http\Controllers\PreventifDivisiController;
 use App\Http\Controllers\DivisiController;
+use App\Http\Controllers\PreventifChecksheetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -120,6 +121,46 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
     Route::delete('/preventif-divisi/{divisi}', [
         PreventifDivisiController::class,
         'destroy'])->name('preventif-divisi.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Checksheet Preventif
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('checksheet-preventif')
+        ->name('preventif-checksheets.')
+        ->controller(PreventifChecksheetController::class)
+        ->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::post('/import', 'import')->name('import');
+
+            // tujuan klik notifikasi dari Schedule Preventif
+            Route::get('/item/{preventifMesin}', 'untukItem')->name('untuk-item');
+
+            // form bulanan (harus di atas route /{preventifChecksheet})
+            Route::put('/records/{record}', 'updateRecord')->name('records.update');
+            Route::delete('/records/{record}', 'destroyRecord')->name('records.destroy');
+            Route::post('/records/{record}/aksi', 'setAksi')->name('records.aksi');
+            Route::put('/records/{record}/hasil', 'updateHasil')->name('records.hasil');
+
+            Route::get('/{preventifChecksheet}', 'show')->name('show');
+            Route::get('/{preventifChecksheet}/export-bulan', 'exportBulan')->name('export-bulan');
+            Route::put('/{preventifChecksheet}', 'update')->name('update');
+            Route::delete('/{preventifChecksheet}', 'destroy')->name('destroy');
+
+            Route::post('/{preventifChecksheet}/records', 'storeRecord')->name('records.store');
+
+            Route::post('/{preventifChecksheet}/items', 'storeItem')->name('items.store');
+            Route::put('/{preventifChecksheet}/items/{item}', 'updateItem')->name('items.update');
+            Route::delete('/{preventifChecksheet}/items/{item}', 'destroyItem')->name('items.destroy');
+
+            Route::put('/{preventifChecksheet}/abnormalities/{abnormality}', 'updateAbnormality')
+                ->name('abnormalities.update');
+            Route::post('/{preventifChecksheet}/abnormalities/{abnormality}/catatan', 'storeCatatan')
+                ->name('abnormalities.catatan');
+        });
 
 
     /*

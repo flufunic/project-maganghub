@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CheckSheetAbnormality extends Model
@@ -28,17 +29,18 @@ class CheckSheetAbnormality extends Model
 
     protected $fillable = [
         'check_sheet_id',
+        'check_sheet_item_id',
         'line_id',
         'tanggal',
         'abnormality',
         'countermeasure',
         'status',
+        'tanggal_selesai',   // BARU
         'pic',
     ];
 
     /**
      * Ikut dikirim ke frontend: daftar id item preventif terkait.
-     * (dipakai form edit untuk mencentang pilihan yang sudah tersimpan)
      */
     protected $appends = ['preventif_mesin_ids'];
 
@@ -46,12 +48,18 @@ class CheckSheetAbnormality extends Model
     {
         return [
             'tanggal' => 'date:Y-m-d',
+            'tanggal_selesai' => 'date:Y-m-d', // BARU
         ];
     }
 
     public function checkSheet(): BelongsTo
     {
         return $this->belongsTo(CheckSheet::class)->withTrashed();
+    }
+
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(CheckSheetItem::class, 'check_sheet_item_id')->withTrashed();
     }
 
     public function line(): BelongsTo
@@ -72,7 +80,15 @@ class CheckSheetAbnormality extends Model
             'preventif_mesin_id',
             'id',
             'no'
-        )->withTimestamps();
+        )->withPivot(['act_tanggal', 'act_otomatis'])->withTimestamps(); // withPivot = BARU
+    }
+
+    /** Catatan progress dari Checksheet Preventif (BARU). */
+    public function catatans(): HasMany
+    {
+        return $this->hasMany('App\\Models\\AbnormalityCatatan', 'check_sheet_abnormality_id')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     public function getPreventifMesinIdsAttribute(): array

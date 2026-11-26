@@ -365,7 +365,7 @@ class PreventifMesinController extends Controller
             }
         }
 
-        $formatAbnormalitas = fn ($a) => [
+        $formatAbnormalitas = fn ($a, $noItem = null) => [
             'id' => $a->id,
             'tanggal' => $a->tanggal->format('Y-m-d'),
             'tanggal_format' => $a->tanggal->translatedFormat('d F Y'),
@@ -381,6 +381,12 @@ class PreventifMesinController extends Controller
                 'tahun' => $a->tanggal->year,
                 'line_id' => $a->line_id,
             ]),
+            'url_perbaikan' => $noItem
+                ? route('preventif-checksheets.untuk-item', [
+                    'preventifMesin' => $noItem,
+                    'abnormality' => $a->id,
+                ])
+                : null,
         ];
 
         // =========================
@@ -439,7 +445,7 @@ class PreventifMesinController extends Controller
 
                 // Abnormality checksheet yang belum selesai untuk item ini
                 $preventif->abnormalitas_terbuka = ($abnormalitasPerItem->get($preventif->no) ?? collect())
-                    ->map($formatAbnormalitas)
+                    ->map(fn ($a) => $formatAbnormalitas($a, $preventif->no))
                     ->values();
 
                 return $preventif;
@@ -615,6 +621,7 @@ class PreventifMesinController extends Controller
                     'mesin' => $info['mesin'],
                     'abnormality' => $info['abnormality'],
                     'url' => $info['url'],
+                    'url_perbaikan' => $formatAbnormalitas($a, $pm->no)['url_perbaikan'],
                     'pesan' =>
                         'Ditemukan abnormality pada checksheet "' . $info['checksheet'] . '"'
                         . ($info['mesin'] ? ' (' . $info['mesin'] . ')' : '')

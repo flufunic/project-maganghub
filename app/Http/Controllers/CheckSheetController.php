@@ -15,6 +15,7 @@ use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\CheckSheetWorkbookExport;
 use App\Models\PreventifMesin;
+use App\Models\CheckSheetAbnormality; 
 
 class CheckSheetController extends Controller
 {
@@ -64,8 +65,6 @@ class CheckSheetController extends Controller
                 'total'   => [],
             ];
         }
-
-        // ... lanjutkan kode lama mulai dari "// ---------- 1. JUMLAH CENTANG ----------"
 
         // ---------- 1. JUMLAH CENTANG ----------
         $centangRows = DB::table('check_sheet_checklists as c')
@@ -552,7 +551,10 @@ class CheckSheetController extends Controller
 
             // abnormality HANYA milik line ini
             'abnormalities' => function ($query) use ($awalBulan, $akhirBulan, $lineId) {
-                $query->with('preventifMesins')
+                $query->with([
+                        'preventifMesins',
+                        'item:id,no,shift,inspection_point',
+                    ])
                     ->where('line_id', $lineId)
                     ->whereBetween('tanggal', [
                         $awalBulan->toDateString(),
@@ -697,8 +699,6 @@ class CheckSheetController extends Controller
         return back()->with('success', 'Inspection Point berhasil dihapus.');
     }
 
-    
-
     // =====================================================
     // CHECKLIST (per line)
     // =====================================================
@@ -743,7 +743,7 @@ class CheckSheetController extends Controller
 
         return back();
     }
-    
+
     // =====================================================
     // PELUMASAN (dipakai bersama semua line, jadwal statis)
     // =====================================================
@@ -813,6 +813,7 @@ class CheckSheetController extends Controller
 
         return back()->with('success', 'Data pelumasan berhasil dihapus.');
     }
+
     // =====================================================
     // CENTANG SEMUA (khusus pimpinan)
     // Satu bulan penuh, SKIP Sabtu, Minggu, dan tanggal yang belum datang.
@@ -945,7 +946,7 @@ class CheckSheetController extends Controller
     }
 
     // =====================================================
-    // ABNORMALITY (per line)
+    // ABNORMALITY (per line, boleh terhubung ke 1 item / kotak)
     // =====================================================
 
     /**
@@ -969,11 +970,22 @@ class CheckSheetController extends Controller
     {
         $validated = $request->validate(
             $this->aturanAbnormality() + [
-                'line_id' => ['nullable', 'integer'],
+                'line_id'             => ['nullable', 'integer'],
+                // kalau diisi = abnormality milik item (kotak) tertentu
+                'check_sheet_item_id' => ['nullable', 'integer'],
             ]
         );
 
         $line = $this->lineUntuk($checkSheet, $validated['line_id'] ?? null);
+
+        // item harus milik check sheet ini
+        $item = null;
+
+        if (! empty($validated['check_sheet_item_id'])) {
+            $item = $checkSheet->items()
+                ->where('id', $validated['check_sheet_item_id'])
+                ->firstOrFail();
+        }
 
         $preventifIds = collect($validated['preventif_mesin_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -981,13 +993,33 @@ class CheckSheetController extends Controller
             ->values()
             ->all();
 
-        unset($validated['line_id'], $validated['preventif_mesin_ids']);
+        unset(
+            $validated['line_id'],
+            $validated['preventif_mesin_ids'],
+            $validated['check_sheet_item_id']
+        );
 
-        $abnormality = $checkSheet->abnormalities()->create($validated + [
-            'line_id' => $line?->id,
-        ]);
+        DB::transaction(function () use ($checkSheet, $validated, $line, $item, $preventifIds) {
+            $abnormality = $checkSheet->abnormalities()->create($validated + [
+                'line_id'             => $line?->id,
+                'check_sheet_item_id' => $item?->id,
+            ]);
 
-        $abnormality->preventifMesins()->sync($preventifIds);
+            $abnormality->preventifMesins()->sync($preventifIds);
+
+            // Item sudah diperiksa (hasilnya abnormal), jadi dihitung terisi
+            // supaya persentase di dashboard tidak turun.
+            // KWH dikecualikan: status terisi ditentukan oleh angka Actual (lihat storeNilai).
+           // Centang hanya kalau abnormality langsung dibuat dengan status Closed.
+            // Open / Progress tidak mencentang; centang otomatis saat Closed dari Checksheet Preventif.
+            if ($item && ! $checkSheet->pakai_actual
+                && in_array(strtolower(trim($validated['status'])), CheckSheetAbnormality::STATUS_SELESAI, true)) {
+                $item->checklists()->updateOrCreate(
+                    ['line_id' => $line?->id, 'tanggal' => $validated['tanggal']],
+                    ['status' => true]
+                );
+            }
+        });
 
         return $this->redirectKePeriode($checkSheet, $validated['tanggal'], $line?->id)
             ->with('success', 'Abnormality berhasil ditambahkan.');
@@ -1013,6 +1045,17 @@ class CheckSheetController extends Controller
         unset($validated['preventif_mesin_ids']);
 
         $checkSheetAbnormality->update($validated);
+        if ($checkSheetAbnormality->check_sheet_item_id
+            && ! $checkSheet->pakai_actual
+            && in_array(strtolower(trim($validated['status'])), CheckSheetAbnormality::STATUS_SELESAI, true)) {
+            $checkSheetAbnormality->item?->checklists()->updateOrCreate(
+                [
+                    'line_id' => $checkSheetAbnormality->line_id,
+                    'tanggal' => $checkSheetAbnormality->tanggal->toDateString(),
+                ],
+                ['status' => true]
+            );
+        }
 
         // sync: yang tidak dicentang lagi otomatis dilepas
         $checkSheetAbnormality->preventifMesins()->sync($preventifIds);

@@ -58,6 +58,7 @@ const ICONS = {
     layers: { paths: ['M12 2l10 5-10 5L2 7z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'] },
     hash: { paths: ['M5 9h14M5 15h14', 'M10 3L8 21M16 3l-2 18'] },
     droplet: { paths: ['M12 2.7s6 6.2 6 10.8a6 6 0 11-12 0c0-4.6 6-10.8 6-10.8z'] },
+    clock: { paths: ['M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'] },
 };
 
 const Icon = ({ type, className = 'h-4 w-4' }) => {
@@ -542,12 +543,14 @@ const PreventifPicker = ({ options = [], value = [], onChange }) => {
 
 // Field form Abnormality (dipakai add & edit)
 // preventifOptions = daftar item preventif untuk pilihan "Item Preventif Terkait"
+// hideTanggal      = true kalau tanggal sudah ditentukan oleh kotak yang diklik
 const AbnormalityFields = ({
     data,
     setData,
     errors,
     withPlaceholder = false,
     preventifOptions = [],
+    hideTanggal = false,
 }) => {
     // error array dari Laravel: preventif_mesin_ids / preventif_mesin_ids.0 / ...
     const errorPreventif =
@@ -560,15 +563,17 @@ const AbnormalityFields = ({
 
     return (
         <>
-            <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Tanggal" required error={errors.tanggal}>
-                    <input
-                        type="date"
-                        value={data.tanggal}
-                        onChange={(e) => setData('tanggal', e.target.value)}
-                        className={`${inputClass} cursor-pointer`}
-                    />
-                </Field>
+            <div className={`grid gap-5 ${hideTanggal ? '' : 'sm:grid-cols-2'}`}>
+                {!hideTanggal && (
+                    <Field label="Tanggal" required error={errors.tanggal}>
+                        <input
+                            type="date"
+                            value={data.tanggal}
+                            onChange={(e) => setData('tanggal', e.target.value)}
+                            className={`${inputClass} cursor-pointer`}
+                        />
+                    </Field>
+                )}
 
                 <Field label="Status" required error={errors.status}>
                     <SelectBox
@@ -638,31 +643,51 @@ const AbnormalityFields = ({
     );
 };
 
+// state: null | 'open' (silang merah) | 'progress' (jam, menunggu) | 'closed' (centang normal)
 // =========================================================
 // CHECKBOX KECIL (kolom Plan / Act / centang)
+// dot kuning = ada catatan, dot merah = ada abnormality
 // =========================================================
 
-const CheckBtn = ({ checked, tone = 'emerald', title, onClick }) => (
-    <button
-        type="button"
-        title={title}
-        aria-label={title}
-        aria-pressed={checked}
-        onClick={onClick}
-        className={`mx-auto flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 outline-none transition-all duration-200 active:scale-90 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${
-            checked
-                ? tone === 'blue'
-                    ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30'
-                    : 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
-                : 'border-slate-200 bg-white text-transparent hover:border-blue-400 hover:bg-blue-50'
-        }`}
-    >
-        {checked && <Icon type="check" className="idx-check h-3.5 w-3.5" />}
-    </button>
-);
+const CheckBtn = ({ checked, tone = 'emerald', title, onClick, catatan = false, abnormality = false }) => {
+    const warna = checked
+        ? tone === 'blue'
+            ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30'
+            : 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+        : 'border-slate-200 bg-white text-transparent hover:border-blue-400 hover:bg-blue-50';
+
+    return (
+        <span className="relative mx-auto block h-6 w-6">
+            <button
+                type="button"
+                title={title}
+                aria-label={title}
+                aria-pressed={checked}
+                onClick={onClick}
+                className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 outline-none transition-all duration-200 active:scale-90 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${warna}`}
+            >
+                {checked && <Icon type="check" className="idx-check h-3.5 w-3.5" />}
+            </button>
+
+            {catatan && (
+                <span
+                    title="Ada catatan"
+                    className="pointer-events-none absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-amber-400"
+                />
+            )}
+
+            {abnormality && (
+                <span
+                    title="Ada abnormality"
+                    className="pointer-events-none absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500"
+                />
+            )}
+        </span>
+    );
+};
 
 // =========================================================
-// TOMBOL CATATAN (ikon catatan, titik merah kalau sudah ada catatan)
+// TOMBOL CATATAN (ikon catatan, kuning kalau sudah ada catatan)
 // =========================================================
 
 const CatatanBtn = ({ ada, onClick }) => (
@@ -671,14 +696,11 @@ const CatatanBtn = ({ ada, onClick }) => (
         onClick={onClick}
         title={ada ? 'Lihat / ubah catatan' : 'Tambah catatan'}
         aria-label={ada ? 'Lihat atau ubah catatan' : 'Tambah catatan'}
-        className={`relative mx-auto flex h-5 w-5 cursor-pointer items-center justify-center rounded-md outline-none transition-all duration-200 hover:scale-110 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${
-            ada ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'
+        className={`mx-auto flex h-5 w-5 cursor-pointer items-center justify-center rounded-md outline-none transition-all duration-200 hover:scale-110 focus-visible:ring-4 focus-visible:ring-blue-500/25 ${
+            ada ? 'text-amber-500' : 'text-slate-300 hover:text-slate-500'
         }`}
     >
         <Icon type="note" className="h-3.5 w-3.5" />
-        {ada && (
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
-        )}
     </button>
 );
 
@@ -693,9 +715,10 @@ const CatatanBtn = ({ ada, onClick }) => (
 // }
 // Yang dikirim ke server hanya { actual, catatan }.
 // Selisih tidak diinput & tidak disimpan, selalu dihitung di tampilan.
+// abnormalCount / onAbnormal = tombol "Abn" untuk abnormality per kotak
 // =========================================================
 
-const NilaiCell = ({ nilai, onSave }) => {
+const NilaiCell = ({ nilai, onSave, abnormalCount = 0, onAbnormal }) => {
     const [act, setAct] = useState(nilai.actual ?? '');
     const [cat, setCat] = useState(nilai.catatan ?? '');
 
@@ -764,6 +787,21 @@ const NilaiCell = ({ nilai, onSave }) => {
                 onBlur={simpan}
                 className={`${miniInput} text-left`}
             />
+
+            {/* Tombol abnormality (merah + jumlah kalau sudah ada) */}
+            <button
+                type="button"
+                onClick={onAbnormal}
+                title={abnormalCount > 0 ? 'Lihat / ubah abnormality' : 'Tambah abnormality'}
+                className={`flex h-6 cursor-pointer items-center justify-center gap-1 rounded-md text-[10px] font-bold outline-none transition active:scale-95 ${
+                    abnormalCount > 0
+                        ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
+                        : 'bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500'
+                }`}
+            >
+                <Icon type="close" className="h-3 w-3" />
+                {abnormalCount > 0 ? `Abn ${abnormalCount}` : 'Abn'}
+            </button>
         </div>
     );
 };
@@ -950,7 +988,241 @@ const ConfirmDialog = ({ dialog, onCancel }) => {
 };
 
 // =========================================================
-// MODAL CATATAN CHECKLIST (mode Plan/Act & mode biasa)
+// TAB ABNORMALITY DI DALAM MODAL CATATAN
+// (abnormality milik 1 item pada 1 tanggal)
+// =========================================================
+
+const formatCatatanWaktu = (v) => {
+    if (!v) return '';
+
+    const d = new Date(v);
+
+    return Number.isNaN(d.getTime())
+        ? ''
+        : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const AbnormalitasTab = ({
+    checkSheet,
+    line,
+    target,
+    list,
+    preventifOptions,
+    notify,
+    confirm,
+    onDone,
+}) => {
+    const baseUrl = `/check-sheets/${checkSheet.id}/abnormalities`;
+
+    const kosong = {
+        line_id: line?.id ?? '',
+        check_sheet_item_id: target.item.id,
+        preventif_mesin_ids: [],
+        tanggal: target.tanggal,
+        abnormality: '',
+        countermeasure: '',
+        status: 'Open',
+        pic: '',
+    };
+
+    const form = useForm(kosong);
+
+    // null = mode tambah baru, object = mode edit
+    const [editing, setEditing] = useState(null);
+
+    const bukaBaru = () => {
+        form.clearErrors();
+        form.setData(kosong);
+        setEditing(null);
+    };
+
+    const bukaEdit = (a) => {
+        form.clearErrors();
+        form.setData({
+            ...kosong,
+            preventif_mesin_ids: (a.preventif_mesin_ids ?? []).map(Number),
+            tanggal: String(a.tanggal).substring(0, 10),
+            abnormality: a.abnormality ?? '',
+            countermeasure: a.countermeasure ?? '',
+            status: a.status ?? 'Open',
+            pic: a.pic ?? '',
+        });
+        setEditing(a);
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+
+        const opsi = {
+            preserveScroll: true,
+            onSuccess: () => {
+                notify(
+                    editing
+                        ? 'Abnormality berhasil diperbarui.'
+                        : 'Abnormality berhasil ditambahkan.'
+                );
+                onDone();
+            },
+            onError: () =>
+                notify('Data gagal disimpan. Periksa kembali isian kamu.', 'error'),
+        };
+
+        if (editing) {
+            form.put(`${baseUrl}/${editing.id}`, opsi);
+        } else {
+            form.post(baseUrl, opsi);
+        }
+    };
+
+    const hapus = () =>
+        confirm({
+            title: 'Hapus Abnormality?',
+            message: 'Apakah kamu yakin ingin menghapus data abnormality ini?',
+            confirmLabel: 'Ya, Hapus',
+            tone: 'red',
+            icon: 'trash',
+            onConfirm: () => {
+                confirm(null);
+
+                router.delete(`${baseUrl}/${editing.id}`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        notify('Abnormality berhasil dihapus.');
+                        onDone();
+                    },
+                    onError: () => notify('Data gagal dihapus.', 'error'),
+                });
+            },
+        });
+
+    const statusClass = (s) =>
+        s === 'Closed'
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
+            : s === 'Progress'
+            ? 'bg-amber-50 text-amber-700 ring-amber-200/80'
+            : 'bg-red-50 text-red-700 ring-red-200/80';
+
+    return (
+        <form onSubmit={submit} className="space-y-5">
+            {/* Daftar abnormality yang sudah ada di kotak ini */}
+            {list.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-700">
+                        Abnormality di kotak ini ({list.length})
+                    </p>
+
+                    {list.map((a) => (
+                        <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => bukaEdit(a)}
+                            className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition ${
+                                editing?.id === a.id
+                                    ? 'border-amber-400 bg-amber-50/60'
+                                    : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                        >
+                            <span className="min-w-0 text-xs leading-snug text-slate-700">
+                                {a.abnormality}
+                            </span>
+
+                            <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${statusClass(
+                                    a.status
+                                )}`}
+                            >
+                                {a.status}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <FormBanner
+                text={editing ? 'Edit Abnormality' : 'Tambah Abnormality Baru'}
+                tone="amber"
+            />
+
+            {editing && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+                    <p className="text-xs font-bold text-amber-700">
+                        Tindak lanjut dari Checksheet Preventif
+                    </p>
+
+                    {(editing.catatans ?? []).length === 0 ? (
+                        <p className="mt-1 text-xs text-amber-700/70">
+                            Belum ada catatan progress.
+                        </p>
+                    ) : (
+                        <ul className="mt-2 space-y-1.5">
+                            {editing.catatans.map((c) => (
+                                <li key={c.id} className="text-xs leading-snug text-slate-700">
+                                    <span className="font-semibold">{c.catatan}</span>
+                                    <span className="ml-2 text-[11px] text-slate-400">
+                                        {formatCatatanWaktu(c.created_at)}
+                                        {c.oleh ? ` · ${c.oleh}` : ''}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+
+            <AbnormalityFields
+                data={form.data}
+                setData={form.setData}
+                errors={form.errors}
+                preventifOptions={preventifOptions}
+                withPlaceholder
+                hideTanggal
+            />
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                    {editing && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={hapus}
+                                className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.97]"
+                            >
+                                <Icon type="trash" className="h-4 w-4" />
+                                Hapus
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={bukaBaru}
+                                className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.97]"
+                            >
+                                <Icon type="plus" className="h-4 w-4" />
+                                Baru
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={form.processing}
+                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 text-sm font-bold text-white shadow-lg shadow-amber-500/25 outline-none transition-all duration-200 hover:bg-amber-600 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-amber-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    {form.processing && <Spinner />}
+                    {form.processing
+                        ? 'Menyimpan...'
+                        : editing
+                        ? 'Simpan Perubahan'
+                        : 'Simpan Abnormality'}
+                </button>
+            </div>
+        </form>
+    );
+};
+
+// =========================================================
+// MODAL CATATAN CHECKLIST (tab Catatan + tab Abnormality)
+// target.hanyaAbnormality = true (mode KWH) -> tab Catatan disembunyikan
 // =========================================================
 
 const CatatanModalInner = ({
@@ -963,12 +1235,44 @@ const CatatanModalInner = ({
     namaBulan,
     bulan,
     tahun,
+    abnormalList = [],
+    checkSheet,
+    line,
+    preventifOptions = [],
+    notify,
+    confirm,
 }) => {
     const overlayRef = useRef(null);
 
     useOverlay(overlayRef, onClose);
 
+    // semua mode boleh punya abnormality
+    const hanyaAbnormality = Boolean(target.hanyaAbnormality);
+
+    const [tab, setTab] = useState(
+        hanyaAbnormality || target.tab === 'abnormality' ? 'abnormality' : 'catatan'
+    );
+
     const hari = Number(String(target.tanggal).substring(8, 10));
+
+    const tabBtn = (key, label, activeClass, badge) => (
+        <button
+            type="button"
+            onClick={() => setTab(key)}
+            className={`-mb-px inline-flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-xs font-bold outline-none transition ${
+                tab === key
+                    ? activeClass
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+        >
+            {label}
+            {badge > 0 && (
+                <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] leading-none text-white">
+                    {badge}
+                </span>
+            )}
+        </button>
+    );
 
     return (
         <div
@@ -979,11 +1283,20 @@ const CatatanModalInner = ({
             <div
                 role="dialog"
                 aria-modal="true"
-                className="idx-sheet w-full max-w-lg overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-slate-950/30 sm:rounded-3xl"
+                className={`idx-sheet flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-slate-950/30 sm:rounded-3xl ${
+                    tab === 'abnormality' ? 'max-w-2xl' : 'max-w-lg'
+                }`}
             >
-                <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                        <Icon type="note" className="h-5 w-5" />
+                {/* HEADER */}
+                <div className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                    <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            hanyaAbnormality
+                                ? 'bg-amber-50 text-amber-600'
+                                : 'bg-blue-50 text-blue-600'
+                        }`}
+                    >
+                        <Icon type={hanyaAbnormality ? 'alert' : 'note'} className="h-5 w-5" />
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -1006,52 +1319,86 @@ const CatatanModalInner = ({
                     </button>
                 </div>
 
-                <div className="px-5 py-5 sm:px-6">
-                    <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3">
-                        <Icon type="clipboard" className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                        <p className="text-sm leading-snug text-slate-600">
-                            {target.label}
-                        </p>
+                {/* TAB */}
+                {!hanyaAbnormality && (
+                    <div className="flex shrink-0 gap-1 border-b border-slate-200 px-4 sm:px-5">
+                        {tabBtn('catatan', 'Catatan', 'border-blue-600 text-blue-700')}
+                        {tabBtn(
+                            'abnormality',
+                            'Abnormality',
+                            'border-red-500 text-red-600',
+                            abnormalList.length
+                        )}
                     </div>
+                )}
 
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                        Catatan
-                    </label>
+                {/* ISI */}
+                <div className="idx-scroll flex-1 overflow-y-auto">
+                    <div className="px-5 py-5 sm:px-6">
+                        <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3">
+                            <Icon type="clipboard" className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                            <p className="text-sm leading-snug text-slate-600">
+                                {target.label}
+                            </p>
+                        </div>
 
-                    <textarea
-                        value={value}
-                        onChange={(e) => onChange(e.target.value)}
-                        rows="5"
-                        maxLength={255}
-                        autoFocus
-                        placeholder="Tulis catatan untuk checklist ini..."
-                        className={`${inputClass} resize-none`}
-                    />
+                        {tab === 'catatan' ? (
+                            <>
+                                <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                                    Catatan
+                                </label>
 
-                    <p className="mt-1.5 text-right text-[11px] tabular-nums text-slate-400">
-                        {value.length}/255
-                    </p>
+                                <textarea
+                                    value={value}
+                                    onChange={(e) => onChange(e.target.value)}
+                                    rows="5"
+                                    maxLength={255}
+                                    autoFocus
+                                    placeholder="Tulis catatan untuk checklist ini..."
+                                    className={`${inputClass} resize-none`}
+                                />
+
+                                <p className="mt-1.5 text-right text-[11px] tabular-nums text-slate-400">
+                                    {value.length}/255
+                                </p>
+                            </>
+                        ) : (
+                            <AbnormalitasTab
+                                checkSheet={checkSheet}
+                                line={line}
+                                target={target}
+                                list={abnormalList}
+                                preventifOptions={preventifOptions}
+                                notify={notify}
+                                confirm={confirm}
+                                onDone={onClose}
+                            />
+                        )}
+                    </div>
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 outline-none transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-slate-300/50"
-                    >
-                        Batal
-                    </button>
+                {/* FOOTER (hanya tab Catatan) */}
+                {tab === 'catatan' && (
+                    <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 outline-none transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-slate-300/50"
+                        >
+                            Batal
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={onSave}
-                        disabled={saving}
-                        className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/25 outline-none transition-all duration-200 hover:bg-blue-700 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {saving && <Spinner />}
-                        {saving ? 'Menyimpan...' : 'Simpan Catatan'}
-                    </button>
-                </div>
+                        <button
+                            type="button"
+                            onClick={onSave}
+                            disabled={saving}
+                            className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/25 outline-none transition-all duration-200 hover:bg-blue-700 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {saving && <Spinner />}
+                            {saving ? 'Menyimpan...' : 'Simpan Catatan'}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1617,7 +1964,7 @@ const LubrikasiSection = ({ checkSheet, line, confirm, notify }) => {
 // (dikirim dari CheckSheetController::show, untuk pilihan Item Preventif Terkait)
 //
 // checkSheet.abnormalities[].preventif_mesin_ids = [no, no, ...]
-// (accessor di model CheckSheetAbnormality, dipakai form edit & label di tabel)
+// checkSheet.abnormalities[].check_sheet_item_id = id item (kotak tempat abnormality dicatat)
 export default function Show({
     checkSheet,
     bulan,
@@ -1685,8 +2032,8 @@ export default function Show({
     // Toast: { id, type: 'success' | 'error', message }
     const [toast, setToast] = useState(null);
 
-    // Catatan checklist (mode Plan/Act & biasa)
-    const [catatanTarget, setCatatanTarget] = useState(null); // { item, tanggal, label }
+    // Catatan checklist (mode Plan/Act & biasa) + abnormality per kotak
+    const [catatanTarget, setCatatanTarget] = useState(null); // { item, tanggal, kolom, tab, label }
     const [catatanText, setCatatanText] = useState('');
     const [savingCatatan, setSavingCatatan] = useState(false);
 
@@ -1742,7 +2089,7 @@ export default function Show({
     });
 
     // =====================================================
-    // FORM - ADD ABNORMALITY
+    // FORM - ADD ABNORMALITY (tombol Tambah di tabel bawah)
     // =====================================================
 
     const {
@@ -1763,7 +2110,7 @@ export default function Show({
     });
 
     // =====================================================
-    // FORM - EDIT ABNORMALITY
+    // FORM - EDIT ABNORMALITY (dari tabel bawah)
     // =====================================================
 
     const {
@@ -1891,47 +2238,65 @@ export default function Show({
         });
     };
 
-    // =====================================================
-    // CHECKLIST (langsung, tanpa konfirmasi)
-    // kolom: 'status' = Act / centang biasa, 'plan' = Plan
-    // =====================================================
-
-    const toggleChecklist = (item, tanggalLengkap, kolom = 'status') => {
-        const checklist = item.checklists?.find(
-            (c) => String(c.tanggal).substring(0, 10) === tanggalLengkap
+    // Abnormality milik 1 item pada 1 tanggal (kotak tertentu)
+    const abnormalDi = (itemId, tanggalLengkap) =>
+        (checkSheet.abnormalities ?? []).filter(
+            (a) =>
+                Number(a.check_sheet_item_id) === Number(itemId) &&
+                String(a.tanggal).substring(0, 10) === tanggalLengkap
         );
 
-        const statusBaru = checklist ? !checklist[kolom] : true;
+    // Status abnormality di satu kotak: 'open' | 'progress' | 'closed' | null
+    // (open > progress > closed kalau ada lebih dari satu)
+    const statusAbnormal = (itemId, tanggalLengkap) => {
+        const list = abnormalDi(itemId, tanggalLengkap);
 
-        router.post(
-            `/check-sheets/${checkSheet.id}/checklist`,
-            {
-                check_sheet_item_id: item.id,
-                line_id: line?.id ?? null,
-                tanggal: tanggalLengkap,
-                kolom,
-                status: statusBaru,
-            },
-            {
-                preserveScroll: true,
+        if (list.length === 0) {
+            return null;
+        }
+
+        const norm = (v) => {
+            const x = String(v ?? '').trim().toLowerCase();
+
+            if (['close', 'closed', 'selesai', 'done', 'ok', 'finish', 'finished'].includes(x)) {
+                return 'closed';
             }
-        );
+
+            if (['progress', 'in progress', 'on progress', 'proses'].includes(x)) {
+                return 'progress';
+            }
+
+            return 'open';
+        };
+
+        const semua = list.map((a) => norm(a.status));
+
+        if (semua.includes('open')) return 'open';
+        if (semua.includes('progress')) return 'progress';
+
+        return 'closed';
     };
 
     // =====================================================
-    // CATATAN CHECKLIST (mode Plan/Act & biasa)
+    // CATATAN CHECKLIST + ABNORMALITY PER KOTAK
     // =====================================================
 
-    const bukaCatatan = (item, tanggalLengkap, kolom = 'status') => {
+    const bukaCatatan = (item, tanggalLengkap, kolom = 'status', tab = null) => {
         const cl = getChecklist(item, tanggalLengkap);
 
         // Plan punya catatan sendiri (catatan_plan), Act / centang biasa pakai catatan
         const field = kolom === 'plan' ? 'catatan_plan' : 'catatan';
 
+        // ada abnormality & belum ada catatan -> langsung buka tab Abnormality
+        const adaAbn = kolom === 'status' && abnormalDi(item.id, tanggalLengkap).length > 0;
+        const tabAwal =
+            tab ?? (adaAbn && !String(cl?.[field] ?? '').trim() ? 'abnormality' : 'catatan');
+
         setCatatanTarget({
             item,
             tanggal: tanggalLengkap,
             kolom,
+            tab: tabAwal,
             label: item.inspection_point,
             judul:
                 kolom === 'plan'
@@ -1941,6 +2306,20 @@ export default function Show({
                     : 'Catatan Checklist',
         });
         setCatatanText(cl?.[field] ?? '');
+    };
+
+    // KWH: buka modal yang hanya berisi form abnormality
+    const bukaAbnormalityKwh = (item, tanggalLengkap) => {
+        setCatatanTarget({
+            item,
+            tanggal: tanggalLengkap,
+            kolom: 'status',
+            tab: 'abnormality',
+            hanyaAbnormality: true,
+            label: item.inspection_point,
+            judul: 'Abnormality',
+        });
+        setCatatanText('');
     };
 
     const tutupCatatan = () => {
@@ -1978,6 +2357,33 @@ export default function Show({
                 },
                 onError: () =>
                     notify('Catatan gagal disimpan. Periksa kembali isian kamu.', 'error'),
+            }
+        );
+    };
+
+    // =====================================================
+    // CHECKLIST (langsung, tanpa konfirmasi)
+    // kolom: 'status' = Act / centang biasa, 'plan' = Plan
+    // =====================================================
+
+    const toggleChecklist = (item, tanggalLengkap, kolom = 'status') => {
+        const checklist = item.checklists?.find(
+            (c) => String(c.tanggal).substring(0, 10) === tanggalLengkap
+        );
+
+        const statusBaru = checklist ? !checklist[kolom] : true;
+
+        router.post(
+            `/check-sheets/${checkSheet.id}/checklist`,
+            {
+                check_sheet_item_id: item.id,
+                line_id: line?.id ?? null,
+                tanggal: tanggalLengkap,
+                kolom,
+                status: statusBaru,
+            },
+            {
+                preserveScroll: true,
             }
         );
     };
@@ -2300,7 +2706,7 @@ export default function Show({
 
         setEditAbnormalityData({
             preventif_mesin_ids: (abnormality.preventif_mesin_ids ?? []).map(Number),
-            tanggal: abnormality.tanggal,
+            tanggal: String(abnormality.tanggal).substring(0, 10),
             abnormality: abnormality.abnormality,
             countermeasure: abnormality.countermeasure ?? '',
             status: abnormality.status,
@@ -2651,8 +3057,8 @@ export default function Show({
                                 pakaiActual
                                     ? 'Isi Actual dan Catatan harian, Selisih dihitung otomatis.'
                                     : pakaiPlanAct
-                                    ? 'Centang Plan / Act, klik ikon catatan untuk menambah catatan.'
-                                    : 'Kelola titik pemeriksaan, checklist harian, dan catatan.'
+                                    ? 'Centang Plan / Act, klik ikon catatan untuk menambah catatan atau abnormality.'
+                                    : 'Kelola titik pemeriksaan, checklist harian, catatan, dan abnormality.'
                             }
                             count={`${filteredItems.length} item`}
                             action={
@@ -2706,7 +3112,7 @@ export default function Show({
                         {pakaiActual && (
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500 sm:px-5">
                                 <span className="font-bold text-slate-600">
-                                    Tiap tanggal: Act / Sel / Catatan
+                                    Tiap tanggal: Act / Sel / Catatan / Abn
                                 </span>
 
                                 <span>
@@ -2724,6 +3130,11 @@ export default function Show({
                                     <span className="font-bold text-red-600">merah</span> =
                                     ada selisih
                                 </span>
+
+                                <span>
+                                    <span className="font-bold text-red-600">Abn</span> =
+                                    catat abnormality di kotak ini
+                                </span>
                             </div>
                         )}
 
@@ -2732,12 +3143,17 @@ export default function Show({
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500 sm:px-5">
                                 <span className="inline-flex items-center gap-1.5">
                                     <Icon type="note" className="h-3.5 w-3.5 text-slate-400" />
-                                    Klik untuk menambah / melihat catatan
+                                    Klik ikon untuk catatan / abnormality
                                 </span>
 
                                 <span className="inline-flex items-center gap-1.5">
-                                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-                                    Titik merah = sudah ada catatan
+                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                    Dot kuning = ada catatan
+                                </span>
+
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+                                    Dot merah = ada abnormality
                                 </span>
                             </div>
                         )}
@@ -2941,7 +3357,12 @@ export default function Show({
                                                                 tahun
                                                             );
 
-                                                        // ---------- MODE KWH: Actual / Selisih / Catatan ----------
+                                                        const adaAbnormal =
+                                                            abnormalDi(item.id, tanggalLengkap).length > 0;
+
+                                                        const statusAbn = statusAbnormal(item.id, tanggalLengkap);
+
+                                                        // ---------- MODE KWH: Actual / Selisih / Catatan / Abn ----------
                                                         if (pakaiActual) {
                                                             const nilai =
                                                                 nilaiMap[tanggalLengkap];
@@ -2953,6 +3374,15 @@ export default function Show({
                                                                 >
                                                                     <NilaiCell
                                                                         nilai={nilai}
+                                                                        abnormalCount={
+                                                                            abnormalDi(item.id, tanggalLengkap).length
+                                                                        }
+                                                                        onAbnormal={() =>
+                                                                            bukaAbnormalityKwh(
+                                                                                item,
+                                                                                tanggalLengkap
+                                                                            )
+                                                                        }
                                                                         onSave={(payload) =>
                                                                             simpanNilai(
                                                                                 item,
@@ -2966,98 +3396,55 @@ export default function Show({
                                                         }
 
                                                         // ---------- MODE PLAN / ACT: 2 kolom, masing-masing checkbox ----------
+                                                        // ---------- MODE PLAN / ACT: 2 kolom, masing-masing checkbox ----------
                                                         if (pakaiPlanAct) {
-                                                            const cl = getChecklist(
-                                                                item,
-                                                                tanggalLengkap
-                                                            );
+                                                            const cl = getChecklist(item, tanggalLengkap);
                                                             const plan = Boolean(cl?.plan);
                                                             const act = Boolean(cl?.status);
+                                                            const adaCatatanPlan = Boolean(String(cl?.catatan_plan ?? '').trim());
+                                                            const adaCatatanAct = Boolean(String(cl?.catatan ?? '').trim());
 
                                                             return (
-                                                                <React.Fragment
-                                                                    key={tanggalLengkap || idx}
-                                                                >
+                                                                <React.Fragment key={tanggalLengkap || idx}>
                                                                     <td
                                                                         className={`border-b border-l border-slate-100 px-1 py-1.5 text-center transition-colors ${
-                                                                            plan
-                                                                                ? 'bg-blue-50/70'
-                                                                                : ''
+                                                                            plan ? 'bg-blue-50/70' : ''
                                                                         }`}
                                                                     >
                                                                         <div className="flex flex-col items-center gap-1">
                                                                             <CheckBtn
                                                                                 checked={plan}
                                                                                 tone="blue"
-                                                                                title={
-                                                                                    plan
-                                                                                        ? 'Batalkan Plan'
-                                                                                        : 'Tandai Plan'
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    toggleChecklist(
-                                                                                        item,
-                                                                                        tanggalLengkap,
-                                                                                        'plan'
-                                                                                    )
-                                                                                }
+                                                                                catatan={adaCatatanPlan}
+                                                                                title={plan ? 'Batalkan Plan' : 'Tandai Plan'}
+                                                                                onClick={() => toggleChecklist(item, tanggalLengkap, 'plan')}
                                                                             />
 
                                                                             <CatatanBtn
-                                                                                ada={Boolean(
-                                                                                    String(
-                                                                                        cl?.catatan_plan ?? ''
-                                                                                    ).trim()
-                                                                                )}
-                                                                                onClick={() =>
-                                                                                    bukaCatatan(
-                                                                                        item,
-                                                                                        tanggalLengkap,
-                                                                                        'plan'
-                                                                                    )
-                                                                                }
+                                                                                ada={adaCatatanPlan}
+                                                                                onClick={() => bukaCatatan(item, tanggalLengkap, 'plan')}
                                                                             />
                                                                         </div>
                                                                     </td>
 
                                                                     <td
                                                                         className={`border-b border-slate-100 px-1 py-1.5 text-center transition-colors ${
-                                                                            act
-                                                                                ? 'bg-emerald-50/70'
-                                                                                : ''
+                                                                            act ? 'bg-emerald-50/70' : ''
                                                                         }`}
                                                                     >
                                                                         <div className="flex flex-col items-center gap-1">
                                                                             <CheckBtn
                                                                                 checked={act}
                                                                                 tone="emerald"
-                                                                                title={
-                                                                                    act
-                                                                                        ? 'Batalkan Act'
-                                                                                        : 'Tandai Act'
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    toggleChecklist(
-                                                                                        item,
-                                                                                        tanggalLengkap,
-                                                                                        'status'
-                                                                                    )
-                                                                                }
+                                                                                catatan={adaCatatanAct}
+                                                                                abnormality={adaAbnormal}
+                                                                                title={act ? 'Batalkan Act' : 'Tandai Act'}
+                                                                                onClick={() => toggleChecklist(item, tanggalLengkap, 'status')}
                                                                             />
 
                                                                             <CatatanBtn
-                                                                                ada={Boolean(
-                                                                                    String(
-                                                                                        cl?.catatan ?? ''
-                                                                                    ).trim()
-                                                                                )}
-                                                                                onClick={() =>
-                                                                                    bukaCatatan(
-                                                                                        item,
-                                                                                        tanggalLengkap,
-                                                                                        'status'
-                                                                                    )
-                                                                                }
+                                                                                ada={adaCatatanAct}
+                                                                                onClick={() => bukaCatatan(item, tanggalLengkap, 'status')}
                                                                             />
                                                                         </div>
                                                                     </td>
@@ -3066,14 +3453,9 @@ export default function Show({
                                                         }
 
                                                         // ---------- MODE BIASA: centang + catatan ----------
-                                                        const checklist = getChecklist(
-                                                            item,
-                                                            tanggalLengkap
-                                                        );
-
-                                                        const checked = Boolean(
-                                                            checklist?.status
-                                                        );
+                                                        const checklist = getChecklist(item, tanggalLengkap);
+                                                        const checked = Boolean(checklist?.status);
+                                                        const adaCatatan = Boolean(String(checklist?.catatan ?? '').trim());
 
                                                         return (
                                                             <td
@@ -3086,31 +3468,15 @@ export default function Show({
                                                                     <CheckBtn
                                                                         checked={checked}
                                                                         tone="emerald"
-                                                                        title={
-                                                                            checked
-                                                                                ? 'Klik untuk membatalkan'
-                                                                                : 'Klik untuk menandai selesai'
-                                                                        }
-                                                                        onClick={() =>
-                                                                            toggleChecklist(
-                                                                                item,
-                                                                                tanggalLengkap
-                                                                            )
-                                                                        }
+                                                                        catatan={adaCatatan}
+                                                                        abnormality={adaAbnormal}
+                                                                        title={checked ? 'Klik untuk membatalkan' : 'Klik untuk menandai selesai'}
+                                                                        onClick={() => toggleChecklist(item, tanggalLengkap)}
                                                                     />
 
                                                                     <CatatanBtn
-                                                                        ada={Boolean(
-                                                                            String(
-                                                                                checklist?.catatan ?? ''
-                                                                            ).trim()
-                                                                        )}
-                                                                        onClick={() =>
-                                                                            bukaCatatan(
-                                                                                item,
-                                                                                tanggalLengkap
-                                                                            )
-                                                                        }
+                                                                        ada={adaCatatan}
+                                                                        onClick={() => bukaCatatan(item, tanggalLengkap)}
                                                                     />
                                                                 </div>
                                                             </td>
@@ -3171,11 +3537,15 @@ export default function Show({
                         />
 
                         <div className="idx-scroll overflow-x-auto">
-                            <table className="w-full min-w-[800px] border-collapse text-sm">
+                            <table className="w-full min-w-[1000px] border-collapse text-sm">
                                 <thead>
                                     <tr className="bg-slate-50">
                                         <th className={`w-32 text-left ${tableHead}`}>
                                             Tanggal
+                                        </th>
+                                        
+                                        <th className={`min-w-[200px] text-left ${tableHead}`}>
+                                            Item
                                         </th>
 
                                         <th className={`min-w-[220px] text-left ${tableHead}`}>
@@ -3205,7 +3575,7 @@ export default function Show({
                                     checkSheet.abnormalities.length === 0 ? (
                                         <tr>
                                             <td
-                                                colSpan="6"
+                                                colSpan="7"
                                                 className="px-6 py-14 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-sm flex-col items-center">
@@ -3241,6 +3611,34 @@ export default function Show({
                                                             {formatTanggal(abnormality.tanggal)}
                                                         </td>
 
+                                                        <td className="px-3 py-3 align-top">
+                                                            {(() => {
+                                                                const itemAsal =
+                                                                    abnormality.item ??
+                                                                    checkSheet.items?.find(
+                                                                        (i) => Number(i.id) === Number(abnormality.check_sheet_item_id)
+                                                                    );
+
+                                                                if (!itemAsal) {
+                                                                    return (
+                                                                        <span className="text-xs text-slate-300">
+                                                                            {abnormality.check_sheet_item_id ? 'Item dihapus' : 'Umum'}
+                                                                        </span>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <span className="inline-flex max-w-[260px] items-start gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold leading-snug text-slate-700">
+                                                                        <span className="shrink-0 rounded bg-indigo-100 px-1 text-indigo-700">
+                                                                            {itemAsal.shift}
+                                                                            {nomorUrut[itemAsal.id] ?? ''}
+                                                                        </span>
+                                                                        <span>{itemAsal.inspection_point}</span>
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                        </td>
+
                                                         <td className="px-3 py-3 align-top text-sm font-semibold text-slate-800">
                                                             {abnormality.abnormality || '-'}
 
@@ -3269,6 +3667,12 @@ export default function Show({
 
                                                         <td className="px-3 py-3 align-top text-sm leading-5 text-slate-600">
                                                             {abnormality.countermeasure || '-'}
+
+                                                            {(abnormality.catatans ?? []).length > 0 && (
+                                                                <span className="mt-2 block rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-medium leading-snug text-amber-700 ring-1 ring-inset ring-amber-200">
+                                                                    Catatan: {abnormality.catatans[0].catatan}
+                                                                </span>
+                                                            )}
                                                         </td>
 
                                                         <td className="px-3 py-3 text-center align-top">
@@ -3520,7 +3924,7 @@ export default function Show({
                 </Modal>
             )}
 
-            {/* MODAL - CATATAN CHECKLIST */}
+            {/* MODAL - CATATAN CHECKLIST + ABNORMALITY PER KOTAK */}
             <CatatanModal
                 target={catatanTarget}
                 value={catatanText}
@@ -3531,6 +3935,16 @@ export default function Show({
                 namaBulan={namaBulan}
                 bulan={bulan}
                 tahun={tahun}
+                abnormalList={
+                    catatanTarget
+                        ? abnormalDi(catatanTarget.item.id, catatanTarget.tanggal)
+                        : []
+                }
+                checkSheet={checkSheet}
+                line={line}
+                preventifOptions={preventifOptions}
+                notify={notify}
+                confirm={setConfirmDialog}
             />
 
             {/* DIALOG KONFIRMASI (simpan / edit / hapus) */}
