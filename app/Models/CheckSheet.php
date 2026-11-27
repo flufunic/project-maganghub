@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CheckSheet extends Model
 {
@@ -27,6 +28,13 @@ class CheckSheet extends Model
 
     protected static function booted(): void
     {
+        // Kode barcode otomatis & permanen (1 check sheet = 1 mesin = 1 QR)
+        static::creating(function (CheckSheet $cs) {
+            if (empty($cs->kode)) {
+                $cs->kode = static::buatKode();
+            }
+        });
+
         static::deleted(function (CheckSheet $cs) {
             if ($cs->isForceDeleting()) {
                 return;
@@ -51,9 +59,25 @@ class CheckSheet extends Model
 
             $cs->bbmItems()->onlyTrashed()
                 ->where('deleted_at', $cs->deleted_at)->restore();
+
             $cs->lubrications()->onlyTrashed()
                 ->where('deleted_at', $cs->deleted_at)->restore();
         });
+    }
+
+    public static function buatKode(): string
+    {
+        do {
+            $kode = 'CS-' . Str::upper(Str::random(8));
+        } while (static::withTrashed()->where('kode', $kode)->exists());
+
+        return $kode;
+    }
+
+    // replicate() (fitur Salin & command pemecah) tidak boleh ikut menyalin kode
+    public function replicate(?array $except = null)
+    {
+        return parent::replicate(array_merge($except ?? [], ['kode']));
     }
 
     protected function casts(): array
@@ -63,7 +87,7 @@ class CheckSheet extends Model
             'pakai_plan_act'   => 'boolean',
             'pakai_monitoring' => 'boolean',
             'pakai_bbm'        => 'boolean',
-            'bbm_kali_60' => 'boolean',
+            'bbm_kali_60'      => 'boolean',
             'pakai_pelumasan'  => 'boolean',
         ];
     }
@@ -71,6 +95,11 @@ class CheckSheet extends Model
     public function divisi(): BelongsTo
     {
         return $this->belongsTo(Divisi::class);
+    }
+
+    public function line(): BelongsTo
+    {
+        return $this->belongsTo(Line::class);
     }
 
     public function items(): HasMany
@@ -93,10 +122,6 @@ class CheckSheet extends Model
         return $this->hasMany(CheckSheetBbmItem::class);
     }
 
-    public function line()
-    {
-        return $this->belongsTo(Line::class);
-    }
     public function lubrications(): HasMany
     {
         return $this->hasMany(CheckSheetLubrication::class);
@@ -130,7 +155,7 @@ class CheckSheet extends Model
      * Konsumsi solar (Liter) dari running hours (jam).
      * - Generator     : Solar (L/jam)   x jam
      * - Pompa Hydrant : Solar (L/menit) x jam x 60
-    */
+     */
     public function hitungKonsumsiBbm(?float $runningHours, float $solar): ?float
     {
         if ($runningHours === null) {

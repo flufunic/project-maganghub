@@ -20,12 +20,21 @@ const NAVY = '#0a1a4d';
 
 const getOrigin = () => (typeof window !== 'undefined' ? window.location.origin : '');
 
+/* "CHECK SHEET PREDIKTIF MAINTENANCE (...) Eq. Tank material M C Headrest"
+   -> "Checksheet Prediktif Mesin Tank material M C Headrest" */
+const namaPendek = (nama = '') => {
+    const m = nama.match(/\bEq\.?\s*(.+)$/i);
+    if (!m) return nama;
+
+    const prefix = /prediktif/i.test(nama) ? 'Checksheet Prediktif' : 'Checksheet';
+    return `${prefix} Mesin ${m[1].trim()}`;
+};
+
 const card =
     'rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.12)]';
 
 /* ------------------------------------------------------------------
 | QR bergaya: titik bulat + pojok rounded + badge di tengah
-| Ukuran mengikuti parent (h-full w-full), bungkus dengan div ber-ukuran.
 ------------------------------------------------------------------ */
 function StyledQr({ value, label = 'FJI' }) {
     const { n, dots, finders } = useMemo(() => {
@@ -92,7 +101,6 @@ function StyledQr({ value, label = 'FJI' }) {
     );
 }
 
-/* Bingkai pemindai: empat sudut di sekeliling QR */
 function ScanFrame({ children, className = '' }) {
     const corner = 'absolute h-4 w-4 border-blue-500 transition-all duration-300 print:hidden';
     return (
@@ -106,50 +114,67 @@ function ScanFrame({ children, className = '' }) {
     );
 }
 
-export default function Barcodes({ lines = [] }) {
+export default function Barcodes({ sheets = [] }) {
     const [query, setQuery] = useState('');
     const [divisi, setDivisi] = useState('all');
-    const [selected, setSelected] = useState(() => new Set(lines.map((l) => l.id)));
-    const [printOnly, setPrintOnly] = useState(null); // id satu line yang dicetak dari preview
+    const [lineFilter, setLineFilter] = useState('all');
+    const [selected, setSelected] = useState(() => new Set(sheets.map((s) => s.id)));
+    const [printOnly, setPrintOnly] = useState(null);
     const [preview, setPreview] = useState(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [toast, setToast] = useState(null);
     const toastTimer = useRef(null);
     const qrRef = useRef(null);
 
-    const urlOf = (line) => `${getOrigin()}/s/${encodeURIComponent(line.kode)}`;
+    // Barcode = kode check sheet (1 mesin)
+    const urlOf = (sheet) => `${getOrigin()}/s/${encodeURIComponent(sheet.kode)}`;
 
     /* ---------- derived ---------- */
     const divisiCounts = useMemo(() => {
         const map = new Map();
-        lines.forEach((l) => {
-            const nama = l.divisi?.nama_divisi;
+        sheets.forEach((s) => {
+            const nama = s.divisi?.nama_divisi;
             if (nama) map.set(nama, (map.get(nama) ?? 0) + 1);
         });
         return map;
-    }, [lines]);
+    }, [sheets]);
 
     const divisiList = useMemo(() => ['all', ...divisiCounts.keys()], [divisiCounts]);
 
+    // daftar line mengikuti divisi yang dipilih
+    const lineList = useMemo(() => {
+        const set = new Set();
+        sheets.forEach((s) => {
+            if (divisi === 'all' || s.divisi?.nama_divisi === divisi) {
+                if (s.line?.nama_line) set.add(s.line.nama_line);
+            }
+        });
+        return ['all', ...set];
+    }, [sheets, divisi]);
+
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return lines.filter((l) => {
-            const okDivisi = divisi === 'all' || l.divisi?.nama_divisi === divisi;
+        return sheets.filter((s) => {
+            const okDivisi = divisi === 'all' || s.divisi?.nama_divisi === divisi;
+            const okLine = lineFilter === 'all' || s.line?.nama_line === lineFilter;
             const okQuery =
                 !q ||
-                l.nama_line?.toLowerCase().includes(q) ||
-                l.kode?.toLowerCase().includes(q) ||
-                l.divisi?.nama_divisi?.toLowerCase().includes(q);
-            return okDivisi && okQuery;
+                s.nama_checksheet?.toLowerCase().includes(q) ||
+                namaPendek(s.nama_checksheet).toLowerCase().includes(q) ||
+                s.line?.nama_line?.toLowerCase().includes(q) ||
+                s.kode?.toLowerCase().includes(q) ||
+                s.nomor_dokumen?.toLowerCase().includes(q) ||
+                s.divisi?.nama_divisi?.toLowerCase().includes(q);
+            return okDivisi && okLine && okQuery;
         });
-    }, [lines, query, divisi]);
+    }, [sheets, query, divisi, lineFilter]);
 
-    const selectedCount = useMemo(() => lines.filter((l) => selected.has(l.id)).length, [lines, selected]);
-    const allFilteredSelected = filtered.length > 0 && filtered.every((l) => selected.has(l.id));
+    const selectedCount = useMemo(() => sheets.filter((s) => selected.has(s.id)).length, [sheets, selected]);
+    const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.id));
 
     const stats = [
-        { label: 'Total line', value: lines.length, hint: `${divisiCounts.size} divisi`, icon: Layers, bar: 'from-blue-500 to-indigo-600', soft: 'bg-blue-50 text-blue-600' },
-        { label: 'Dipilih untuk cetak', value: selectedCount, hint: `dari ${lines.length} line`, icon: CheckCheck, bar: 'from-emerald-400 to-green-600', soft: 'bg-emerald-50 text-emerald-600' },
+        { label: 'Total mesin', value: sheets.length, hint: `${divisiCounts.size} divisi`, icon: Layers, bar: 'from-blue-500 to-indigo-600', soft: 'bg-blue-50 text-blue-600' },
+        { label: 'Dipilih untuk cetak', value: selectedCount, hint: `dari ${sheets.length} barcode`, icon: CheckCheck, bar: 'from-emerald-400 to-green-600', soft: 'bg-emerald-50 text-emerald-600' },
         { label: 'Sedang ditampilkan', value: filtered.length, hint: divisi === 'all' ? 'Semua divisi' : divisi, icon: QrCode, bar: 'from-violet-500 to-purple-600', soft: 'bg-violet-50 text-violet-600' },
     ];
 
@@ -170,21 +195,26 @@ export default function Barcodes({ lines = [] }) {
     const toggleAllFiltered = () =>
         setSelected((prev) => {
             const next = new Set(prev);
-            if (allFilteredSelected) filtered.forEach((l) => next.delete(l.id));
-            else filtered.forEach((l) => next.add(l.id));
+            if (allFilteredSelected) filtered.forEach((s) => next.delete(s.id));
+            else filtered.forEach((s) => next.add(s.id));
             return next;
         });
 
-    const copyLink = async (line) => {
+    const gantiDivisi = (d) => {
+        setDivisi(d);
+        setLineFilter('all');
+    };
+
+    const copyLink = async (sheet) => {
         try {
-            await navigator.clipboard.writeText(urlOf(line));
-            showToast(`Link ${line.nama_line} disalin`);
+            await navigator.clipboard.writeText(urlOf(sheet));
+            showToast(`Link ${namaPendek(sheet.nama_checksheet)} disalin`);
         } catch {
             showToast('Gagal menyalin link', 'error');
         }
     };
 
-    const downloadSvg = (line) => {
+    const downloadSvg = (sheet) => {
         const svg = qrRef.current?.querySelector('svg');
         if (!svg) return;
         const source = new XMLSerializer().serializeToString(svg);
@@ -192,7 +222,7 @@ export default function Barcodes({ lines = [] }) {
         const href = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = href;
-        a.download = `qr-${line.kode}.svg`;
+        a.download = `qr-${sheet.kode}.svg`;
         a.click();
         URL.revokeObjectURL(href);
         showToast('QR berhasil diunduh');
@@ -200,7 +230,7 @@ export default function Barcodes({ lines = [] }) {
 
     const requestPrint = () => {
         if (selectedCount === 0) {
-            showToast('Pilih minimal satu line untuk dicetak', 'error');
+            showToast('Pilih minimal satu barcode untuk dicetak', 'error');
             return;
         }
         setConfirmOpen(true);
@@ -213,9 +243,8 @@ export default function Barcodes({ lines = [] }) {
         setTimeout(() => window.print(), 250);
     };
 
-    // Cetak satu line saja tanpa mengubah pilihan yang sudah dibuat
-    const printOne = (line) => {
-        setPrintOnly(line.id);
+    const printOne = (sheet) => {
+        setPrintOnly(sheet.id);
         setPreview(null);
         setTimeout(() => window.print(), 250);
     };
@@ -249,7 +278,7 @@ export default function Barcodes({ lines = [] }) {
 
     return (
         <>
-            <Head title="Cetak Barcode Line" />
+            <Head title="Cetak Barcode Mesin" />
 
             <style>{`
                 @keyframes bc-fade { from { opacity: 0 } to { opacity: 1 } }
@@ -301,12 +330,12 @@ export default function Barcodes({ lines = [] }) {
                     />
                 </div>
 
-                {/* ================= HEADER ================= */}
+                {/* HEADER */}
                 <header className="sticky top-0 z-30 bg-gradient-to-r from-[#061033] via-[#0b1d57] to-[#12328a] shadow-lg shadow-slate-950/20 print:hidden">
                     <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
                         <div className="flex min-w-0 items-center gap-3">
                             <Link
-                                href="/check-sheets"
+                                href="/master/divisi"
                                 aria-label="Kembali"
                                 className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
                             >
@@ -314,8 +343,8 @@ export default function Barcodes({ lines = [] }) {
                             </Link>
 
                             <div className="min-w-0">
-                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">Barcode Line</h1>
-                                <p className="truncate text-xs text-blue-200/80">QR permanen untuk check sheet</p>
+                                <h1 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">Barcode Mesin</h1>
+                                <p className="truncate text-xs text-blue-200/80">1 QR permanen untuk tiap check sheet / mesin</p>
                             </div>
                         </div>
 
@@ -337,7 +366,7 @@ export default function Barcodes({ lines = [] }) {
                 </header>
 
                 <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 print:max-w-none print:p-0">
-                    {/* ================= STAT ================= */}
+                    {/* STAT */}
                     <section className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3 print:hidden">
                         {stats.map((s, i) => {
                             const Icon = s.icon;
@@ -367,7 +396,7 @@ export default function Barcodes({ lines = [] }) {
                         })}
                     </section>
 
-                    {/* ================= TOOLBAR ================= */}
+                    {/* TOOLBAR */}
                     <section style={{ animationDelay: '220ms' }} className={`bc-rise mb-5 space-y-4 p-4 sm:p-5 print:hidden ${card}`}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                             <div className="relative flex-1">
@@ -375,7 +404,7 @@ export default function Barcodes({ lines = [] }) {
                                 <input
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
-                                    placeholder="Cari nama line, kode, atau divisi..."
+                                    placeholder="Cari mesin, line, kode, atau divisi..."
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                                 />
                                 {query && (
@@ -401,15 +430,16 @@ export default function Barcodes({ lines = [] }) {
                             </button>
                         </div>
 
+                        {/* filter divisi */}
                         <div className="flex flex-wrap items-center gap-2">
                             {divisiList.map((d) => {
                                 const active = divisi === d;
-                                const jumlah = d === 'all' ? lines.length : divisiCounts.get(d);
+                                const jumlah = d === 'all' ? sheets.length : divisiCounts.get(d);
                                 return (
                                     <button
                                         key={d}
                                         type="button"
-                                        onClick={() => setDivisi(d)}
+                                        onClick={() => gantiDivisi(d)}
                                         className={`inline-flex cursor-pointer items-center gap-2 rounded-full py-1.5 pl-3.5 pr-2 text-xs font-semibold transition-all duration-200 active:scale-95 ${
                                             active
                                                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30'
@@ -428,21 +458,46 @@ export default function Barcodes({ lines = [] }) {
                                 );
                             })}
                         </div>
+
+                        {/* filter line (ikut divisi yang dipilih) */}
+                        {lineList.length > 2 && (
+                            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                                <span className="text-[11px] font-semibold text-slate-400">Line:</span>
+                                {lineList.map((l) => {
+                                    const active = lineFilter === l;
+                                    return (
+                                        <button
+                                            key={l}
+                                            type="button"
+                                            onClick={() => setLineFilter(l)}
+                                            className={`cursor-pointer rounded-lg px-3 py-1 text-xs font-semibold transition active:scale-95 ${
+                                                active
+                                                    ? 'bg-slate-800 text-white'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            {l === 'all' ? 'Semua line' : l}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </section>
 
-                    {/* ================= GRID ================= */}
+                    {/* GRID */}
                     {filtered.length === 0 ? (
                         <div className={`bc-pop flex flex-col items-center px-6 py-16 text-center print:hidden ${card}`}>
                             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                                 <SearchX className="h-8 w-8" />
                             </div>
-                            <p className="text-base font-bold text-slate-800">Line tidak ditemukan</p>
-                            <p className="mt-1 text-sm text-slate-500">Coba kata kunci lain atau ganti filter divisi.</p>
+                            <p className="text-base font-bold text-slate-800">Mesin tidak ditemukan</p>
+                            <p className="mt-1 text-sm text-slate-500">Coba kata kunci lain atau ganti filter.</p>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setQuery('');
                                     setDivisi('all');
+                                    setLineFilter('all');
                                 }}
                                 className="mt-5 cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/30 transition hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                             >
@@ -451,13 +506,13 @@ export default function Barcodes({ lines = [] }) {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3 print:gap-3">
-                            {filtered.map((line, i) => {
-                                const isSel = selected.has(line.id);
-                                const dicetak = printOnly !== null ? printOnly === line.id : isSel;
+                            {filtered.map((sheet, i) => {
+                                const isSel = selected.has(sheet.id);
+                                const dicetak = printOnly !== null ? printOnly === sheet.id : isSel;
 
                                 return (
                                     <article
-                                        key={line.id}
+                                        key={sheet.id}
                                         style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}
                                         className={`bc-rise group relative flex break-inside-avoid flex-col items-center overflow-hidden rounded-2xl border bg-white px-5 pb-4 pt-6 text-center transition duration-300 print:rounded-xl print:border-2 print:border-slate-800 print:shadow-none ${
                                             isSel
@@ -471,10 +526,9 @@ export default function Barcodes({ lines = [] }) {
                                             }`}
                                         />
 
-                                        {/* checkbox */}
                                         <button
                                             type="button"
-                                            onClick={() => toggleOne(line.id)}
+                                            onClick={() => toggleOne(sheet.id)}
                                             aria-label={isSel ? 'Batal pilih' : 'Pilih'}
                                             aria-pressed={isSel}
                                             className={`absolute left-3.5 top-4 flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border-2 transition active:scale-90 print:hidden ${
@@ -486,22 +540,26 @@ export default function Barcodes({ lines = [] }) {
                                             <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
                                         </button>
 
+                                        {/* divisi / line */}
                                         <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600 print:bg-transparent print:px-0 print:text-slate-600">
-                                            {line.divisi?.nama_divisi ?? '-'}
+                                            {sheet.divisi?.nama_divisi ?? '-'} · {sheet.line?.nama_line ?? '-'}
                                         </span>
 
-                                        <h2 className="mb-4 mt-2 text-xl font-extrabold tracking-tight text-slate-900">{line.nama_line}</h2>
+                                        {/* nama mesin = nama check sheet (versi pendek) */}
+                                        <h2 className="mb-4 mt-2 text-lg font-extrabold leading-tight tracking-tight text-slate-900">
+                                            {namaPendek(sheet.nama_checksheet)}
+                                        </h2>
 
                                         <button
                                             type="button"
-                                            onClick={() => setPreview(line)}
-                                            aria-label={`Perbesar QR ${line.nama_line}`}
+                                            onClick={() => setPreview(sheet)}
+                                            aria-label={`Perbesar QR ${namaPendek(sheet.nama_checksheet)}`}
                                             className="group/qr relative cursor-zoom-in rounded-2xl bg-slate-50 p-4 transition duration-300 group-hover:scale-[1.03] print:cursor-auto print:bg-transparent print:p-1"
                                         >
                                             <ScanFrame>
                                                 <div className="rounded-xl bg-white p-2.5 shadow-sm print:p-0 print:shadow-none">
                                                     <div className="h-[160px] w-[160px]">
-                                                        <StyledQr value={urlOf(line)} />
+                                                        <StyledQr value={urlOf(sheet)} />
                                                     </div>
                                                 </div>
                                             </ScanFrame>
@@ -512,13 +570,13 @@ export default function Barcodes({ lines = [] }) {
                                         </button>
 
                                         <p className="mt-3.5 rounded-md bg-slate-100 px-2.5 py-1 font-mono text-[11px] text-slate-500 print:bg-transparent">
-                                            {line.kode}
+                                            {sheet.kode}
                                         </p>
 
                                         <div className="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-slate-100 pt-3 print:hidden">
                                             <button
                                                 type="button"
-                                                onClick={() => copyLink(line)}
+                                                onClick={() => copyLink(sheet)}
                                                 className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-blue-50 hover:text-blue-700 active:scale-95"
                                             >
                                                 <Copy className="h-3.5 w-3.5" /> Salin link
@@ -526,7 +584,7 @@ export default function Barcodes({ lines = [] }) {
                                             <span className="h-4 w-px bg-slate-200" />
                                             <button
                                                 type="button"
-                                                onClick={() => setPreview(line)}
+                                                onClick={() => setPreview(sheet)}
                                                 className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-blue-50 hover:text-blue-700 active:scale-95"
                                             >
                                                 <Maximize2 className="h-3.5 w-3.5" /> Perbesar
@@ -539,7 +597,7 @@ export default function Barcodes({ lines = [] }) {
                     )}
                 </main>
 
-                {/* ================= PREVIEW MODAL ================= */}
+                {/* PREVIEW MODAL */}
                 {preview && (
                     <div
                         className="bc-fade fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/55 backdrop-blur-sm sm:items-center sm:p-4 print:hidden"
@@ -561,8 +619,12 @@ export default function Barcodes({ lines = [] }) {
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
-                                <p className="relative text-xs font-semibold text-blue-200">{preview.divisi?.nama_divisi ?? '-'}</p>
-                                <h3 className="relative mt-1 text-2xl font-extrabold tracking-tight">{preview.nama_line}</h3>
+                                <p className="relative text-xs font-semibold text-blue-200">
+                                    {preview.divisi?.nama_divisi ?? '-'} · {preview.line?.nama_line ?? '-'}
+                                </p>
+                                <h3 className="relative mt-1 pr-10 text-xl font-extrabold leading-tight tracking-tight">
+                                    {namaPendek(preview.nama_checksheet)}
+                                </h3>
                             </div>
 
                             <div className="-mt-11 px-6 pb-6">
@@ -610,7 +672,7 @@ export default function Barcodes({ lines = [] }) {
                     </div>
                 )}
 
-                {/* ================= CONFIRM PRINT MODAL ================= */}
+                {/* CONFIRM PRINT MODAL */}
                 {confirmOpen && (
                     <div
                         className="bc-fade fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center sm:p-4 print:hidden"
@@ -633,7 +695,7 @@ export default function Barcodes({ lines = [] }) {
                                     Cetak barcode?
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                                    <b className="text-slate-800">{selectedCount} barcode line</b> akan dicetak. Pastikan printer sudah siap dan
+                                    <b className="text-slate-800">{selectedCount} barcode mesin</b> akan dicetak. Pastikan printer sudah siap dan
                                     ukuran kertas sesuai.
                                 </p>
                             </div>
@@ -659,7 +721,7 @@ export default function Barcodes({ lines = [] }) {
                     </div>
                 )}
 
-                {/* ================= TOAST ================= */}
+                {/* TOAST */}
                 {toast && (
                     <div
                         key={toast.id}

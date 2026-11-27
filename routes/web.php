@@ -354,6 +354,9 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
         'unlock',
     ])->name('check-sheets.unlock');
 
+    Route::post('/check-sheets/salin-line', [CheckSheetController::class, 'salinLine'])
+    ->name('check-sheets.salin-line');
+
     // Monitoring Running Hours
     Route::prefix('check-sheets/{checkSheet}')->group(function () {
 

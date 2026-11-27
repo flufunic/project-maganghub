@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CheckSheet;
 use App\Models\Divisi;
 use App\Models\Line;
 use Illuminate\Http\Request;
@@ -17,24 +18,26 @@ class DivisiController extends Controller
         return Inertia::render('Divisi/Index', [
             'divisis' => Divisi::orderBy('nama_divisi')->get(),
             'lines'   => Line::orderBy('divisi_id')->orderBy('id')->get(),
+
+            // check sheet = 1 mesin, menempel ke 1 line
+            'checkSheets' => CheckSheet::orderBy('line_id')
+                ->orderBy('id')
+                ->get(['id', 'divisi_id', 'line_id', 'kode', 'nomor_dokumen', 'nama_checksheet']),
         ]);
     }
 
     /**
-     * Tambah divisi + daftar line/mesinnya sekaligus.
-     *
-     * per_mesin = true  -> tiap line = 1 mesin, punya check sheet sendiri (Utility / Saidan)
-     * per_mesin = false -> check sheet dipakai bersama semua line di divisi (Headrest)
+     * Tambah divisi + daftar line-nya sekaligus.
+     * Check sheet (mesin) dibuat per line setelah divisi tersimpan.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'nama_divisi' => ['required', 'string', 'max:100', 'unique:divisis,nama_divisi'],
-            'per_mesin'   => ['required', 'boolean'],
             'daftar_line' => ['required', 'string'],
         ], [
             'nama_divisi.unique'   => 'Nama divisi sudah dipakai.',
-            'daftar_line.required' => 'Isi minimal satu nama line / mesin.',
+            'daftar_line.required' => 'Isi minimal satu nama line.',
         ]);
 
         // satu baris textarea = satu line
@@ -46,7 +49,7 @@ class DivisiController extends Controller
 
         if ($namaLines->isEmpty()) {
             throw ValidationException::withMessages([
-                'daftar_line' => 'Isi minimal satu nama line / mesin.',
+                'daftar_line' => 'Isi minimal satu nama line.',
             ]);
         }
 
@@ -56,11 +59,11 @@ class DivisiController extends Controller
             $divisi->save();
 
             foreach ($namaLines as $nama) {
-                $this->simpanLine($divisi, $nama, (bool) $validated['per_mesin']);
+                $this->simpanLine($divisi, $nama);
             }
         });
 
-        return back()->with('success', 'Divisi berhasil ditambahkan beserta barcode line-nya.');
+        return back()->with('success', 'Divisi berhasil ditambahkan. Sekarang tambahkan check sheet (mesin) di tiap line.');
     }
 
     public function update(Request $request, Divisi $divisi)
@@ -71,7 +74,6 @@ class DivisiController extends Controller
             'nama_divisi.unique' => 'Nama divisi sudah dipakai.',
         ]);
 
-        // kode barcode TIDAK diubah, supaya QR yang sudah tercetak tetap berlaku
         $divisi->nama_divisi = trim($validated['nama_divisi']);
         $divisi->save();
 
@@ -119,10 +121,7 @@ class DivisiController extends Controller
             ]);
         }
 
-        // mengikuti tipe divisi: kalau line pertama per_mesin, yang baru juga per_mesin
-        $perMesin = (bool) Line::where('divisi_id', $divisi->id)->value('per_mesin');
-
-        $this->simpanLine($divisi, $nama, $perMesin);
+        $this->simpanLine($divisi, $nama);
 
         return back()->with('success', 'Line berhasil ditambahkan.');
     }
@@ -136,7 +135,7 @@ class DivisiController extends Controller
 
         if ($dipakai) {
             throw ValidationException::withMessages([
-                'hapus' => 'Line sudah punya check sheet / data isian, tidak bisa dihapus.',
+                'hapus' => 'Line masih punya check sheet / data isian, tidak bisa dihapus.',
             ]);
         }
 
@@ -147,19 +146,21 @@ class DivisiController extends Controller
 
     // ---------------- HELPER ----------------
 
-    private function simpanLine(Divisi $divisi, string $nama, bool $perMesin): Line
+    // Semua line sekarang per mesin: tiap check sheet menempel ke 1 line
+    private function simpanLine(Divisi $divisi, string $nama): Line
     {
         $line = new Line();
         $line->divisi_id = $divisi->id;
         $line->nama_line = $nama;
-        $line->per_mesin = $perMesin;
+        $line->per_mesin = true;
         $line->kode      = $this->buatKode($divisi->nama_divisi, $nama);
         $line->save();
 
         return $line;
     }
 
-    // Kode unik & huruf besar, contoh: "PACKING-MESIN-1"
+    // Kode line unik & huruf besar, contoh: "SEWING-D14N"
+    // (barcode yang dicetak sekarang memakai kode check sheet, bukan kode line)
     private function buatKode(string $divisi, string $nama): string
     {
         $dasar = Str::upper(Str::slug($divisi . ' ' . $nama, '-'));

@@ -22,8 +22,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  *
  * Yang diimpor : nama equipment, nomor dokumen, tgl terbit/revisi, revisi,
  *                disetujui/diperiksa/dibuat, daftar Inspection Point + Standar.
- * Tidak diimpor: centang W1-W4, kondisi terakhir, keterangan, dan baris log
- *                abnormality di bagian bawah (dilaporkan jumlahnya saja).
+ *                Kolom Standar boleh bernama "Standar", "Standard" atau
+ *                "Condition" (lihat ALIAS_STANDAR) -> semuanya masuk ke field `standar`.
+ * Tidak diimpor: centang W1-W4, kondisi terakhir (OK/NG), keterangan, dan baris
+ *                log abnormality di bagian bawah (dilaporkan jumlahnya saja).
  */
 class PreventifChecksheetImporter
 {
@@ -33,6 +35,14 @@ class PreventifChecksheetImporter
     private const BATAS_TABEL = ['INSPECT BY', 'APPROVED', 'DATE', 'ABNORMALITY'];
 
     private const LABEL_AKSI = ['PERIKSA', 'BERSIHKAN', 'LUBRIKASI', 'GANTI', 'PERBAIKI'];
+
+    // Nama header yang dianggap kolom "Inspection Point".
+    private const ALIAS_INSPECTION = ['INSPECTION POINT', 'INSPECTION POINTS'];
+
+    // Nama header yang dianggap kolom "Standar". Urutan = prioritas:
+    // kalau satu sheet punya lebih dari satu, yang paling atas dipakai.
+    // Sengaja TIDAK ada 'KONDISI' / 'KONDISI TERAKHIR' karena itu kolom hasil OK/NG.
+    private const ALIAS_STANDAR = ['STANDAR', 'STANDARD', 'KONDISI STANDAR', 'CONDITION'];
 
     public function import(string $path, string $divisi): array
     {
@@ -92,10 +102,15 @@ class PreventifChecksheetImporter
             return $laporan;
         }
 
-        [$barisHeader, $kolNo, $kolInsp, $kolStd] = $header;
+        [$barisHeader, $kolNo, $kolInsp, $kolStd, $labelStd] = $header;
+
+        if ($kolStd === null) {
+            $laporan['catatan'][] = 'Kolom Standar / Condition tidak ditemukan, standar dikosongkan.';
+        } elseif ($labelStd !== 'STANDAR') {
+            $laporan['catatan'][] = 'Kolom standar dibaca dari header "' . $labelStd . '".';
+        }
 
         $items = [];
-        $barisLog = null;
 
         foreach ($this->urutBaris($grid, $barisHeader + 1) as $r) {
             if ($this->barisBerisi($grid[$r], self::BATAS_TABEL)) {
@@ -117,7 +132,9 @@ class PreventifChecksheetImporter
             $items[] = [
                 'no' => is_numeric($nomor) ? (int) $nomor : null,
                 'inspection_point' => trim((string) $teks),
-                'standar' => $kolStd ? trim((string) ($grid[$r][$kolStd] ?? '')) ?: null : null,
+                'standar' => $kolStd !== null
+                    ? (trim((string) ($grid[$r][$kolStd] ?? '')) ?: null)
+                    : null,
             ];
         }
 
@@ -284,26 +301,36 @@ class PreventifChecksheetImporter
         return false;
     }
 
-    /** @return array{0:int,1:int,2:int,3:?int}|null  [baris, kolNo, kolInspection, kolStandar] */
+    /**
+     * Cari baris header tabel.
+     * Kolom Standar dikenali lewat ALIAS_STANDAR ("Standar", "Standard", "Condition", dst).
+     *
+     * @return array{0:int,1:int,2:int,3:?int,4:?string}|null
+     *         [baris, kolNo, kolInspection, kolStandar, labelStandarYangDipakai]
+     */
     private function cariHeaderTabel(array $grid): ?array
     {
         foreach ($grid as $r => $cols) {
-            $kolNo = $kolInsp = $kolStd = null;
+            $kolNo = $kolInsp = null;
+            $kandidatStd = []; // [prioritas => [kolom, label]]
 
             foreach ($cols as $c => $v) {
                 $k = $this->kunci($v);
 
                 if ($k === 'NO') {
                     $kolNo ??= $c;
-                } elseif ($k === 'INSPECTION POINT') {
+                } elseif (in_array($k, self::ALIAS_INSPECTION, true)) {
                     $kolInsp = $c;
-                } elseif ($k === 'STANDAR') {
-                    $kolStd = $c;
+                } elseif (($p = array_search($k, self::ALIAS_STANDAR, true)) !== false) {
+                    $kandidatStd[$p] ??= [$c, $k];
                 }
             }
 
             if ($kolInsp !== null) {
-                return [$r, $kolNo ?? 0, $kolInsp, $kolStd];
+                ksort($kandidatStd);
+                [$kolStd, $labelStd] = $kandidatStd ? reset($kandidatStd) : [null, null];
+
+                return [$r, $kolNo ?? 0, $kolInsp, $kolStd, $labelStd];
             }
         }
 
