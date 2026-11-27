@@ -2248,6 +2248,26 @@ export default function Show({
 
     // Status abnormality di satu kotak: 'open' | 'progress' | 'closed' | null
     // (open > progress > closed kalau ada lebih dari satu)
+        // Normalisasi status abnormality: 'open' | 'progress' | 'closed'
+    const normStatus = (v) => {
+        const x = String(v ?? '').trim().toLowerCase();
+
+        if (['close', 'closed', 'selesai', 'done', 'ok', 'finish', 'finished'].includes(x)) {
+            return 'closed';
+        }
+
+        if (['progress', 'in progress', 'on progress', 'proses'].includes(x)) {
+            return 'progress';
+        }
+
+        return 'open';
+    };
+
+    // Abnormality yang BELUM Closed di satu kotak (yang Closed sudah ada di riwayat)
+    const abnormalAktifDi = (itemId, tanggalLengkap) =>
+        abnormalDi(itemId, tanggalLengkap).filter((a) => normStatus(a.status) !== 'closed');
+
+    // Status abnormality di satu kotak: 'open' | 'progress' | 'closed' | null
     const statusAbnormal = (itemId, tanggalLengkap) => {
         const list = abnormalDi(itemId, tanggalLengkap);
 
@@ -2255,21 +2275,7 @@ export default function Show({
             return null;
         }
 
-        const norm = (v) => {
-            const x = String(v ?? '').trim().toLowerCase();
-
-            if (['close', 'closed', 'selesai', 'done', 'ok', 'finish', 'finished'].includes(x)) {
-                return 'closed';
-            }
-
-            if (['progress', 'in progress', 'on progress', 'proses'].includes(x)) {
-                return 'progress';
-            }
-
-            return 'open';
-        };
-
-        const semua = list.map((a) => norm(a.status));
+        const semua = list.map((a) => normStatus(a.status));
 
         if (semua.includes('open')) return 'open';
         if (semua.includes('progress')) return 'progress';
@@ -2288,7 +2294,7 @@ export default function Show({
         const field = kolom === 'plan' ? 'catatan_plan' : 'catatan';
 
         // ada abnormality & belum ada catatan -> langsung buka tab Abnormality
-        const adaAbn = kolom === 'status' && abnormalDi(item.id, tanggalLengkap).length > 0;
+        const adaAbn = kolom === 'status' && abnormalAktifDi(item.id, tanggalLengkap).length > 0;
         const tabAwal =
             tab ?? (adaAbn && !String(cl?.[field] ?? '').trim() ? 'abnormality' : 'catatan');
 
@@ -3357,10 +3363,11 @@ export default function Show({
                                                                 tahun
                                                             );
 
-                                                        const adaAbnormal =
-                                                            abnormalDi(item.id, tanggalLengkap).length > 0;
-
                                                         const statusAbn = statusAbnormal(item.id, tanggalLengkap);
+
+                                                        // titik merah hanya untuk abnormality yang belum Closed
+                                                        const adaAbnormal =
+                                                            statusAbn === 'open' || statusAbn === 'progress';
 
                                                         // ---------- MODE KWH: Actual / Selisih / Catatan / Abn ----------
                                                         if (pakaiActual) {
@@ -3375,7 +3382,7 @@ export default function Show({
                                                                     <NilaiCell
                                                                         nilai={nilai}
                                                                         abnormalCount={
-                                                                            abnormalDi(item.id, tanggalLengkap).length
+                                                                            abnormalAktifDi(item.id, tanggalLengkap).length
                                                                         }
                                                                         onAbnormal={() =>
                                                                             bukaAbnormalityKwh(

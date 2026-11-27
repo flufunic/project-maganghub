@@ -144,7 +144,8 @@ Route::middleware(['auth', 'role:admin,pimpinan'])->group(function () {
             Route::delete('/records/{record}', 'destroyRecord')->name('records.destroy');
             Route::post('/records/{record}/aksi', 'setAksi')->name('records.aksi');
             Route::put('/records/{record}/hasil', 'updateHasil')->name('records.hasil');
-
+            Route::post('/records/{record}/status-tanggal', 'setStatusTanggal')->name('records.status-tanggal');
+            
             Route::get('/{preventifChecksheet}', 'show')->name('show');
             Route::get('/{preventifChecksheet}/export-bulan', 'exportBulan')->name('export-bulan');
             Route::put('/{preventifChecksheet}', 'update')->name('update');

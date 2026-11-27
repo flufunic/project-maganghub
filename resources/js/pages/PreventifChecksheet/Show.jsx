@@ -111,6 +111,12 @@ const IconBack = () => (
     </Svg>
 );
 
+const IconCheck = () => (
+    <Svg>
+        <path d="M5 12l4 4L19 6" />
+    </Svg>
+);
+
 const TONE = {
     blue: 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white',
     slate: 'bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white',
@@ -136,9 +142,45 @@ function IconBtn({ title, tone = 'blue', onClick, href, children }) {
 }
 
 /* ------------------------------------------------------------------
+| Radio Kondisi OK / NG. Klik lagi pada pilihan aktif = kosongkan.
+------------------------------------------------------------------ */
+function KondisiRadio({ name, value, disabled, onPilih }) {
+    return (
+        <div className="flex items-center justify-center gap-1.5">
+            {['OK', 'NG'].map((v) => {
+                const aktif = value === v;
+
+                return (
+                    <label
+                        key={v}
+                        className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-bold transition ${
+                            aktif
+                                ? KONDISI_STYLE[v]
+                                : 'border-slate-200 bg-white text-slate-400 hover:border-blue-300'
+                        } ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                    >
+                        <input
+                            type="radio"
+                            name={name}
+                            value={v}
+                            checked={aktif}
+                            disabled={disabled}
+                            onChange={() => {}}
+                            onClick={() => onPilih(aktif ? '' : v)}
+                            className="h-3 w-3 cursor-pointer accent-current"
+                        />
+                        {v}
+                    </label>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------
 | Header form:
-| - Hari/tanggal  : otomatis dari abnormality
-| - PIC pelaksana : otomatis dari PIC abnormality (selalu mengikuti)
+| - Hari/tanggal  : otomatis dari tanggal abnormality yang dipilih
+| - PIC pelaksana : otomatis dari PIC abnormality
 | - Line          : diisi manual, tersimpan saat selesai mengetik
 ------------------------------------------------------------------ */
 function RecordHeader({ record, auto }) {
@@ -190,18 +232,18 @@ function RecordHeader({ record, auto }) {
     );
 }
 
-/* Keterangan: tersimpan saat kehilangan fokus */
-function KeteranganInput({ recordId, itemId, value }) {
+/* Keterangan (per tanggal): tersimpan saat kehilangan fokus */
+function KeteranganInput({ recordId, itemId, tanggal, value }) {
     const [text, setText] = useState(value ?? '');
 
     useEffect(() => setText(value ?? ''), [value]);
 
     const simpan = () => {
-        if ((value ?? '') === text) return;
+        if (!tanggal || (value ?? '') === text) return;
 
         router.put(
             `${BASE}/records/${recordId}/hasil`,
-            { item_id: itemId, keterangan: text },
+            { item_id: itemId, tanggal, keterangan: text },
             { preserveScroll: true, preserveState: true, only: ['results'] }
         );
     };
@@ -209,10 +251,11 @@ function KeteranganInput({ recordId, itemId, value }) {
     return (
         <input
             value={text}
+            disabled={!tanggal}
             onChange={(e) => setText(e.target.value)}
             onBlur={simpan}
             placeholder="Keterangan"
-            className="w-full min-w-[160px] rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-xs text-slate-700 outline-none transition hover:border-slate-200 focus:border-blue-400 focus:bg-white"
+            className="w-full min-w-[160px] rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-xs text-slate-700 outline-none transition hover:border-slate-200 focus:border-blue-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-40"
         />
     );
 }
@@ -558,9 +601,9 @@ function Riwayat({ checksheetId, riwayat, bulan, tahun, onLihat, onHapus, onImpo
 
 /* ------------------------------------------------------------------
 | Kartu abnormality: satu kartu = satu abnormality dari Check Sheet Prediktif.
-| Status otomatis dari Kondisi OK / NG di tabel; countermeasure & PIC tersimpan otomatis.
+| Status diubah lewat tombol Closed per tanggal; countermeasure & PIC tersimpan otomatis.
 ------------------------------------------------------------------ */
-function AbnormalityCard({ checksheetId, a, highlight }) {
+function AbnormalityCard({ checksheetId, a, highlight, aktif }) {
     const ambil = () => ({ countermeasure: a.countermeasure ?? '', pic: a.pic ?? '' });
 
     const [form, setForm] = useState(ambil);
@@ -582,8 +625,7 @@ function AbnormalityCard({ checksheetId, a, highlight }) {
         router.put(`${BASE}/${checksheetId}/abnormalities/${a.id}`, form, {
             preserveScroll: true,
             preserveState: true,
-            // headerOtomatis + records ikut dimuat ulang supaya PIC pelaksana langsung mengikuti
-            only: ['abnormalities', 'headerOtomatis', 'records', 'riwayat', 'flash'],
+            only: ['abnormalities', 'tanggalList', 'headerOtomatis', 'records', 'riwayat', 'flash'],
         });
     };
 
@@ -596,6 +638,7 @@ function AbnormalityCard({ checksheetId, a, highlight }) {
             {
                 preserveScroll: true,
                 preserveState: true,
+                only: ['abnormalities', 'tanggalList', 'flash'],
                 onSuccess: () => setCatatan(''),
             }
         );
@@ -605,7 +648,11 @@ function AbnormalityCard({ checksheetId, a, highlight }) {
         <div
             id={`abn-${a.id}`}
             className={`rounded-2xl border p-4 transition-shadow ${
-                highlight ? 'border-amber-300 bg-amber-50/60 ring-4 ring-amber-200/60' : 'border-slate-200 bg-white'
+                highlight
+                    ? 'border-amber-300 bg-amber-50/60 ring-4 ring-amber-200/60'
+                    : aktif
+                      ? 'border-blue-300 bg-white ring-2 ring-blue-100'
+                      : 'border-slate-200 bg-white'
             }`}
         >
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -625,7 +672,7 @@ function AbnormalityCard({ checksheetId, a, highlight }) {
                 </div>
 
                 <span
-                    title="Otomatis dari Kondisi OK / NG"
+                    title="Ubah lewat tombol Closed pada tanggal abnormality"
                     className={`rounded-full border px-3 py-1 text-[11px] font-bold ${STATUS_STYLE[a.status]}`}
                 >
                     {a.status}
@@ -701,6 +748,8 @@ export default function Show({
     aksi = EMPTY,
     headerOtomatis = null,
     abnormalities = [],
+    tanggalList = [],
+    tanggalAktif = null,
     riwayat = [],
     highlightAbnormality = null,
     flash = {},
@@ -752,14 +801,18 @@ export default function Show({
     const tanggalStr = (d) => `${tahun}-${String(bulan).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const akhirPekan = (d) => [0, 6].includes(new Date(tahun, bulan - 1, d).getDay());
 
-    // tanggal abnormality ditandai kuning di tabel
-    const tanggalAbnormality = new Set(abnormalities.map((a) => a.tanggal));
-    const adaAbn = (d) => tanggalAbnormality.has(tanggalStr(d));
+    // status abnormality per tanggal: { '2026-11-01': 'Open' | 'Progress' | 'Closed' }
+    const statusPerTanggal = Object.fromEntries(tanggalList.map((t) => [t.tanggal, t.status]));
+    const statusTgl = (d) => statusPerTanggal[tanggalStr(d)] ?? null;
 
-    // salinan lokal supaya dropdown langsung berubah tanpa menunggu server
+    const tanggalAktifInfo = tanggalList.find((t) => t.tanggal === tanggalAktif) ?? null;
+
+    // salinan lokal supaya dropdown / radio langsung berubah tanpa menunggu server
     const [aksiLokal, setAksiLokal] = useState(aksi);
+    const [kondisiLokal, setKondisiLokal] = useState(results);
 
     useEffect(() => setAksiLokal(aksi), [aksi]);
+    useEffect(() => setKondisiLokal(results), [results]);
 
     const pilihAksi = (item, d, nilai) => {
         const kunci = `${item.id}-${tanggalStr(d)}`;
@@ -785,17 +838,59 @@ export default function Show({
         );
     };
 
-    // Kondisi OK / NG -> status abnormality ikut berubah otomatis
-    const pilihKondisi = (item, nilai) =>
+    // Kondisi OK / NG hanya untuk tanggal abnormality yang dipilih (tidak mengubah status)
+    const pilihKondisi = (item, nilai) => {
+        if (!tanggalAktif) return;
+
+        setKondisiLokal((cur) => ({
+            ...cur,
+            [`i${item.id}`]: { ...(cur?.[`i${item.id}`] ?? {}), kondisi: nilai || null },
+        }));
+
         router.put(
             `${BASE}/records/${record.id}/hasil`,
-            { item_id: item.id, kondisi: nilai || null },
+            { item_id: item.id, tanggal: tanggalAktif, kondisi: nilai || null },
             {
                 preserveScroll: true,
                 preserveState: true,
-                only: ['results', 'abnormalities', 'riwayat', 'flash'],
+                only: ['results', 'riwayat', 'flash'],
+                onError: () => router.reload({ only: ['results'] }),
             }
         );
+    };
+
+    // Tombol Closed / Buka lagi untuk tanggal aktif
+    const ubahStatusTanggal = (closed) => {
+        const nilai = Object.values(kondisiLokal ?? {});
+        const jumlahNg = nilai.filter((v) => v?.kondisi === 'NG').length;
+        const belumIsi = checksheet.items.length - nilai.filter((v) => v?.kondisi).length;
+
+        let peringatan = '';
+
+        if (closed && jumlahNg > 0) {
+            peringatan = ` Masih ada ${jumlahNg} inspection point berkondisi NG.`;
+        } else if (closed && belumIsi > 0) {
+            peringatan = ` Masih ada ${belumIsi} inspection point yang Kondisinya belum diisi.`;
+        }
+
+        setConfirm({
+            title: closed ? 'Tandai Closed?' : 'Buka lagi abnormality?',
+            message: closed
+                ? `Semua abnormality tanggal ${tanggalAktifInfo?.tanggal_format} akan ditutup (Closed).${peringatan} Lanjutkan?`
+                : `Abnormality tanggal ${tanggalAktifInfo?.tanggal_format} akan dibuka kembali. Lanjutkan?`,
+            confirmLabel: closed ? 'Ya, Closed' : 'Ya, Buka Lagi',
+            onConfirm: () =>
+                router.post(
+                    `${BASE}/records/${record.id}/status-tanggal`,
+                    { tanggal: tanggalAktif, closed },
+                    {
+                        preserveScroll: true,
+                        preserveState: true,
+                        only: ['abnormalities', 'tanggalList', 'headerOtomatis', 'records', 'riwayat', 'flash'],
+                    }
+                ),
+        });
+    };
 
     const hapusItem = (item) =>
         setConfirm({
@@ -889,8 +984,74 @@ export default function Show({
                             </select>
                         </div>
 
-                        {record && <RecordHeader key={record.id} record={record} auto={headerOtomatis} />}
+                        {record && <RecordHeader key={`${record.id}-${tanggalAktif}`} record={record} auto={headerOtomatis} />}
                     </section>
+
+                    {/* PILIH TANGGAL ABNORMALITY + TOMBOL CLOSED */}
+                    {checksheet.preventif_mesin_id && (
+                        <section className={`${card} px-5 py-4`}>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="text-sm font-bold text-slate-900">Tanggal Abnormality</h2>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Kondisi OK / NG dan Keterangan di tabel berlaku untuk tanggal yang dipilih. Tiap
+                                        tanggal punya isian dan tombol Closed sendiri.
+                                    </p>
+                                </div>
+
+                                {tanggalAktifInfo && (
+                                    <div className="flex items-center gap-2">
+                                        {tanggalAktifInfo.status === 'Closed' ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => ubahStatusTanggal(false)}
+                                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                                            >
+                                                Buka lagi
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => ubahStatusTanggal(true)}
+                                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 transition hover:bg-emerald-700"
+                                            >
+                                                <IconCheck />
+                                                Tandai Closed · {tanggalAktifInfo.tanggal_format}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {tanggalList.length === 0 && (
+                                    <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                                        Belum ada abnormality pada {BULAN[bulan - 1]} {tahun}.
+                                    </p>
+                                )}
+
+                                {tanggalList.map((t) => {
+                                    const dipilih = t.tanggal === tanggalAktif;
+
+                                    return (
+                                        <button
+                                            key={t.tanggal}
+                                            type="button"
+                                            onClick={() => ganti({ tanggal: t.tanggal })}
+                                            className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                                                STATUS_STYLE[t.status]
+                                            } ${dipilih ? 'ring-4 ring-blue-200' : 'opacity-80 hover:opacity-100'}`}
+                                        >
+                                            {t.tanggal_format}
+                                            <span className="rounded-md bg-white/70 px-1.5 py-0.5 text-[10px] font-bold">
+                                                {t.status} · {t.jumlah}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
 
                     {/* TABEL INSPECTION POINT */}
                     <section className={`overflow-hidden ${card}`}>
@@ -902,8 +1063,8 @@ export default function Show({
                                     </span>
                                 ))}
                                 <span className="text-slate-500">
-                                    Kolom kuning = tanggal abnormality. Isi semua baris di kolom itu, lalu pilih Kondisi
-                                    OK / NG.
+                                    Kolom kuning = abnormality belum Closed, hijau = sudah Closed. Klik header tanggal
+                                    untuk memilih, lalu isi Kondisi OK / NG.
                                 </span>
                             </div>
                             <button
@@ -925,7 +1086,14 @@ export default function Show({
                                         <th colSpan={jumlahHari} className="border-b border-white/10 px-3 py-2">
                                             ACTION · {BULAN[bulan - 1]} {tahun}
                                         </th>
-                                        <th rowSpan={3} className="border-b border-l border-r border-white/10 px-3 py-2">Kondisi</th>
+                                        <th rowSpan={3} className="min-w-[130px] border-b border-l border-r border-white/10 px-3 py-2">
+                                            Kondisi
+                                            {tanggalAktifInfo && (
+                                                <span className="mt-0.5 block text-[10px] font-medium text-blue-200">
+                                                    {tanggalAktifInfo.tanggal_format}
+                                                </span>
+                                            )}
+                                        </th>
                                         <th rowSpan={3} className="min-w-[180px] border-b border-r border-white/10 px-3 py-2 text-left">Keterangan</th>
                                         <th rowSpan={3} className="border-b border-white/10 px-3 py-2" />
                                     </tr>
@@ -937,20 +1105,31 @@ export default function Show({
                                         ))}
                                     </tr>
                                     <tr className="bg-[#0b1a4d] text-[11px] font-semibold">
-                                        {hari.map((d) => (
-                                            <th
-                                                key={d}
-                                                className={`min-w-[92px] border-b border-r border-white/10 px-2 py-2 ${
-                                                    adaAbn(d)
-                                                        ? 'bg-amber-500 text-white'
-                                                        : akhirPekan(d)
-                                                          ? 'bg-[#2a1f4d] text-rose-200'
-                                                          : 'text-white/90'
-                                                }`}
-                                            >
-                                                {d}
-                                            </th>
-                                        ))}
+                                        {hari.map((d) => {
+                                            const st = statusTgl(d);
+                                            const dipilih = tanggalStr(d) === tanggalAktif;
+
+                                            return (
+                                                <th
+                                                    key={d}
+                                                    onClick={st ? () => ganti({ tanggal: tanggalStr(d) }) : undefined}
+                                                    title={st ? `Abnormality ${st} · klik untuk memilih` : undefined}
+                                                    className={`min-w-[92px] border-b border-r border-white/10 px-2 py-2 ${
+                                                        st ? 'cursor-pointer' : ''
+                                                    } ${
+                                                        st === 'Closed'
+                                                            ? 'bg-emerald-600 text-white'
+                                                            : st
+                                                              ? 'bg-amber-500 text-white'
+                                                              : akhirPekan(d)
+                                                                ? 'bg-[#2a1f4d] text-rose-200'
+                                                                : 'text-white/90'
+                                                    } ${dipilih ? 'ring-2 ring-inset ring-white' : ''}`}
+                                                >
+                                                    {d}
+                                                </th>
+                                            );
+                                        })}
                                     </tr>
                                 </thead>
 
@@ -964,7 +1143,7 @@ export default function Show({
                                     )}
 
                                     {checksheet.items.map((item) => {
-                                        const kondisi = results?.[`i${item.id}`]?.kondisi ?? '';
+                                        const kondisi = kondisiLokal?.[`i${item.id}`]?.kondisi ?? '';
 
                                         return (
                                             <tr key={item.id} className="group">
@@ -980,16 +1159,19 @@ export default function Show({
 
                                                 {hari.map((d) => {
                                                     const nilai = aksiLokal[`${item.id}-${tanggalStr(d)}`] ?? '';
+                                                    const st = statusTgl(d);
 
                                                     return (
                                                         <td
                                                             key={d}
                                                             className={`border-b border-r border-slate-100 px-1 py-1.5 text-center ${
-                                                                adaAbn(d)
-                                                                    ? 'bg-amber-50'
-                                                                    : akhirPekan(d)
-                                                                      ? 'bg-rose-50/40'
-                                                                      : ''
+                                                                st === 'Closed'
+                                                                    ? 'bg-emerald-50/60'
+                                                                    : st
+                                                                      ? 'bg-amber-50'
+                                                                      : akhirPekan(d)
+                                                                        ? 'bg-rose-50/40'
+                                                                        : ''
                                                             }`}
                                                         >
                                                             <select
@@ -1000,7 +1182,7 @@ export default function Show({
                                                                 className={`h-7 w-[84px] cursor-pointer rounded-md border px-1 text-[11px] font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                                                     nilai
                                                                         ? AKSI_WARNA[nilai]
-                                                                        : adaAbn(d)
+                                                                        : st && st !== 'Closed'
                                                                           ? 'border-amber-400 bg-white text-amber-400'
                                                                           : 'border-slate-200 bg-white text-slate-300 hover:border-blue-300'
                                                                 }`}
@@ -1017,28 +1199,22 @@ export default function Show({
                                                 })}
 
                                                 <td className="border-b border-l border-r border-slate-100 px-2 py-2 text-center">
-                                                    <select
+                                                    <KondisiRadio
+                                                        name={`kondisi-${item.id}`}
                                                         value={kondisi}
-                                                        disabled={!record}
-                                                        onChange={(e) => pilihKondisi(item, e.target.value)}
-                                                        className={`h-7 w-[72px] cursor-pointer rounded-md border px-1 text-[11px] font-bold outline-none transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                                                            kondisi
-                                                                ? KONDISI_STYLE[kondisi]
-                                                                : 'border-slate-200 bg-white text-slate-300 hover:border-blue-300'
-                                                        }`}
-                                                    >
-                                                        <option value="" className="text-slate-700">—</option>
-                                                        <option value="OK" className="text-slate-700">OK</option>
-                                                        <option value="NG" className="text-slate-700">NG</option>
-                                                    </select>
+                                                        disabled={!record || !tanggalAktif}
+                                                        onPilih={(v) => pilihKondisi(item, v)}
+                                                    />
                                                 </td>
 
                                                 <td className="border-b border-r border-slate-100 px-1 py-1">
                                                     {record && (
                                                         <KeteranganInput
+                                                            key={`${item.id}-${tanggalAktif}`}
                                                             recordId={record.id}
                                                             itemId={item.id}
-                                                            value={results?.[`i${item.id}`]?.keterangan}
+                                                            tanggal={tanggalAktif}
+                                                            value={kondisiLokal?.[`i${item.id}`]?.keterangan}
                                                         />
                                                     )}
                                                 </td>
@@ -1084,8 +1260,8 @@ export default function Show({
                                 )}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
-                                Dari Check Sheet Prediktif. Status otomatis: semua Kondisi OK = Closed. Ada NG atau ada
-                                catatan kendala (mis. terkendala produksi) = Progress.
+                                Dari Check Sheet Prediktif. Status diubah manual lewat tombol <b>Tandai Closed</b> pada
+                                tanggal abnormality. Ada catatan kendala (mis. terkendala produksi) = Progress.
                             </p>
                             <p className="mt-1 text-xs text-slate-400">
                                 Abnormality hanya muncul di sini kalau di Check Sheet Prediktif kolom{' '}
@@ -1106,6 +1282,7 @@ export default function Show({
                                         checksheetId={checksheet.id}
                                         a={a}
                                         highlight={highlightAbnormality === a.id}
+                                        aktif={a.tanggal === tanggalAktif}
                                     />
                                 ))}
                             </div>

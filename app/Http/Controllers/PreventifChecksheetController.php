@@ -260,27 +260,6 @@ class PreventifChecksheetController extends Controller
             $aksiPerItem[$x->preventif_checksheet_item_id][$x->tanggal->format('Y-m-d')] = $x->aksi;
         }
 
-        // ACTION #1..#4 = 4 tanggal pelaksanaan pertama di bulan itu
-        $tanggalAksi = ($record?->aksis ?? collect())
-            ->map(fn ($x) => $x->tanggal->format('Y-m-d'))
-            ->unique()
-            ->sort()
-            ->values()
-            ->take(4);
-
-        $actions = $tanggalAksi
-            ->map(fn ($t) => [
-                'tanggal' => $t,
-                'label' => Carbon::parse($t)->translatedFormat('d M Y'),
-            ])
-            ->all();
-
-        $hasil = $record
-            ? PreventifChecksheetResult::where('preventif_checksheet_record_id', $record->id)
-                ->get()
-                ->keyBy('preventif_checksheet_item_id')
-            : collect();
-
         // abnormality item ini di bulan itu
         $abn = collect();
 
@@ -299,9 +278,47 @@ class PreventifChecksheetController extends Controller
                 ->get();
         }
 
-        $tanggalLabel = $tanggalAksi->isNotEmpty()
-            ? $tanggalAksi->map(fn ($t) => Carbon::parse($t)->translatedFormat('d F Y'))->implode(', ')
-            : ($abn->isNotEmpty() ? $abn->first()->tanggal->translatedFormat('d F Y') : '');
+        // BLOK = tanggal abnormality (kalau tidak ada: tanggal aksi yang terisi)
+        $tanggalBlok = $abn->map(fn ($a) => $a->tanggal->format('Y-m-d'))->unique()->values();
+
+        if ($tanggalBlok->isEmpty()) {
+            $tanggalBlok = collect($aksiPerItem)
+                ->flatMap(fn ($per) => array_keys($per))
+                ->unique()
+                ->sort()
+                ->values();
+        }
+
+        $actions = $tanggalBlok
+            ->map(fn ($t) => [
+                'tanggal' => $t,
+                'label' => Carbon::parse($t)->translatedFormat('d M Y'),
+            ])
+            ->all();
+
+        // kondisi + keterangan per item per tanggal
+        $kondisiPerItem = [];
+        $ketPerItem = [];
+
+        if ($record) {
+            foreach (PreventifChecksheetResult::where('preventif_checksheet_record_id', $record->id)->get() as $r) {
+                $tgl = substr((string) $r->tanggal, 0, 10);
+
+                if (! $tgl) {
+                    continue;
+                }
+
+                $kondisiPerItem[$r->preventif_checksheet_item_id][$tgl] = $r->kondisi;
+
+                if (filled($r->keterangan)) {
+                    $ketPerItem[$r->preventif_checksheet_item_id][$tgl] = $r->keterangan;
+                }
+            }
+        }
+
+        $tanggalLabel = $tanggalBlok
+            ->map(fn ($t) => Carbon::parse($t)->translatedFormat('d F Y'))
+            ->implode(', ');
 
         $export = new PreventifChecksheetFormExport([
             'nama_equipment' => $cs->nama_equipment,
@@ -317,8 +334,8 @@ class PreventifChecksheetController extends Controller
                 'inspection_point' => $i->inspection_point,
                 'standar' => $i->standar,
                 'aksi' => $aksiPerItem[$i->id] ?? [],
-                'kondisi' => $hasil->get($i->id)?->kondisi,
-                'keterangan' => $hasil->get($i->id)?->keterangan,
+                'kondisi' => $kondisiPerItem[$i->id] ?? [],     // [tanggal => OK/NG]
+                'keterangan' => $ketPerItem[$i->id] ?? [],      // [tanggal => teks]
             ])->all(),
             'abnormalities' => $abn->map(fn ($a) => [
                 'tanggal' => $a->tanggal->format('d/m/Y'),
@@ -350,11 +367,11 @@ class PreventifChecksheetController extends Controller
         $bulan = max(1, min(12, (int) $request->input('bulan', now()->month)));
         $tahun = max(2020, min(2040, (int) $request->input('tahun', now()->year)));
 
-        // satu form per bulan: dibuat otomatis kalau belum ada
         $record = $cs->records()->firstOrCreate(['tahun' => $tahun, 'bulan' => $bulan]);
 
-        // abnormality item ini pada bulan yang dipilih
         $abnormalities = collect();
+        $tanggalList = collect();
+        $tanggalAktif = null;
         $headerOtomatis = null;
 
         if ($cs->preventif_mesin_id) {
@@ -377,33 +394,66 @@ class PreventifChecksheetController extends Controller
 
             $abnormalities = $lista->map(fn ($a) => $this->formatAbnormality($a))->values();
 
-            // Header form: hari/tanggal ikut abnormality
-            // (yang dibuka dari notifikasi, kalau tidak ada = yang paling baru)
-            $target = $request->filled('abnormality')
-                ? $lista->firstWhere('id', $request->integer('abnormality'))
-                : null;
+            // ringkasan per tanggal abnormality
+            $tanggalList = $lista
+                ->groupBy(fn ($a) => $a->tanggal->format('Y-m-d'))
+                ->map(function ($grup, $tgl) {
+                    $s = $grup->map(fn ($a) => $this->normalisasiStatus($a->status));
 
-            $target ??= $lista->last();
+                    return [
+                        'tanggal' => $tgl,
+                        'tanggal_format' => $grup->first()->tanggal->translatedFormat('d F Y'),
+                        'jumlah' => $grup->count(),
+                        'status' => $s->contains('Open')
+                            ? 'Open'
+                            : ($s->contains('Progress') ? 'Progress' : 'Closed'),
+                    ];
+                })
+                ->values();
 
-            if ($target) {
+            // tanggal aktif: ?tanggal= > tanggal dari ?abnormality= > yang belum Closed > terakhir
+            $pilihan = $request->input('tanggal');
+
+            if (! $request->filled('tanggal') && $request->filled('abnormality')) {
+                $dari = $lista->firstWhere('id', $request->integer('abnormality'));
+                $pilihan = $dari?->tanggal->format('Y-m-d');
+            }
+
+            if (! $pilihan || ! $tanggalList->contains('tanggal', $pilihan)) {
+                $pilihan = data_get($tanggalList->first(fn ($t) => $t['status'] !== 'Closed'), 'tanggal')
+                    ?? data_get($tanggalList->last(), 'tanggal');
+            }
+
+            $tanggalAktif = $pilihan;
+
+            if ($tanggalAktif) {
+                $picAbn = $lista
+                    ->filter(fn ($a) => $a->tanggal->format('Y-m-d') === $tanggalAktif)
+                    ->pluck('pic')
+                    ->filter()
+                    ->first();
+
                 $headerOtomatis = [
-                    'tanggal' => $target->tanggal->format('Y-m-d'),
-                    'tanggal_format' => $target->tanggal->translatedFormat('l, d F Y'),
-                    'pic' => $target->pic,
+                    'tanggal' => $tanggalAktif,
+                    'tanggal_format' => Carbon::parse($tanggalAktif)->translatedFormat('l, d F Y'),
+                    'pic' => $picAbn,
                 ];
 
-                // PIC pelaksana otomatis dari PIC abnormality (hanya kalau belum diisi)
-                if (blank($record->pic_pelaksana) && filled($target->pic)) {
-                    $record->update(['pic_pelaksana' => $target->pic]);
+                if (blank($record->pic_pelaksana) && filled($picAbn)) {
+                    $record->update(['pic_pelaksana' => $picAbn]);
                 }
             }
         }
 
-        // key "i{id}" / "{itemId}-{tanggal}" supaya selalu jadi object di JSON
+        // Kondisi / keterangan HANYA untuk tanggal aktif
         $results = [];
         $aksi = [];
 
         foreach ($record->results as $r) {
+            if (! $tanggalAktif || substr((string) $r->tanggal, 0, 10) !== $tanggalAktif) {
+                continue;
+            }
+
             $results['i' . $r->preventif_checksheet_item_id] = [
                 'kondisi' => $r->kondisi,
                 'keterangan' => $r->keterangan,
@@ -413,7 +463,7 @@ class PreventifChecksheetController extends Controller
         foreach ($record->aksis as $x) {
             $aksi[$x->preventif_checksheet_item_id . '-' . $x->tanggal->format('Y-m-d')] = $x->aksi;
         }
-        
+
         $riwayat = $cs->records()
             ->withCount('aksis')
             ->with('results:id,preventif_checksheet_record_id,kondisi')
@@ -459,6 +509,8 @@ class PreventifChecksheetController extends Controller
             'aksi' => (object) $aksi,
             'headerOtomatis' => $headerOtomatis,
             'abnormalities' => $abnormalities,
+            'tanggalList' => $tanggalList,
+            'tanggalAktif' => $tanggalAktif,
             'highlightAbnormality' => $request->integer('abnormality') ?: null,
             'divisis' => PreventifDivisi::orderBy('urutan')->orderBy('id')->pluck('nama'),
             'preventifOptions' => $this->preventifOptions(),
@@ -643,15 +695,18 @@ class PreventifChecksheetController extends Controller
     }
 
     /** Kondisi (OK / NG) dan Keterangan. Mengubah Kondisi ikut memperbarui status abnormality. */
+    /** Kondisi (OK / NG) dan Keterangan, PER TANGGAL abnormality. Tidak mengubah status. */
     public function updateHasil(Request $request, PreventifChecksheetRecord $record)
     {
         $data = $request->validate([
             'item_id' => ['required', 'integer'],
+            'tanggal' => ['required', 'date_format:Y-m-d'],
             'kondisi' => ['nullable', Rule::in(['OK', 'NG'])],
             'keterangan' => ['nullable', 'string', 'max:500'],
         ]);
 
         $item = $this->itemMilik($record, $data['item_id']);
+        $this->pastikanDiBulanRecord($record, $data['tanggal']);
 
         $nilai = [];
 
@@ -667,86 +722,72 @@ class PreventifChecksheetController extends Controller
             [
                 'preventif_checksheet_record_id' => $record->id,
                 'preventif_checksheet_item_id' => $item->id,
+                'tanggal' => $data['tanggal'],
             ],
             $nilai
         );
 
-        if ($request->has('kondisi')) {
-            $pesan = $this->sinkronStatusAbnormality($record);
-
-            if ($pesan) {
-                return back()->with('success', $pesan);
-            }
-        }
-
         return back();
     }
 
-    /**
-     * Status abnormality bulan form ini otomatis dari Kondisi tiap baris:
-     *  - semua baris OK      -> Closed (ACT Schedule Preventif + centang Prediktif ikut)
-     *  - ada yang NG         -> Progress
-     *  - selain itu          -> Open (atau Progress kalau sudah ada catatan kendala)
-     *
-     * @return string|null pesan untuk toast kalau ada status yang berubah
-     */
-    private function sinkronStatusAbnormality(PreventifChecksheetRecord $record): ?string
+    private function pastikanDiBulanRecord(PreventifChecksheetRecord $record, string $tanggal): void
     {
+        $t = Carbon::createFromFormat('Y-m-d', $tanggal);
+
+        if ((int) $t->year !== (int) $record->tahun || (int) $t->month !== (int) $record->bulan) {
+            throw ValidationException::withMessages([
+                'tanggal' => 'Tanggal harus berada di bulan form ini.',
+            ]);
+        }
+    }
+
+    /**
+     * Tombol Closed / Buka lagi PER TANGGAL abnormality.
+     * closed = true  -> semua abnormality (item ini) di tanggal itu jadi Closed
+     *                   (+ centang Prediktif + ACT Schedule Preventif)
+     * closed = false -> dibuka lagi (Progress kalau sudah ada catatan, selain itu Open)
+     */
+    public function setStatusTanggal(Request $request, PreventifChecksheetRecord $record)
+    {
+        $data = $request->validate([
+            'tanggal' => ['required', 'date_format:Y-m-d'],
+            'closed' => ['required', 'boolean'],
+        ]);
+
+        $this->pastikanDiBulanRecord($record, $data['tanggal']);
+
         $cs = $record->checksheet;
 
-        if (! $cs || ! $cs->preventif_mesin_id) {
-            return null;
-        }
+        abort_unless($cs && $cs->preventif_mesin_id, 404);
 
-        $itemIds = $cs->items()->pluck('id');
-
-        if ($itemIds->isEmpty()) {
-            return null;
-        }
-
-        $kondisi = $record->results()
-            ->whereIn('preventif_checksheet_item_id', $itemIds)
-            ->pluck('kondisi');
-
-        $adaNg = $kondisi->contains('NG');
-        $semuaOk = ! $adaNg && $kondisi->filter(fn ($k) => $k === 'OK')->count() === $itemIds->count();
-
-        $statusBaru = $adaNg ? 'Progress' : ($semuaOk ? 'Closed' : 'Open');
-        $closed = $statusBaru === 'Closed';
-
-        $awal = Carbon::create($record->tahun, $record->bulan, 1)->startOfMonth()->toDateString();
-        $akhir = Carbon::create($record->tahun, $record->bulan, 1)->endOfMonth()->toDateString();
+        $closed = $request->boolean('closed');
 
         $lista = CheckSheetAbnormality::whereHas(
             'preventifMesins',
             fn ($q) => $q->where('preventif_mesins.no', $cs->preventif_mesin_id)
         )
-            ->whereBetween('tanggal', [$awal, $akhir])
+            ->whereDate('tanggal', $data['tanggal'])
             ->get();
 
+        if ($lista->isEmpty()) {
+            return back()->with('error', 'Tidak ada abnormality pada tanggal itu.');
+        }
+
         $item = PreventifMesin::find($cs->preventif_mesin_id);
-        $berubah = false;
         $actDitandai = false;
-        $statusAkhir = $statusBaru;
+        $berubah = 0;
 
-        DB::transaction(function () use ($lista, $statusBaru, $closed, $item, &$berubah, &$actDitandai, &$statusAkhir) {
+        DB::transaction(function () use ($lista, $closed, $item, &$actDitandai, &$berubah) {
             foreach ($lista as $a) {
-                // belum semua OK & tidak ada NG, tapi ada catatan kendala (mis. terkendala produksi)
-                // -> tetap Progress, bukan Open
-                $target = $statusBaru;
-
-                if ($target === 'Open' && $a->catatans()->exists()) {
-                    $target = 'Progress';
-                }
+                $target = $closed
+                    ? 'Closed'
+                    : ($a->catatans()->exists() ? 'Progress' : 'Open');
 
                 if ($this->normalisasiStatus($a->status) === $target) {
                     continue;
                 }
 
-                $berubah = true;
-                $statusAkhir = $target;
-
-                $tanggalSelesai = $target === 'Closed'
+                $tanggalSelesai = $closed
                     ? max($a->tanggal->toDateString(), now()->toDateString())
                     : null;
 
@@ -755,27 +796,29 @@ class PreventifChecksheetController extends Controller
                     'tanggal_selesai' => $tanggalSelesai,
                 ]);
 
-                // Closed -> kotak di Check Sheet Prediktif dipastikan tercentang
-                $this->sinkronkanChecklistPrediktif($a, $target === 'Closed');
+                $this->sinkronkanChecklistPrediktif($a, $closed);
 
-                if ($item && $this->sinkronkanAct($a, $item, $target === 'Closed', $tanggalSelesai)) {
+                if ($item && $this->sinkronkanAct($a, $item, $closed, $tanggalSelesai)) {
                     $actDitandai = true;
                 }
+
+                $berubah++;
             }
         });
 
-        if (! $berubah) {
-            return null;
+        $tgl = Carbon::createFromFormat('Y-m-d', $data['tanggal'])->translatedFormat('d F Y');
+
+        if ($berubah === 0) {
+            return back();
         }
 
-        return match ($statusAkhir) {
-            'Closed' => 'Semua inspection point OK, abnormality ditutup.'
-                . ($actDitandai ? ' ACT di Schedule Preventif sudah ditandai.' : ''),
-            'Progress' => $adaNg
-                ? 'Ada inspection point NG, status abnormality menjadi Progress.'
-                : 'Status abnormality menjadi Progress (ada catatan kendala).',
-            default => 'Status abnormality kembali Open.',
-        };
+        return back()->with(
+            'success',
+            $closed
+                ? "Abnormality tanggal {$tgl} ditutup (Closed)."
+                    . ($actDitandai ? ' ACT di Schedule Preventif sudah ditandai.' : '')
+                : "Abnormality tanggal {$tgl} dibuka kembali."
+        );
     }
 
     // =====================================================

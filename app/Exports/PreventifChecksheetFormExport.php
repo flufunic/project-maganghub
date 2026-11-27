@@ -92,6 +92,12 @@ class PreventifChecksheetFormExport
     {
         $d = $this->d;
 
+        // jumlah blok tanggal (minimal 4 supaya bentuk kertas tetap)
+        $B = max(4, count($d['actions']));
+        $last = 3 + 6 * $B + 1;          // indeks kolom Keterangan
+        $cL = $this->col($last);         // huruf kolom terakhir
+        $cKet = $cL;
+
         $ss = new Spreadsheet();
         $s = $ss->getActiveSheet();
         $s->setTitle(mb_substr(preg_replace('/[\\\\\/\?\*\[\]:]/', '', $d['nama_equipment']) ?: 'Checksheet', 0, 31));
@@ -102,25 +108,32 @@ class PreventifChecksheetFormExport
         $s->getColumnDimension('B')->setWidth(34);
         $s->getColumnDimension('C')->setWidth(18);
 
-        for ($i = 4; $i <= 23; $i++) {
-            $s->getColumnDimension($this->col($i))->setWidth(5.4);
+        for ($i = 4; $i < $last; $i++) {
+            // kolom ke-6 di tiap blok = Kondisi
+            $s->getColumnDimension($this->col($i))->setWidth(($i - 3) % 6 === 0 ? 7.5 : 5.4);
         }
 
-        $s->getColumnDimension('X')->setWidth(11);
-        $s->getColumnDimension('Y')->setWidth(30);
+        $s->getColumnDimension($cKet)->setWidth(30);
 
         // ---------- KEPALA FORM (baris 1-5) ----------
+        $cJudulAkhir = $this->col($last - 9);
+
         $s->mergeCells('A1:B5');
 
-        $s->mergeCells('C1:P3');
+        $s->mergeCells("C1:{$cJudulAkhir}3");
         $this->put($s, 'C1', 'CHECK LIST PREVENTIF MAINTENANCE');
         $s->getStyle('C1')->getFont()->setBold(true)->setSize(14);
-        $this->center($s, 'C1:P3');
+        $this->center($s, "C1:{$cJudulAkhir}3");
 
-        $s->mergeCells('C4:P5');
+        $s->mergeCells("C4:{$cJudulAkhir}5");
         $this->put($s, 'C4', 'NAMA EQUIPMENT: ' . $d['nama_equipment']);
         $s->getStyle('C4')->getFont()->setBold(true)->setSize(10);
-        $this->left($s, 'C4:P5');
+        $this->left($s, "C4:{$cJudulAkhir}5");
+
+        $iL1 = $this->col($last - 8);
+        $iL2 = $this->col($last - 7);
+        $iV1 = $this->col($last - 6);
+        $iV2 = $this->col($last - 4);
 
         $info = [
             1 => ['No. Dokumen', $d['nomor_dokumen'] ?? ''],
@@ -131,25 +144,29 @@ class PreventifChecksheetFormExport
         ];
 
         foreach ($info as $r => [$label, $nilai]) {
-            $s->mergeCells("Q{$r}:R{$r}");
-            $s->mergeCells("S{$r}:U{$r}");
-            $this->put($s, "Q{$r}", $label);
-            $this->put($s, "S{$r}", $nilai);
+            $s->mergeCells("{$iL1}{$r}:{$iL2}{$r}");
+            $s->mergeCells("{$iV1}{$r}:{$iV2}{$r}");
+            $this->put($s, "{$iL1}{$r}", $label);
+            $this->put($s, "{$iV1}{$r}", $nilai);
         }
 
-        $this->left($s, 'Q1:U5');
+        $this->left($s, "{$iL1}1:{$iV2}5");
 
         // kotak tanda tangan
-        $this->put($s, 'V1', 'Disetujui');
-        $this->put($s, 'W1', 'Diperiksa');
-        $s->mergeCells('X1:Y1');
-        $this->put($s, 'X1', 'Dibuat');
-        $s->mergeCells('V2:V5');
-        $s->mergeCells('W2:W5');
-        $s->mergeCells('X2:Y5');
-        $this->center($s, 'V1:Y5');
+        $tD = $this->col($last - 3);
+        $tP = $this->col($last - 2);
+        $tB1 = $this->col($last - 1);
 
-        $this->box($s, 'A1:Y5');
+        $this->put($s, "{$tD}1", 'Disetujui');
+        $this->put($s, "{$tP}1", 'Diperiksa');
+        $s->mergeCells("{$tB1}1:{$cL}1");
+        $this->put($s, "{$tB1}1", 'Dibuat');
+        $s->mergeCells("{$tD}2:{$tD}5");
+        $s->mergeCells("{$tP}2:{$tP}5");
+        $s->mergeCells("{$tB1}2:{$cL}5");
+        $this->center($s, "{$tD}1:{$cL}5");
+
+        $this->box($s, "A1:{$cL}5");
 
         // ---------- IDENTITAS (baris 7-11) ----------
         $identitas = [
@@ -164,27 +181,27 @@ class PreventifChecksheetFormExport
             $this->put($s, "B{$r}", $label);
             $s->getStyle("B{$r}")->getFont()->setBold(true);
 
-            $s->mergeCells("C{$r}:L{$r}");
+            $s->mergeCells("C{$r}:P{$r}");
             $this->put($s, "C{$r}", ': ' . $nilai);
-            $s->getStyle("C{$r}:L{$r}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOTTED);
-            $this->left($s, "C{$r}:L{$r}");
+            $s->getStyle("C{$r}:P{$r}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOTTED);
+            $this->left($s, "C{$r}:P{$r}");
         }
 
         // ---------- HEADER TABEL (baris 13-14) ----------
         $h1 = 13;
         $h2 = 14;
 
-        foreach (['A' => 'No', 'B' => 'Inspection Point', 'C' => 'Standar', 'X' => 'Kondisi terakhir', 'Y' => 'Keterangan'] as $c => $t) {
+        foreach (['A' => 'No', 'B' => 'Inspection Point', 'C' => 'Standar', $cKet => 'Keterangan'] as $c => $t) {
             $s->mergeCells("{$c}{$h1}:{$c}{$h2}");
             $this->put($s, "{$c}{$h1}", $t);
         }
 
-        for ($k = 0; $k < 4; $k++) {
-            $c1 = 4 + $k * 5;
+        for ($k = 0; $k < $B; $k++) {
+            $c1 = 4 + $k * 6;
             $awal = $this->col($c1);
-            $akhir = $this->col($c1 + 4);
+            $akhirBlok = $this->col($c1 + 5);
 
-            $s->mergeCells("{$awal}{$h1}:{$akhir}{$h1}");
+            $s->mergeCells("{$awal}{$h1}:{$akhirBlok}{$h1}");
 
             $judul = 'ACTION #' . ($k + 1);
 
@@ -202,15 +219,20 @@ class PreventifChecksheetFormExport
                 $s->getStyle($cell)->getAlignment()->setTextRotation(90);
                 $j++;
             }
+
+            // kolom Kondisi milik blok ini
+            $cellK = $this->col($c1 + 5) . $h2;
+            $this->put($s, $cellK, 'Kondisi');
+            $s->getStyle($cellK)->getAlignment()->setTextRotation(90);
         }
 
         $s->getRowDimension($h1)->setRowHeight(30);
         $s->getRowDimension($h2)->setRowHeight(52);
 
-        $s->getStyle("A{$h1}:Y{$h2}")->getFont()->setBold(true);
-        $this->center($s, "A{$h1}:Y{$h2}");
-        $this->fill($s, "A{$h1}:Y{$h2}", 'E7E6E6');
-        $this->box($s, "A{$h1}:Y{$h2}");
+        $s->getStyle("A{$h1}:{$cL}{$h2}")->getFont()->setBold(true);
+        $this->center($s, "A{$h1}:{$cL}{$h2}");
+        $this->fill($s, "A{$h1}:{$cL}{$h2}", 'E7E6E6');
+        $this->box($s, "A{$h1}:{$cL}{$h2}");
 
         // ---------- ISI TABEL ----------
         $mulai = $h2 + 1;
@@ -230,31 +252,56 @@ class PreventifChecksheetFormExport
             $this->put($s, "B{$r}", $item['inspection_point']);
             $this->put($s, "C{$r}", $item['standar'] ?? '');
 
-            foreach ($d['actions'] as $k => $act) {
-                $pilih = $item['aksi'][$act['tanggal']] ?? null;
+            $ketGabung = [];
 
-                if (! $pilih) {
-                    continue;
+            foreach ($d['actions'] as $k => $act) {
+                $c1 = 4 + $k * 6;
+                $tgl = $act['tanggal'];
+
+                $pilih = $item['aksi'][$tgl] ?? null;
+
+                if ($pilih) {
+                    $j = array_search($pilih, array_keys(self::AKSI), true);
+
+                    if ($j !== false) {
+                        $this->put($s, $this->col($c1 + $j) . $r, '✓');
+                    }
                 }
 
-                $j = array_search($pilih, array_keys(self::AKSI), true);
+                // Kondisi tanggal ini
+                $this->put($s, $this->col($c1 + 5) . $r, $item['kondisi'][$tgl] ?? '');
 
-                if ($j !== false) {
-                    $this->put($s, $this->col(4 + $k * 5 + $j) . $r, '✓');
+                if (filled($item['keterangan'][$tgl] ?? null)) {
+                    $ketGabung[$tgl] = $item['keterangan'][$tgl];
                 }
             }
 
-            $this->put($s, "X{$r}", $item['kondisi'] ?? '');
-            $this->put($s, "Y{$r}", $item['keterangan'] ?? '');
+            // Keterangan: kalau lebih dari 1 tanggal, diberi awalan dd/mm
+            $teks = [];
+
+            foreach ($ketGabung as $tgl => $isi) {
+                $teks[] = count($ketGabung) > 1
+                    ? substr($tgl, 8, 2) . '/' . substr($tgl, 5, 2) . ': ' . $isi
+                    : $isi;
+            }
+
+            $this->put($s, "{$cKet}{$r}", implode("\n", $teks));
         }
 
         $akhirItem = $mulai + $jumlah - 1;
 
+        $cTengahAkhir = $this->col($last - 1);
+
         $this->center($s, "A{$mulai}:A{$akhirItem}");
         $this->left($s, "B{$mulai}:C{$akhirItem}");
-        $this->center($s, "D{$mulai}:X{$akhirItem}");
-        $this->left($s, "Y{$mulai}:Y{$akhirItem}");
-        $s->getStyle("X{$mulai}:X{$akhirItem}")->getFont()->setBold(true);
+        $this->center($s, "D{$mulai}:{$cTengahAkhir}{$akhirItem}");
+        $this->left($s, "{$cKet}{$mulai}:{$cKet}{$akhirItem}");
+
+        // Kondisi (kolom ke-6 tiap blok) dibuat tebal
+        for ($k = 0; $k < $B; $k++) {
+            $ck = $this->col(4 + $k * 6 + 5);
+            $s->getStyle("{$ck}{$mulai}:{$ck}{$akhirItem}")->getFont()->setBold(true);
+        }
 
         // Inspect By / Approved
         $rIns = $akhirItem + 1;
@@ -266,17 +313,20 @@ class PreventifChecksheetFormExport
         $s->getRowDimension($rApp)->setRowHeight(24);
         $this->center($s, "C{$rIns}:C{$rApp}");
 
-        $this->box($s, "A{$mulai}:Y{$rApp}");
+        $this->box($s, "A{$mulai}:{$cL}{$rApp}");
 
         // ---------- TABEL ABNORMALITY + STANDARD PENGECEKAN ----------
         $ah = $rApp + 2;
+
+        $cStdA = $this->col($last - 1);   // Standard Pengecekan: 2 kolom terakhir
+        $cPicAkhir = $this->col($last - 2);
 
         $kolom = [
             ['A', 'B', 'Date'],
             ['C', 'K', 'Abnormality'],
             ['L', 'S', 'Countermeasure'],
             ['T', 'U', 'Status'],
-            ['V', 'W', 'PIC'],
+            ['V', $cPicAkhir, 'PIC'],
         ];
 
         foreach ($kolom as [$a, $b, $t]) {
@@ -284,9 +334,9 @@ class PreventifChecksheetFormExport
             $this->put($s, "{$a}{$ah}", $t);
         }
 
-        $s->getStyle("A{$ah}:W{$ah}")->getFont()->setBold(true);
-        $this->center($s, "A{$ah}:W{$ah}");
-        $this->fill($s, "A{$ah}:W{$ah}", 'BDD7EE');
+        $s->getStyle("A{$ah}:{$cPicAkhir}{$ah}")->getFont()->setBold(true);
+        $this->center($s, "A{$ah}:{$cPicAkhir}{$ah}");
+        $this->fill($s, "A{$ah}:{$cPicAkhir}{$ah}", 'BDD7EE');
 
         $n = max(count($d['abnormalities']), self::MIN_BARIS_ABN);
 
@@ -311,23 +361,23 @@ class PreventifChecksheetFormExport
 
         $akhirAbn = $ah + $n;
 
-        $this->left($s, 'A' . ($ah + 1) . ":W{$akhirAbn}");
+        $this->left($s, 'A' . ($ah + 1) . ":{$cPicAkhir}{$akhirAbn}");
         $this->center($s, 'A' . ($ah + 1) . ':B' . $akhirAbn);
         $this->center($s, 'T' . ($ah + 1) . ':U' . $akhirAbn);
-        $this->box($s, "A{$ah}:W{$akhirAbn}");
+        $this->box($s, "A{$ah}:{$cPicAkhir}{$akhirAbn}");
 
         // Standard Pengecekan
-        $s->mergeCells("X{$ah}:Y{$ah}");
-        $this->put($s, "X{$ah}", 'Standard Pengecekan');
-        $this->put($s, 'X' . ($ah + 1), 'NORMAL');
-        $this->put($s, 'Y' . ($ah + 1), 'OK');
-        $this->put($s, 'X' . ($ah + 2), 'RUSAK');
-        $this->put($s, 'Y' . ($ah + 2), 'NG');
+        $s->mergeCells("{$cStdA}{$ah}:{$cL}{$ah}");
+        $this->put($s, "{$cStdA}{$ah}", 'Standard Pengecekan');
+        $this->put($s, $cStdA . ($ah + 1), 'NORMAL');
+        $this->put($s, $cL . ($ah + 1), 'OK');
+        $this->put($s, $cStdA . ($ah + 2), 'RUSAK');
+        $this->put($s, $cL . ($ah + 2), 'NG');
 
-        $s->getStyle("X{$ah}")->getFont()->setBold(true);
-        $this->fill($s, "X{$ah}:Y{$ah}", 'BDD7EE');
-        $this->center($s, "X{$ah}:Y" . ($ah + 2));
-        $this->box($s, "X{$ah}:Y" . ($ah + 2));
+        $s->getStyle("{$cStdA}{$ah}")->getFont()->setBold(true);
+        $this->fill($s, "{$cStdA}{$ah}:{$cL}{$ah}", 'BDD7EE');
+        $this->center($s, "{$cStdA}{$ah}:{$cL}" . ($ah + 2));
+        $this->box($s, "{$cStdA}{$ah}:{$cL}" . ($ah + 2));
 
         // ---------- CETAK ----------
         $s->getPageSetup()
@@ -335,7 +385,7 @@ class PreventifChecksheetFormExport
             ->setPaperSize(PageSetup::PAPERSIZE_A4)
             ->setFitToWidth(1)
             ->setFitToHeight(0);
-        $s->getPageSetup()->setPrintArea("A1:Y{$akhirAbn}");
+        $s->getPageSetup()->setPrintArea("A1:{$cL}{$akhirAbn}");
         $s->getSheetView()->setZoomScale(90);
         $s->setShowGridlines(false);
 

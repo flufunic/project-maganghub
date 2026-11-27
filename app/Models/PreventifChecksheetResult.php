@@ -9,6 +9,7 @@ class PreventifChecksheetResult extends Model
     protected $fillable = [
         'preventif_checksheet_record_id',
         'preventif_checksheet_item_id',
+        'tanggal',
         'kondisi',
         'keterangan',
     ];
